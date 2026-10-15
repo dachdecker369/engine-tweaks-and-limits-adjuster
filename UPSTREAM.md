@@ -1,0 +1,15 @@
+## Archive
+
+| | |
+|---|---|
+| `HeapAdjusterEnhanced-master.zip` | https://github.com/Chiheb-Bacha/HeapAdjusterEnhanced |
+| `ModkitLimitAdjusterEnhanced-master.zip` | https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced |
+| `PackfileLimitAdjusterEnhanced-master.zip` | https://github.com/Chiheb-Bacha/PackfileLimitAdjusterEnhanced |
+| `RageOpenV-master.zip` | https://github.com/Chiheb-Bacha/RageOpenV |
+| `StraightToStoryMode-master.zip` | https://github.com/Chiheb-Bacha/StraightToStoryMode |
+| `vendor/MinHook/` | https://github.com/TsudaKageyu/minhook |
+
+## Notes
+
+- **Git History:** Archived ZIPs contain no `.git` data and no submodules. The original `.gitignore`, `.gitattributes` and `.gitmodules` files inside are unchanged.
+- **Edits** Changes belong in `source/`. Mark with a `// TweaksV:` comment.

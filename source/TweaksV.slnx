@@ -1,0 +1,8 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="TweaksV.vcxproj" Id="417ca19d-be00-4175-8984-b9d487b77e2e" />
+</Solution>

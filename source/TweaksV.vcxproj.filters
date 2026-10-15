@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Solution Explorer only: groups the files by the project they came from. On disk they share one folder. -->
+  <ItemGroup>
+    <Filter Include="TweaksV">
+      <UniqueIdentifier>{E237D3E8-FFA3-4BB3-A59E-AEA4FAB6295D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{82CD2E76-CA21-4C93-940E-10F7C0B761D4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeapAdjusterEnhanced">
+      <UniqueIdentifier>{ED71B1E3-B9D5-4F9C-9CBA-8C6595F3B2C1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ModkitLimitAdjusterEnhanced">
+      <UniqueIdentifier>{39AADB46-A54B-4023-A199-B2DF08B9504F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PackfileLimitAdjusterEnhanced">
+      <UniqueIdentifier>{35F24293-AC0D-4E9B-92F0-AAC11A8AD3AD}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RageOpenV">
+      <UniqueIdentifier>{B51F24F7-CBC4-49B5-913E-097F5C136CD4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="StraightToStoryMode">
+      <UniqueIdentifier>{9D4CF5F3-5EA7-455E-9C2C-9F51CC921EC8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MinHook">
+      <UniqueIdentifier>{F39B3B09-5489-40B0-B40A-92558779CAF3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
+    <ClCompile Include="TweaksVConflicts.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
+    <ClCompile Include="TweaksVIni.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
+    <ClCompile Include="TweaksVLog.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
+    <ClCompile Include="TweaksVPatch.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
+    <ClCompile Include="TweaksVSummary.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
+    <ClCompile Include="ClearLog.cpp">
+      <Filter>Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="MemScanner.cpp">
+      <Filter>Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="StubMemory.cpp">
+      <Filter>Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="HeapAdjusterEnhanced_Game.cpp">
+      <Filter>HeapAdjusterEnhanced</Filter>
+    </ClCompile>
+    <ClCompile Include="ModkitLimitAdjusterEnhanced_Game.cpp">
+      <Filter>ModkitLimitAdjusterEnhanced</Filter>
+    </ClCompile>
+    <ClCompile Include="ModkitLimitAdjusterEnhanced_Logging.cpp">
+      <Filter>ModkitLimitAdjusterEnhanced</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooking.cpp">
+      <Filter>PackfileLimitAdjusterEnhanced</Filter>
+    </ClCompile>
+    <ClCompile Include="PackfileLimitAdjusterEnhanced_Game.cpp">
+      <Filter>PackfileLimitAdjusterEnhanced</Filter>
+    </ClCompile>
+    <ClCompile Include="PackfileLimitAdjusterEnhanced_Logging.cpp">
+      <Filter>PackfileLimitAdjusterEnhanced</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomDevice.cpp">
+      <Filter>RageOpenV</Filter>
+    </ClCompile>
+    <ClCompile Include="fiDevice.cpp">
+      <Filter>RageOpenV</Filter>
+    </ClCompile>
+    <ClCompile Include="FileReadHooks.cpp">
+      <Filter>RageOpenV</Filter>
+    </ClCompile>
+    <ClCompile Include="log.cpp">
+      <Filter>RageOpenV</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>RageOpenV</Filter>
+    </ClCompile>
+    <ClCompile Include="PackfileEncryptionHooks.cpp">
+      <Filter>RageOpenV</Filter>
+    </ClCompile>
+    <ClCompile Include="StraightToStoryMode_Game.cpp">
+      <Filter>StraightToStoryMode</Filter>
+    </ClCompile>
+    <ClCompile Include="StraightToStoryMode_Logging.cpp">
+      <Filter>StraightToStoryMode</Filter>
+    </ClCompile>
+    <ClCompile Include="..\vendor\MinHook\src\buffer.c">
+      <Filter>MinHook</Filter>
+    </ClCompile>
+    <ClCompile Include="..\vendor\MinHook\src\hook.c">
+      <Filter>MinHook</Filter>
+    </ClCompile>
+    <ClCompile Include="..\vendor\MinHook\src\trampoline.c">
+      <Filter>MinHook</Filter>
+    </ClCompile>
+    <ClCompile Include="..\vendor\MinHook\src\hde\hde64.c">
+      <Filter>MinHook</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="TweaksVConflicts.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVIni.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVIniDefault.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVLog.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVPatch.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVSummary.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="ClearLog.h">
+      <Filter>Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="GameVersion.h">
+      <Filter>Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="IsEnhanced.h">
+      <Filter>Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="MemScanner.h">
+      <Filter>Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="StubMemory.h">
+      <Filter>Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="HeapAdjusterEnhanced_Game.h">
+      <Filter>HeapAdjusterEnhanced</Filter>
+    </ClInclude>
+    <ClInclude Include="pattern.h">
+      <Filter>HeapAdjusterEnhanced</Filter>
+    </ClInclude>
+    <ClInclude Include="ModkitLimitAdjusterEnhanced_Game.h">
+      <Filter>ModkitLimitAdjusterEnhanced</Filter>
+    </ClInclude>
+    <ClInclude Include="ModkitLimitAdjusterEnhanced_Logging.h">
+      <Filter>ModkitLimitAdjusterEnhanced</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooking.h">
+      <Filter>PackfileLimitAdjusterEnhanced</Filter>
+    </ClInclude>
+    <ClInclude Include="PackfileLimitAdjusterEnhanced_Game.h">
+      <Filter>PackfileLimitAdjusterEnhanced</Filter>
+    </ClInclude>
+    <ClInclude Include="PackfileLimitAdjusterEnhanced_Logging.h">
+      <Filter>PackfileLimitAdjusterEnhanced</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>RageOpenV</Filter>
+    </ClInclude>
+    <ClInclude Include="fiDevice.h">
+      <Filter>RageOpenV</Filter>
+    </ClInclude>
+    <ClInclude Include="fiPackfile.h">
+      <Filter>RageOpenV</Filter>
+    </ClInclude>
+    <ClInclude Include="log.h">
+      <Filter>RageOpenV</Filter>
+    </ClInclude>
+    <ClInclude Include="main.h">
+      <Filter>RageOpenV</Filter>
+    </ClInclude>
+    <ClInclude Include="memory.h">
+      <Filter>RageOpenV</Filter>
+    </ClInclude>
+    <ClInclude Include="rpf.h">
+      <Filter>RageOpenV</Filter>
+    </ClInclude>
+    <ClInclude Include="StraightToStoryMode_Game.h">
+      <Filter>StraightToStoryMode</Filter>
+    </ClInclude>
+    <ClInclude Include="StraightToStoryMode_Logging.h">
+      <Filter>StraightToStoryMode</Filter>
+    </ClInclude>
+    <ClInclude Include="..\vendor\MinHook\include\MinHook.h">
+      <Filter>MinHook</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc">
+      <Filter>TweaksV</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

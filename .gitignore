@@ -1,0 +1,7 @@
+# Built binaries and intermediate files
+x64/
+object/
+
+# Visual Studio's per-user files
+.vs/
+*.user

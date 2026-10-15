@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- TweaksV.asi: TweaksV's own code, the five merged plugins and MinHook (vendor\MinHook) in one
+       project. Builds go to x64\<Configuration>, intermediate files to object\<Configuration>. -->
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{417CA19D-BE00-4175-8984-B9D487B77E2E}</ProjectGuid>
+    <RootNamespace>TweaksV</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup>
+    <!-- TweaksV's version: in BuildInfo.h (the log header) and version.rc (the file's version info) -->
+    <TweaksVVersionMajor>1</TweaksVVersionMajor>
+    <TweaksVVersionMinor>0</TweaksVVersionMinor>
+    <TweaksVVersionPatch>0</TweaksVVersionPatch>
+    <TweaksVRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..'))</TweaksVRoot>
+    <TargetName>TweaksV</TargetName>
+    <TargetExt>.asi</TargetExt>
+    <OutDir>$(TweaksVRoot)x64\$(Configuration)\</OutDir>
+    <IntDir>$(TweaksVRoot)object\$(Configuration)\</IntDir>
+    <!-- No C++20 modules in TweaksV: skip preparing the standard library modules (two empty folders in object\) -->
+    <EnableStdModules>false</EnableStdModules>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <!-- Developer builds from the command line, never for a release (README, "Developer checks"):
+       -p:TweaksVTestBuild=true makes TEST_BREAK_PATTERN in TweaksV.ini work, and
+       -p:TweaksVAnalyze=true runs the MSVC code analysis. Both build into object\ only. -->
+  <PropertyGroup Condition="'$(TweaksVTestBuild)'=='true'">
+    <OutDir>$(TweaksVRoot)object\Test\$(Configuration)\</OutDir>
+    <IntDir>$(OutDir)</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TweaksVAnalyze)'=='true'">
+    <OutDir>$(TweaksVRoot)object\Analyze\$(Configuration)\</OutDir>
+    <IntDir>$(OutDir)</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <!-- $(IntDir) holds BuildInfo.h, written by the TweaksVBuildInfo target at the end of this file -->
+      <AdditionalIncludeDirectories>$(IntDir);$(TweaksVRoot)vendor\MinHook\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <ConformanceMode>true</ConformanceMode>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <!-- Off, as in the build tested in game: Visual Studio's defaults would add /JMC, /Zc:inline and /FC -->
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <RemoveUnreferencedCodeData>false</RemoveUnreferencedCodeData>
+      <UseFullPaths>false</UseFullPaths>
+    </ClCompile>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>version.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ImportLibrary>$(IntDir)$(TargetName).lib</ImportLibrary>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(TweaksVTestBuild)'=='true'">
+    <ClCompile>
+      <PreprocessorDefinitions>TWEAKSV_TEST_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(TweaksVAnalyze)'=='true'">
+    <ClCompile>
+      <AdditionalOptions>/analyze /analyze:external- %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <!-- TweaksV's own code gets strict warnings (/W4); the carried-over code keeps the default level -->
+    <ClCompile Include="dllmain.cpp">
+      <WarningLevel>Level4</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="TweaksVConflicts.cpp">
+      <WarningLevel>Level4</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="TweaksVIni.cpp">
+      <WarningLevel>Level4</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="TweaksVLog.cpp">
+      <WarningLevel>Level4</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="TweaksVPatch.cpp">
+      <WarningLevel>Level4</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="TweaksVSummary.cpp">
+      <WarningLevel>Level4</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="ClearLog.cpp" />
+    <ClCompile Include="MemScanner.cpp" />
+    <ClCompile Include="StubMemory.cpp" />
+    <ClCompile Include="HeapAdjusterEnhanced_Game.cpp" />
+    <ClCompile Include="ModkitLimitAdjusterEnhanced_Game.cpp" />
+    <ClCompile Include="ModkitLimitAdjusterEnhanced_Logging.cpp" />
+    <ClCompile Include="Hooking.cpp" />
+    <ClCompile Include="PackfileLimitAdjusterEnhanced_Game.cpp" />
+    <ClCompile Include="PackfileLimitAdjusterEnhanced_Logging.cpp" />
+    <ClCompile Include="CustomDevice.cpp" />
+    <ClCompile Include="fiDevice.cpp" />
+    <ClCompile Include="FileReadHooks.cpp" />
+    <ClCompile Include="log.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="PackfileEncryptionHooks.cpp" />
+    <ClCompile Include="StraightToStoryMode_Game.cpp" />
+    <ClCompile Include="StraightToStoryMode_Logging.cpp" />
+    <!-- MinHook v1.3.4, compiled unchanged from vendor\MinHook (x64 only: hde64, not hde32) -->
+    <ClCompile Include="..\vendor\MinHook\src\buffer.c" />
+    <ClCompile Include="..\vendor\MinHook\src\hook.c" />
+    <ClCompile Include="..\vendor\MinHook\src\trampoline.c" />
+    <ClCompile Include="..\vendor\MinHook\src\hde\hde64.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="TweaksVConflicts.h" />
+    <ClInclude Include="TweaksVIni.h" />
+    <ClInclude Include="TweaksVIniDefault.h" />
+    <ClInclude Include="TweaksVLog.h" />
+    <ClInclude Include="TweaksVPatch.h" />
+    <ClInclude Include="TweaksVSummary.h" />
+    <ClInclude Include="ClearLog.h" />
+    <ClInclude Include="GameVersion.h" />
+    <ClInclude Include="IsEnhanced.h" />
+    <ClInclude Include="MemScanner.h" />
+    <ClInclude Include="StubMemory.h" />
+    <ClInclude Include="HeapAdjusterEnhanced_Game.h" />
+    <ClInclude Include="pattern.h" />
+    <ClInclude Include="ModkitLimitAdjusterEnhanced_Game.h" />
+    <ClInclude Include="ModkitLimitAdjusterEnhanced_Logging.h" />
+    <ClInclude Include="Hooking.h" />
+    <ClInclude Include="PackfileLimitAdjusterEnhanced_Game.h" />
+    <ClInclude Include="PackfileLimitAdjusterEnhanced_Logging.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="fiDevice.h" />
+    <ClInclude Include="fiPackfile.h" />
+    <ClInclude Include="log.h" />
+    <ClInclude Include="main.h" />
+    <ClInclude Include="memory.h" />
+    <ClInclude Include="rpf.h" />
+    <ClInclude Include="StraightToStoryMode_Game.h" />
+    <ClInclude Include="StraightToStoryMode_Logging.h" />
+    <ClInclude Include="..\vendor\MinHook\include\MinHook.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- BuildInfo.h, for the log header (TweaksVLog.cpp) and version.rc: the version above and the git
+       commit ID, with "-dirty" for uncommitted changes (empty outside a git repository, so the log
+       says "unknown"). Written into $(IntDir) before every build, but only when its content
+       changes, so an unchanged ID causes no rebuild. -->
+  <Target Name="TweaksVBuildInfo" BeforeTargets="ClCompile;ResourceCompile">
+    <Exec Command="git rev-parse --short HEAD 2&gt;nul" WorkingDirectory="$(MSBuildThisFileDirectory)" ConsoleToMSBuild="true" IgnoreExitCode="true" EchoOff="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="TweaksVGitHash" />
+      <Output TaskParameter="ExitCode" PropertyName="TweaksVGitExitCode" />
+    </Exec>
+    <Exec Condition="'$(TweaksVGitExitCode)'=='0'" Command="git diff --quiet HEAD -- 2&gt;nul" WorkingDirectory="$(MSBuildThisFileDirectory)" IgnoreExitCode="true" EchoOff="true" StandardOutputImportance="low">
+      <Output TaskParameter="ExitCode" PropertyName="TweaksVGitDirtyExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <TweaksVGitHash Condition="'$(TweaksVGitExitCode)'!='0'"></TweaksVGitHash>
+      <TweaksVGitHash Condition="'$(TweaksVGitExitCode)'=='0' and '$(TweaksVGitDirtyExitCode)'!='0'">$(TweaksVGitHash)-dirty</TweaksVGitHash>
+    </PropertyGroup>
+    <ItemGroup>
+      <TweaksVBuildInfoLine Include="// Build information, written by TweaksV.vcxproj before every build. Do not edit." />
+      <TweaksVBuildInfoLine Include="#ifndef TWEAKSV_BUILDINFO_H" />
+      <TweaksVBuildInfoLine Include="#define TWEAKSV_BUILDINFO_H" />
+      <TweaksVBuildInfoLine Include="#define TWEAKSV_VERSION_MAJOR $(TweaksVVersionMajor)" />
+      <TweaksVBuildInfoLine Include="#define TWEAKSV_VERSION_MINOR $(TweaksVVersionMinor)" />
+      <TweaksVBuildInfoLine Include="#define TWEAKSV_VERSION_PATCH $(TweaksVVersionPatch)" />
+      <TweaksVBuildInfoLine Include="#define TWEAKSV_VERSION &quot;$(TweaksVVersionMajor).$(TweaksVVersionMinor).$(TweaksVVersionPatch)&quot;" />
+      <TweaksVBuildInfoLine Include="#define TWEAKSV_GIT_HASH &quot;$(TweaksVGitHash)&quot;" />
+      <TweaksVBuildInfoLine Include="#endif" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(IntDir)BuildInfo.h" Lines="@(TweaksVBuildInfoLine)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+</Project>
