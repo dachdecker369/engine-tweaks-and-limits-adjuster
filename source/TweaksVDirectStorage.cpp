@@ -4,7 +4,7 @@
 // With DirectStorage on, the game asks DirectStorage to open every file in its folder at start-up
 // (IDStorageFactory::OpenFile, read-only, shared for reading only) and keeps them open, so mods can
 // no longer write their own files there and scripts can no longer be reloaded while the game runs.
-//   UNLOCK_FILES    off by default: in the game folder, DirectStorage may open only the .rpf and .cache
+//   UNLOCK_FILES    on by default: in the game folder, DirectStorage may open only the .rpf and .cache
 //                   files it reads; OpenFile refuses the folder's other files as not found, so they stay
 //                   free. Files outside the game folder are never refused: the game reads its saves and
 //                   settings (Documents\Rockstar Games\...\Profiles) through OpenFile, too.
@@ -951,7 +951,7 @@ namespace TweaksV
 
 	void InitDirectStorage()
 	{
-		const bool unlock = GetIniBool(kSection, "UNLOCK_FILES", false);
+		const bool unlock = GetIniBool(kSection, "UNLOCK_FILES", true);
 		const bool logCalls = GetIniBool(kSection, "LOG_CALLS", false);
 		const bool logOpens = GetIniBool(kSection, "LOG_FILE_OPENS", false);
 		if (!unlock && !logCalls && !logOpens)

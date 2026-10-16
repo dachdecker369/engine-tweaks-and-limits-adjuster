@@ -77,7 +77,7 @@ SKIP_LANDING_PAGE=1
 [DIRECTSTORAGE_SETTINGS]
 ENABLED=1
 ; DirectStorage may open only the .rpf and .cache files in the game folder, so its other files stay free while the game runs
-UNLOCK_FILES=0
+UNLOCK_FILES=1
 ; TESTING ONLY: logs the game's DirectStorage calls (changes nothing)
 LOG_CALLS=0
 ; TESTING ONLY: logs every file in the game folder the game opens, and how (changes nothing)

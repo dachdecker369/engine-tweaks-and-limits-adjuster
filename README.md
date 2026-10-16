@@ -16,7 +16,7 @@ TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.
 
 With DirectStorage on, GTA V Enhanced opens the files in its folder at start-up, not just its archives, and keeps them open. Other programs can then only read them: while the game runs, mods can't write their own files there and scripts can't be reloaded.
 
-`UNLOCK_FILES=1` under `[DIRECTSTORAGE_SETTINGS]` in `TweaksV.ini` (off by default) lets DirectStorage open only the `.rpf` and `.cache` files in the game folder, the ones it reads there. Every other file in the game folder stays free. Files outside the game folder are never refused: the game reads its saves and settings through DirectStorage, too.
+`UNLOCK_FILES=1` under `[DIRECTSTORAGE_SETTINGS]` in `TweaksV.ini` (on by default) lets DirectStorage open only the `.rpf` and `.cache` files in the game folder, the ones it reads there. Every other file in the game folder stays free. Files outside the game folder are never refused: the game reads its saves and settings through DirectStorage, too.
 
 For testing, two more switches log what happens and change nothing:
 
