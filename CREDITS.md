@@ -26,5 +26,5 @@ TweaksV merges the projects below. All credit for the original research and code
 ## Libraries and tools
 
 - **Tsuda Kageyu** - MinHook - https://github.com/TsudaKageyu/minhook
-- **Alexander Blade** - Script Hook V, whose ASI loader files (`dinput8.dll`, `xinput1_4.dll`) load TweaksV. They are not bundled, and TweaksV does not use Script Hook V itself. - http://www.dev-c.com/gtav/scripthookv/
+- **Alexander Blade** - Script Hook V, whose ASI loader file (`xinput1_4.dll`) loads TweaksV. It is not bundled, and TweaksV does not use Script Hook V itself. - http://www.dev-c.com/gtav/scripthookv/
 - **ThirteenAG** - Ultimate ASI Loader, an alternative loader (not bundled) - https://github.com/ThirteenAG/Ultimate-ASI-Loader

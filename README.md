@@ -50,7 +50,7 @@ Developer checks - not for release (add the switch to the `msbuild` line above):
 1. Use GTA V Enhanced in Story Mode with BattlEye disabled. Never go online with mods.
 2. Remove the standalone versions of the five original plugins. Otherwise standalone modules take priority and disable the respective portions of `TweaksV.asi`.
 3. `TweaksV.asi` goes in the game folder next to `GTA5_Enhanced.exe`.
-4. Add the ASI loader files `dinput8.dll` and `xinput1_4.dll` from the [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) download. Script Hook V itself is not needed.
+4. Add the ASI loader file `xinput1_4.dll` from the [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) download. It is the only file needed; Script Hook V itself is not.
 
 ## Credits
 
