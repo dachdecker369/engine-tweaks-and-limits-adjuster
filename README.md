@@ -30,7 +30,7 @@ Open `source\TweaksV.slnx` in Visual Studio, choose **Release** or **Debug**, an
 Or use x64 Native Tools Command Prompt for VS:
 
 ```
-git clone <URL>
+git clone https://github.com/dachdecker369/engine-tweaks-and-limits-adjuster
 cd engine-tweaks-and-limits-adjuster
 msbuild source\TweaksV.slnx -p:Configuration=Release -p:Platform=x64
 ```

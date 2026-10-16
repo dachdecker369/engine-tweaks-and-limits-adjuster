@@ -9,7 +9,7 @@ Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game bui
 | **Game Build** | 1.0.1158.16 |
 | **Found** | 72 of the 72 patterns this build uses |
 | **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-M0..M2` and `R-E-D1..D2` run only with a newmods folder in the game directory (or in DIAGNOSTIC_MODE). |
-| **Matches** | All match exactly once except `P-E-R31a`, which matches twice (TweaksV uses the first match, the correct one). To check: boot once with `DIAGNOSTIC_MODE=1` and `CONSOLE=1` enabled. Log lists each pattern address and number of matches. Every pattern MUST match exactly once (plan section 5.9 - R7). |
+| **Matches** | All match exactly once. To check: boot once with `DIAGNOSTIC_MODE=1` and `CONSOLE=1` enabled. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern MUST match exactly once (plan section 5.9 - R7). |
 
 Build uses 72 of 76 patterns:
 - Packfile picks one of three direct size patterns and one of two references by game build.
@@ -99,7 +99,7 @@ References to the packfile array (`AdjustPackFileArrayLimit`, rel32 moved to the
 | P-E-R28 | `48 89 3d ? ? ? ? b9 ? ? ? ? ba ? ? ? ? e8 ? ? ? ? b9 ? ? ? ? 66 66 66 66 2e 0f 1f 84 00 00 00 00 00` | 3 | found | 0x1279B18 |
 | P-E-R29 | `48 89 3d ? ? ? ? b9 ? ? ? ? ba ? ? ? ? e8 ? ? ? ? b9 ? ? ? ? 0f 1f 40 00` | 3 | found | 0x127ABC1 |
 | P-E-R30 | `48 89 35 ? ? ? ? b9 ? ? ? ? ba ? ? ? ? e8 ? ? ? ? b9 ? ? ? ? 48 c7 44 08` | 3 | found | 0x1276ED5 |
-| P-E-R31a | `BF ? ? ? ? BE ? ? ? ? 4C 8D 05` | 13 (builds 1.0.1158.13 and later) | found (2 matches; the first is used) | 0x10F163 |
+| P-E-R31a | `BF 08 00 00 00 BE 10 00 00 00 4C 8D 05` | 13 (builds 1.0.1158.13 and later). The two constants are TweaksV's: upstream's `BF ? ? ? ? BE ? ? ? ? 4C 8D 05` also matched obfuscated code at 0x582A227 | found | 0x10F163 |
 | P-E-R31b | `41 ? ? ? ? ? ? ? ? ? ? 41 bb ? ? ? ? ? 8d` | 20 (older builds) | not used on current build | - |
 
 ## RageOpenV
@@ -133,5 +133,5 @@ References to the packfile array (`AdjustPackFileArrayLimit`, rel32 moved to the
 | Label | Pattern | Use | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
 | S-E1 | `0F 85 A9 00 00 00 48 8D 54` | splash screen: `jz` at match - 0x0D becomes `jmp` | found | 0x52DC67 |
-| S-E2 | `00 E9 ? 05 00 00 E8 ? 07` | legal screen: the 6-byte `jcc` at match - 0x0F is NOPed | found | 0x52F040 |
+| S-E2 | `00 E9 ? 05 00 00 E8 ? 07` | legal screen: the 6-byte `jz` (`0F 84`) at match - 0x0F is NOPed | found | 0x52F040 |
 | S-E3 | `E8 ? ? ? ? 8B 0D ? ? ? ? 83 C1 ? 84 C0` | landing page: its callee returns 0 | found | 0x1166F |

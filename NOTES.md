@@ -11,7 +11,7 @@
 - **MemScanner fixes:**
   - A pattern miss is logged and returns null instead of exiting the game;
   - Malformed patterns no longer throw;
-  - DIAGNOSTIC_MODE logs the address, match count and original bytes.
+  - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match.
 
 - **HeapAdjusterEnhanced merged:** `[HEAP_SETTINGS] HEAP_SIZE` (default 2000 MB) is read from `TweaksV.ini`, and its original code is kept in its own namespace. Fixes:
   - A missing pattern no longer crashes the game;
@@ -22,7 +22,7 @@
 
 - **StraightToStoryMode merged:** one `TweaksV.ini` switch per screen (`SKIP_SPLASH_SCREEN`, `SKIP_LEGAL_SCREEN`, `SKIP_LANDING_PAGE`). Fixes:
   - A missing pattern skips only that screen instead of quitting the game;
-  - The bytes are checked before writing, and already-patched screens are skipped quietly;
+  - The bytes are checked before writing (the splash and legal screens must still hold the game's own `jz`), and already-patched screens are skipped quietly;
   - The splash jump is computed from the game's own instruction;
   - A landing-page function hooked by another mod is left alone;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
@@ -41,6 +41,7 @@
   - The array is moved before the limits are raised, so a failure at any step leaves the game safe;
   - Every reference, both size limits and the hooked call are found and checked before anything is written;
   - All references must point to the game's own array, so it is not moved twice;
+  - The pattern for the reference that builds 1.0.1158.13 and later use now includes its two constants, so it no longer also matches obfuscated game code;
   - A call that another mod has already hooked is left alone;
   - The hook is written with the right page protection, and every page gets its original protection back;
   - The new array always has the full 65535 entries, as read/write data;
@@ -71,10 +72,5 @@ Known bugs and open issues in TweaksV.
 - **Where:** `fiDevice.cpp`, `rage::fiDeviceLocal::Seek64`. Only RageOpenV's experimental newmods folder is affected (`NEWMODS=1`; it is off by default).
 - **What:** for `SEEK_END`, the original RageOpenV code subtracts the distance, while Win32's `FILE_END` adds it, so the original's sign may be wrong.
 - **Status:** unconfirmed. The original behaviour is kept until it is known how the game calls this. If the game ever seeks from the end of a file with a non-zero distance, `TweaksV.log` says so once, in a line that names B-ROV-18. Nothing needs to be done unless that line appears.
+- **Tested:** one boot on 1.0.1158.16 with `NEWMODS=1`, `LOG_DEVICE=1` and an empty `newmods` folder. The newmods devices were mounted without a problem, but the game opened no file through them, so this code never ran. Confirming the sign needs a boot in which the game loads a file from the `newmods` folder.
 - **Workaround:** `NEWMODS=0` (the default) under `[RAGEOPENV_SETTINGS]` in `TweaksV.ini` turns newmods off.
-
-## SMALL TECHNICAL (from plan)
-
-- **T2** One pattern matches twice: Packfile's P-E-R31a, "BF ? ? ? ? BE ? ? ? ? 4C 8D 05". TweaksV uses the first match and checks that it points to the packfile array, so this is safe - but every pattern should match exactly once. Fix: make the pattern longer.
-- **T3** The legal screen's original bytes are known now: 0F 84 07 05 00 00. StraightToStoryMode could check exactly those instead of "any 6-byte conditional jump".
-- **T4** Newmods only: does the game ever seek from the end of a file with a non-zero distance? The original may have the sign wrong. TweaksV logs it once if it happens; nothing to do unless that line shows up.

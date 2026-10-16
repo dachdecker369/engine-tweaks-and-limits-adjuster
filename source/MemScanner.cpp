@@ -158,28 +158,33 @@ namespace MemScanner
     }
 
     // TweaksV: DIAGNOSTIC_MODE output - RVA, number of matches and the original bytes
-    // (plan 5.9 R7: a pattern that matches more than once should be made unique)
+    // (plan 5.9 R7: a pattern that matches more than once should be made unique). A pattern
+    // that matches more than once also gets one line per match with the bytes around it, so
+    // that a longer pattern can be chosen that matches only the place it is meant for (T2).
     static void LogPatternDiagnostics(const std::string& patternStr, const std::vector<uint8_t>& pattern, const std::string& mask, uint8_t* startAddress, uint64_t size, uint8_t* address)
     {
         if (!address) // only found patterns are described (code analysis C28182)
             return;
         const int maxCount = 100;
-        int matches = 0;
-        for (uint8_t* cur = address; cur && matches < maxCount;)
+        std::vector<uint8_t*> found; // every match, for the lines per match below
+        for (uint8_t* cur = address; cur && (int)found.size() < maxCount;)
         {
-            ++matches;
+            found.push_back(cur);
             uint64_t used = (uint64_t)(cur + 1 - startAddress);
             if (used >= size)
                 break;
             cur = FindPatternBmh(pattern, mask, cur + 1, size - used);
         }
+        const int matches = (int)found.size();
 
         auto& module = GetModuleInfo();
-        bool inModule = address >= module.base && address < module.base + module.size;
+        auto rva = [&module](const uint8_t* at) // 0 outside the game
+        {
+            return at >= module.base && at < module.base + module.size ? (unsigned long long)(at - module.base) : 0ULL;
+        };
         char text[96];
         snprintf(text, sizeof(text), " -> RVA 0x%llX, %d%s match%s, bytes:",
-            inModule ? (unsigned long long)(address - module.base) : 0ULL,
-            matches, matches >= maxCount ? "+" : "", matches == 1 ? "" : "es");
+            rva(address), matches, matches >= maxCount ? "+" : "", matches == 1 ? "" : "es");
 
         std::string line = "Pattern found: " + patternStr + text;
         for (size_t i = 0; i < pattern.size() && i < 32; i++)
@@ -189,6 +194,27 @@ namespace MemScanner
             line += byteText;
         }
         TweaksV::WriteLog("MemScanner", line);
+
+        if (matches < 2)
+            return;
+        // the first 10 matches: 16 bytes before each and 48 from its start, "|" marks the start
+        const uint8_t* scanEnd = startAddress + size;
+        for (int m = 0; m < matches && m < 10; m++)
+        {
+            const uint8_t* match = found[m];
+            const uint8_t* from = match - startAddress >= 16 ? match - 16 : startAddress;
+            const uint8_t* to = scanEnd - match >= 48 ? match + 48 : scanEnd;
+            snprintf(text, sizeof(text), "  match %d of %d%s at RVA 0x%llX:", m + 1, matches,
+                matches >= maxCount ? "+" : "", rva(match));
+            line = text;
+            for (const uint8_t* at = from; at < to; at++)
+            {
+                char byteText[6];
+                snprintf(byteText, sizeof(byteText), at == match ? " | %02X" : " %02X", *at);
+                line += byteText;
+            }
+            TweaksV::WriteLog("MemScanner", line);
+        }
     }
 
 #ifdef TWEAKSV_TEST_BUILD

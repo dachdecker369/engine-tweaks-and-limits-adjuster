@@ -149,7 +149,7 @@ void initializeGame()
 			{
 				Logging("Legal screen: already patched - skipped.");
 			}
-			else if (legal[0] != 0x0F || (legal[1] & 0xF0) != 0x80) // TweaksV: expect a 6-byte conditional jump "jcc rel32" (plan A, S-E2)
+			else if (legal[0] != 0x0F || legal[1] != 0x84) // TweaksV: must be "jz rel32", as in the game (0F 84 07 05 00 00 on 1.0.1158.16); the jump distance is not checked, as game updates change it (S-E2, T3)
 			{
 				TweaksV::ReportFailure("StraightToStoryMode", "The legal screen cannot be skipped: the game code found is "
 					"not the expected instruction (" + HexBytes(legal, 6) + ").");

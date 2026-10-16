@@ -342,8 +342,10 @@ void AdjustPackFileArrayLimit()
 		{ "48 89 35 ? ? ? ? b9 ? ? ? ? ba ? ? ? ? e8 ? ? ? ? b9 ? ? ? ? 48 c7 44 08", 3},
 	};
 
+	// TweaksV: the 1158.13+ pattern was "BF ? ? ? ? BE ? ? ? ? 4C 8D 05", which also matched obfuscated
+	// code further on (RVA 0x582A227 on 1.0.1158.16); with its two constants it matches only this reference (T2)
 	patternPairs.emplace_back(GetCurrentProcessVersionComparable() >= VERSION_1_1158_13_E.ToComparable() ?
-		PatternPair{ "BF ? ? ? ? BE ? ? ? ? 4C 8D 05", 13 } : PatternPair{ "41 ? ? ? ? ? ? ? ? ? ? 41 bb ? ? ? ? ? 8d", 20 });
+		PatternPair{ "BF 08 00 00 00 BE 10 00 00 00 4C 8D 05", 13 } : PatternPair{ "41 ? ? ? ? ? ? ? ? ? ? 41 bb ? ? ? ? ? 8d", 20 });
 
 	RelocateRelativePackFileArray(newArray, patternPairs);
 }
