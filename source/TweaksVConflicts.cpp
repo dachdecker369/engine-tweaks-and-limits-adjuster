@@ -25,7 +25,8 @@ namespace TweaksV
 		};
 
 		// The plugins TweaksV replaces. ZHeapAdjuster.asi is the rename the HeapAdjuster
-		// author recommends; OpenRPF.asi and OpenIV.asi do RageOpenV's job.
+		// author recommends; OpenRPF.asi and OpenIV.asi do RageOpenV's job, and alloc8or's
+		// DirectStorageFix.asi does the job of TweaksV's own DirectStorage part.
 		constexpr OldPlugin kOldPlugins[] = {
 			{ L"HeapAdjuster.asi", "HEAP_SETTINGS", "HeapAdjusterEnhanced" },
 			{ L"ZHeapAdjuster.asi", "HEAP_SETTINGS", "HeapAdjusterEnhanced" },
@@ -35,6 +36,7 @@ namespace TweaksV
 			{ L"OpenRPF.asi", "RAGEOPENV_SETTINGS", "RageOpenV" },
 			{ L"OpenIV.asi", "RAGEOPENV_SETTINGS", "RageOpenV" },
 			{ L"StraightToStoryMode.asi", "STRAIGHTTOSTORYMODE_SETTINGS", "StraightToStoryMode" },
+			{ L"DirectStorageFix.asi", "DIRECTSTORAGE_SETTINGS", "DirectStorage" },
 		};
 
 		// ASI loaders load .asi files from the game folder and these subfolders.

@@ -61,11 +61,15 @@
   - Its log switches (`LOG_INFO`, `LOG_MODS`, `LOG_DEVICE`) work at runtime, and cost nothing when off;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
-- **DirectStorage (TweaksV's own part, testing only):** `[DIRECTSTORAGE_SETTINGS]` in `TweaksV.ini` (`ENABLED`, `LOG_CALLS`, `LOG_FILE_OPENS`) logs how the game uses DirectStorage. It changes nothing in the game yet.
-  - `LOG_CALLS` logs the game's calls into `dstorage.dll`; with DIAGNOSTIC_MODE also the factory's functions and the configuration values;
-  - `LOG_FILE_OPENS` logs every open of a file or folder inside the game folder, with the access, sharing, result and caller, plus a summary every minute;
-  - With both off, nothing is hooked;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+- **DirectStorage (TweaksV's own part):** `[DIRECTSTORAGE_SETTINGS]` in `TweaksV.ini` (`ENABLED`, `UNLOCK_FILES`, `LOG_CALLS`, `LOG_FILE_OPENS`):
+  - `UNLOCK_FILES=1` (off by default) lets DirectStorage open only the `.rpf` and `.cache` files in the game folder. The game asks it to open every file in its folder at start-up and keeps them locked; the folder's other files are now refused as "not found", so they can be written, renamed and deleted while the game runs;
+  - Files outside the game folder are never refused: the game reads its saves and `pc_settings.bin` (`Documents\Rockstar Games\GTAV Enhanced\Profiles`) and its cloud files in `%TEMP%` through DirectStorage, too;
+  - It hooks the factory's `OpenFile` while the game creates the factory, before its first file, so it needs no game patterns. A summary 10 seconds later counts the files opened and refused;
+  - `LOG_CALLS` (testing) logs the game's calls into `dstorage.dll` and every `OpenFile`; with DIAGNOSTIC_MODE also the factory's functions and the configuration values;
+  - `LOG_FILE_OPENS` (testing) logs every open of a file or folder inside the game folder, with the access, sharing, result and caller, plus a summary every minute;
+  - alloc8or's `DirectStorageFix.asi` counts as an old plugin: with it installed, this part is switched off;
+  - It supports DRY_RUN and DIAGNOSTIC_MODE;
+  - Confirmed on 1.0.1158.16: of the 454 files the game asked DirectStorage for at start-up, the 180 `.rpf` and `.cache` files were opened and the other 274 refused (among them `TweaksV.asi`, `ScriptHookV.dll`, `xinput1_4.dll` and the text and INI files). The save loaded, the game ran normally, and a text file in the game folder could be renamed while playing.
 
 - **Hook:** `TweaksV.asi` stays loaded once enabled until the game exits.
 
@@ -80,10 +84,3 @@ Known bugs and open issues in TweaksV.
 - **Status:** unconfirmed. The original behaviour is kept until it is known how the game calls this. If the game ever seeks from the end of a file with a non-zero distance, `TweaksV.log` says so once, in a line that names B-ROV-18. Nothing needs to be done unless that line appears.
 - **Tested:** one boot on 1.0.1158.16 with `NEWMODS=1`, `LOG_DEVICE=1` and an empty `newmods` folder. The newmods devices were mounted without a problem, but the game opened no file through them, so this code never ran. Confirming the sign needs a boot in which the game loads a file from the `newmods` folder.
 - **Workaround:** `NEWMODS=0` (the default) under `[RAGEOPENV_SETTINGS]` in `TweaksV.ini` turns newmods off.
-
-### DirectStorage keeps the files in the game folder locked
-
-- **Where:** the game itself, with DirectStorage on; TweaksV does not cause it.
-- **What:** at start-up the game opens the files in its folder and subfolders through DirectStorage (`IDStorageFactory::OpenFile`, the factory's function [4]), read-only and shared for reading only, and keeps them open. On 1.0.1158.16 that was 454 files: 179 `.rpf` archives and `rpf.cache`, which DirectStorage reads, and 274 it never reads, among them `TweaksV.asi`, `ScriptHookV.dll`, `xinput1_4.dll`, text and INI files, and the `Redistributables` and `BattlEye` folders. While the game runs, those files can't be written, renamed or deleted.
-- **Status:** found with `LOG_FILE_OPENS`. The fix is next: DirectStorage may open only `.rpf` and `.cache` files.
-- **Workaround:** alloc8or's [DirectStorageFix](https://github.com/alloc8or/DirectStorageFix).

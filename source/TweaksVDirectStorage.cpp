@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - DirectStorage: how GTA V Enhanced opens the files in its folder.
+// TweaksV - DirectStorage: the files GTA V Enhanced keeps locked in its folder.
 //
-// With DirectStorage on (game 1.0.1013.17 and later), GTA V Enhanced keeps a handle open to every
-// file in its folder, so mods can no longer write their own files there and scripts can no longer be
-// reloaded while the game runs. Before TweaksV changes anything, this part finds out how the game
-// does it. For now it only logs, and changes nothing:
-//   LOG_CALLS       the game's calls into dstorage.dll (DStorageSetConfiguration, ...1 and
-//                   DStorageGetFactory) and the code that made them
-//   LOG_FILE_OPENS  every open (NtCreateFile) of a file or folder inside the game folder: the access
-//                   and sharing asked for, the result and the code that asked for it, plus a summary
-//                   every minute
+// With DirectStorage on, the game asks DirectStorage to open every file in its folder at start-up
+// (IDStorageFactory::OpenFile, read-only, shared for reading only) and keeps them open, so mods can
+// no longer write their own files there and scripts can no longer be reloaded while the game runs.
+//   UNLOCK_FILES    off by default: in the game folder, DirectStorage may open only the .rpf and .cache
+//                   files it reads; OpenFile refuses the folder's other files as not found, so they stay
+//                   free. Files outside the game folder are never refused: the game reads its saves and
+//                   settings (Documents\Rockstar Games\...\Profiles) through OpenFile, too.
+//   LOG_CALLS       testing: the game's calls into DirectStorage (DStorageSetConfiguration, ...1,
+//                   DStorageGetFactory and the factory's OpenFile) and the code that made them
+//   LOG_FILE_OPENS  testing: every open (NtCreateFile) of a file or folder inside the game folder:
+//                   the access and sharing asked for, the result and the code that asked for it, plus
+//                   a summary every minute
 // Written for TweaksV; the idea comes from alloc8or's DirectStorageFix.
 
 #include "TweaksVDirectStorage.h"
@@ -37,6 +40,7 @@
 #include "MinHook.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
+#include "TweaksVSummary.h"
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;	// TweaksV.asi itself
 
@@ -51,7 +55,10 @@ namespace TweaksV
 		constexpr uint64_t kMaxLines = 20000;	// open lines in all; then the opens are only counted
 		constexpr DWORD kSummaryEveryMs = 60000;
 
-		bool g_diagnostic = false;				// DIAGNOSTIC_MODE, read once: the hooks never read TweaksV.ini
+		// The switches, read once: the hooks never read TweaksV.ini.
+		bool g_unlockFiles = false;				// UNLOCK_FILES
+		bool g_logCalls = false;				// LOG_CALLS
+		bool g_diagnostic = false;				// DIAGNOSTIC_MODE
 		std::wstring g_gameFolder;				// without a trailing backslash
 
 		// This thread is inside one of the hooks below: whatever it opens there is not logged.
@@ -535,6 +542,264 @@ namespace TweaksV
 			return status;
 		}
 
+		// ---- UNLOCK_FILES: the factory's OpenFile
+
+		// IDStorageFactory, whose function [4] is OpenFile (after IUnknown's 3 and CreateQueue)
+		constexpr GUID kFactoryId = { 0x6924EA0C, 0xC3CD, 0x4826, { 0xB1, 0x0A, 0xF6, 0x4F, 0x4E, 0xD9, 0x27, 0xC1 } };
+		constexpr size_t kOpenFileSlot = 4;
+		constexpr DWORD kOpenFileSummaryMs = 10000;	// the game opens its files right after creating the factory
+
+		using OpenFileFn = HRESULT(STDMETHODCALLTYPE*)(void* factory, const WCHAR* path, REFIID riid, void** ppv);
+		OpenFileFn g_originalOpenFile = nullptr;
+		SRWLOCK g_openFileLock = SRWLOCK_INIT;
+		bool g_openFileHookTried = false;				// under g_openFileLock
+		std::atomic<uint64_t> g_openFileCalls{ 0 };
+		std::atomic<uint64_t> g_archives{ 0 };			// .rpf and .cache paths
+		std::atomic<uint64_t> g_refused{ 0 };
+		std::atomic<uint64_t> g_outside{ 0 };			// paths outside the game folder: never refused
+		std::atomic<uint64_t> g_unreadable{ 0 };		// paths that could not be read: passed on unchecked
+		std::atomic<bool> g_openFileSummaryDone{ false };
+
+		struct ExclusiveLock
+		{
+			SRWLOCK& lock;
+			explicit ExclusiveLock(SRWLOCK& l) : lock(l) { AcquireSRWLockExclusive(&lock); }
+			~ExclusiveLock() { ReleaseSRWLockExclusive(&lock); }
+			ExclusiveLock(const ExclusiveLock&) = delete;
+			ExclusiveLock& operator=(const ExclusiveLock&) = delete;
+		};
+
+		// True for a path that ends in .rpf or .cache, in any case: the files DirectStorage reads.
+		bool IsArchive(std::wstring_view path)
+		{
+			const size_t slash = path.find_last_of(L"\\/");
+			const std::wstring_view name = slash == std::wstring_view::npos ? path : path.substr(slash + 1);
+			const size_t dot = name.find_last_of(L'.');
+			if (dot == std::wstring_view::npos)
+				return false;
+			const std::wstring_view extension = name.substr(dot);
+			return (extension.size() == 4 && _wcsnicmp(extension.data(), L".rpf", 4) == 0) ||
+				(extension.size() == 6 && _wcsnicmp(extension.data(), L".cache", 6) == 0);
+		}
+
+		// Copies a path the game passed (at most capacity - 1 characters); complete is false if it was
+		// longer. False if it cannot be read.
+		bool CopyPathSafely(const wchar_t* path, wchar_t* buffer, size_t capacity, size_t* length, bool* complete)
+		{
+			__try
+			{
+				size_t n = 0;
+				while (n + 1 < capacity && path[n] != L'\0')
+				{
+					buffer[n] = path[n];
+					n++;
+				}
+				buffer[n] = L'\0';
+				*length = n;
+				*complete = path[n] == L'\0';
+				return true;
+			}
+			__except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+			{
+				return false;
+			}
+		}
+
+		// The full path of an OpenFile path (backslashes only): without a "\\?\" prefix, and a relative
+		// path made absolute from the current directory, as DirectStorage does. Empty if that fails.
+		std::wstring FullOpenFilePath(std::wstring_view path)
+		{
+			if (path.substr(0, 4) == L"\\\\?\\")
+				path.remove_prefix(4);
+			const bool absolute = (path.size() >= 3 && path[1] == L':' && path[2] == L'\\') || path.substr(0, 2) == L"\\\\";
+			if (absolute)
+				return std::wstring(path);
+			wchar_t buffer[2048];
+			const std::wstring relative(path);
+			const DWORD n = GetFullPathNameW(relative.c_str(), static_cast<DWORD>(std::size(buffer)), buffer, nullptr);
+			return n == 0 || n >= std::size(buffer) ? std::wstring() : std::wstring(buffer, n);
+		}
+
+		// "x64a.rpf" for a path inside the game folder, the full path otherwise
+		std::string ShortPath(std::wstring_view path)
+		{
+			const std::wstring full = FullOpenFilePath(path);
+			std::wstring_view relative;
+			return ToUtf8(!full.empty() && InGameFolder(full, relative) ? relative : (full.empty() ? path : std::wstring_view(full)));
+		}
+
+		void LogOpenFileSummary()
+		{
+			const uint64_t calls = g_openFileCalls.load();
+			const uint64_t archives = g_archives.load();
+			const uint64_t outside = g_outside.load();
+			const uint64_t unreadable = g_unreadable.load();
+			const std::string seconds = std::to_string(kOpenFileSummaryMs / 1000);
+			const std::string unread = unreadable ? ", " + std::to_string(unreadable) + " with an unreadable path passed on" : "";
+			if (g_unlockFiles)
+				WriteLog(kTag, "UNLOCK_FILES: in its first " + seconds + " seconds the game asked DirectStorage for " +
+					std::to_string(calls) + " files: " + std::to_string(archives) + " .rpf and .cache files were opened, " +
+					std::to_string(g_refused.load()) + " other files in the game folder refused, so they stay free for other " +
+					"programs" + (outside ? ", " + std::to_string(outside) + " outside the game folder opened as usual" : "") + unread + ".");
+			else
+				WriteLog(kTag, "OpenFile: in its first " + seconds + " seconds the game asked DirectStorage for " +
+					std::to_string(calls) + " files: " + std::to_string(archives) + " .rpf and .cache files, " +
+					std::to_string(calls - archives - outside - unreadable) + " other files in the game folder and " +
+					std::to_string(outside) + " outside it" + unread + " (UNLOCK_FILES=0 - all of them opened).");
+		}
+
+		DWORD WINAPI OpenFileSummaryThread(LPVOID)
+		{
+			Sleep(kOpenFileSummaryMs);
+			try
+			{
+				LogOpenFileSummary();
+			}
+			catch (...)
+			{
+			}
+			g_openFileSummaryDone = true;
+			return 0;
+		}
+
+		// LOG_CALLS: every call; otherwise only the refusals after the summary, which are rare.
+		void LogOpenFile(uint64_t number, std::wstring_view path, bool readable, bool refused, HRESULT result)
+		{
+			const std::string name = readable ? ShortPath(path) : std::string("(unreadable path)");
+			if (g_logCalls)
+			{
+				std::string text = "OpenFile #" + std::to_string(number) + ": " + name + " -> " +
+					(refused ? std::string("refused (in the game folder, not .rpf or .cache)") : HResultText(result));
+				if (number == 1)
+					text += ", from " + DescribeCallers(nullptr);
+				WriteLog(kTag, text);
+			}
+			else if (refused && g_openFileSummaryDone.load())
+			{
+				WriteLog(kTag, "UNLOCK_FILES: refused " + name + " (in the game folder, not .rpf or .cache).");
+			}
+		}
+
+		HRESULT STDMETHODCALLTYPE HookOpenFile(void* factory, const WCHAR* path, REFIID riid, void** ppv)
+		{
+			wchar_t copy[2048];
+			size_t length = 0;
+			bool complete = false;
+			const bool readable = path && CopyPathSafely(path, copy, std::size(copy), &length, &complete) && complete;
+			if (readable)
+				for (size_t i = 0; i < length; i++)
+					if (copy[i] == L'/')
+						copy[i] = L'\\';	// only in TweaksV's copy: the game's path is passed on as it is
+			const bool archive = readable && IsArchive({ copy, length });
+			std::wstring_view relative;
+			const std::wstring full = readable ? FullOpenFilePath({ copy, length }) : std::wstring();
+			const bool inside = !full.empty() && InGameFolder(full, relative);
+			const bool refuse = g_unlockFiles && inside && !archive;	// never outside the game folder: saves, settings
+
+			HRESULT result = S_OK;
+			if (refuse)
+			{
+				if (ppv)
+					*ppv = nullptr;
+				result = HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);	// as for a file that is not there
+			}
+			else
+			{
+				result = g_originalOpenFile(factory, path, riid, ppv);
+			}
+
+			const uint64_t number = ++g_openFileCalls;
+			if (archive)
+				++g_archives;
+			if (refuse)
+				++g_refused;
+			if (!readable)
+				++g_unreadable;
+			else if (!inside)
+				++g_outside;
+			if (!t_inside)
+			{
+				const DWORD lastError = GetLastError();
+				t_inside = true;
+				try
+				{
+					if (number == 1)
+					{
+						const HANDLE thread = CreateThread(nullptr, 0, OpenFileSummaryThread, nullptr, 0, nullptr);
+						if (thread)
+							CloseHandle(thread);
+					}
+					LogOpenFile(number, readable ? std::wstring_view(copy, length) : std::wstring_view(), readable, refuse, result);
+				}
+				catch (...)	// nothing may throw into the game
+				{
+				}
+				t_inside = false;
+				SetLastError(lastError);
+			}
+			return result;
+		}
+
+		// Hooks the factory's OpenFile, once: when the game has created the factory (riid, *ppv) and
+		// before it gets it back, so the hook sees its first OpenFile already.
+		void HookFactoryOpenFile(REFIID riid, void** ppv)
+		{
+			const ExclusiveLock lock(g_openFileLock);	// a second caller waits until OpenFile is hooked
+			// with UNLOCK_FILES a failure is a problem for the start-up summary; for LOG_CALLS alone a log line
+			const auto fail = [](const std::string& why)
+			{
+				if (g_unlockFiles)
+					ReportFailure(kTag, "The files in the game folder are not unlocked this session: " + why + ".");
+				else
+					WriteLog(kTag, "LOG_CALLS: OpenFile is not logged: " + why + ".");
+			};
+			if (!IsEqualGUID(riid, kFactoryId))
+			{
+				static bool reported = false;	// under g_openFileLock
+				if (!reported)
+					fail("the game asked for another DirectStorage interface, " + GuidText(riid) + ", whose functions TweaksV does not know");
+				reported = true;
+				return;
+			}
+			if (g_openFileHookTried)
+				return;
+			g_openFileHookTried = true;
+
+			void* factory = nullptr;
+			void* table = nullptr;
+			void* target = nullptr;
+			if (!CopyMemorySafely(&factory, ppv, sizeof(factory)) || !factory ||
+				!CopyMemorySafely(&table, factory, sizeof(table)) || !table ||
+				!CopyMemorySafely(&target, static_cast<void**>(table) + kOpenFileSlot, sizeof(target)) || !target)
+			{
+				fail("the factory's function table could not be read");
+				return;
+			}
+			uintptr_t base = 0;
+			const std::string module = ModuleName(target, base);
+			if (_stricmp(module.c_str(), "dstoragecore.dll") != 0 && _stricmp(module.c_str(), "dstorage.dll") != 0)
+			{
+				fail("the factory's OpenFile is not in DirectStorage's DLLs (" + DescribeCode(target) + ")");
+				return;
+			}
+
+			MH_STATUS status = MH_CreateHook(target, reinterpret_cast<LPVOID>(&HookOpenFile), reinterpret_cast<LPVOID*>(&g_originalOpenFile));
+			if (status == MH_OK)
+			{
+				status = MH_EnableHook(target);
+				if (status != MH_OK)
+					MH_RemoveHook(target);
+			}
+			if (status != MH_OK)
+				fail("OpenFile (" + DescribeCode(target) + ") could not be hooked (MinHook: " + MH_StatusToString(status) + ")");
+			else if (g_unlockFiles)
+				WriteLog(kTag, "UNLOCK_FILES: from now on DirectStorage may open only the .rpf and .cache files in the game "
+					"folder (OpenFile at " + DescribeCode(target) + " hooked); files outside it are not touched.");
+			else
+				WriteLog(kTag, "LOG_CALLS: the game's OpenFile calls are logged (OpenFile at " + DescribeCode(target) +
+					" hooked); UNLOCK_FILES=0, so every file is opened.");
+		}
+
 		// ---- LOG_CALLS
 
 		using GetFactoryFn = HRESULT(WINAPI*)(REFIID riid, void** ppv);
@@ -572,10 +837,15 @@ namespace TweaksV
 				t_inside = true;
 				try
 				{
-					WriteLog(kTag, "the game asked for the DirectStorage factory (call #" + std::to_string(++g_factoryCalls) +
-						", interface " + GuidText(riid) + ") -> " + HResultText(result) + ", from " + DescribeCallers(nullptr));
-					if (g_diagnostic && SUCCEEDED(result) && ppv)
-						LogFactoryFunctions(ppv);
+					if (g_logCalls)
+					{
+						WriteLog(kTag, "the game asked for the DirectStorage factory (call #" + std::to_string(++g_factoryCalls) +
+							", interface " + GuidText(riid) + ") -> " + HResultText(result) + ", from " + DescribeCallers(nullptr));
+						if (g_diagnostic && SUCCEEDED(result) && ppv)
+							LogFactoryFunctions(ppv);
+					}
+					if (SUCCEEDED(result) && ppv)
+						HookFactoryOpenFile(riid, ppv);
 				}
 				catch (...)
 				{
@@ -659,8 +929,7 @@ namespace TweaksV
 			}
 			if (status != MH_OK)
 			{
-				WriteLog(kTag, std::string(function) + " could not be hooked (MinHook: " + MH_StatusToString(status) +
-					") - it is not logged.");
+				WriteLog(kTag, std::string(function) + " could not be hooked (MinHook: " + MH_StatusToString(status) + ").");
 				return false;
 			}
 			return true;
@@ -682,25 +951,30 @@ namespace TweaksV
 
 	void InitDirectStorage()
 	{
+		const bool unlock = GetIniBool(kSection, "UNLOCK_FILES", false);
 		const bool logCalls = GetIniBool(kSection, "LOG_CALLS", false);
 		const bool logOpens = GetIniBool(kSection, "LOG_FILE_OPENS", false);
-		if (!logCalls && !logOpens)
+		if (!unlock && !logCalls && !logOpens)
 		{
-			WriteLog(kTag, "LOG_CALLS=0 and LOG_FILE_OPENS=0 - nothing to do (for now this part only logs).");
+			WriteLog(kTag, "UNLOCK_FILES=0, LOG_CALLS=0 and LOG_FILE_OPENS=0 - nothing to do.");
 			return;
 		}
 
+		g_unlockFiles = unlock;
+		g_logCalls = logCalls;
 		g_diagnostic = IsDiagnosticMode();
 		g_gameFolder = GetGameFolder();
+		const bool loaded = GetModuleHandleW(L"dstorage.dll") != nullptr;
 		WriteLog(kTag, "dstorage.dll " + FileVersionOf(g_gameFolder + L"\\dstorage.dll") + ", dstoragecore.dll " +
-			FileVersionOf(g_gameFolder + L"\\dstoragecore.dll") + "; dstorage.dll is " +
-			(GetModuleHandleW(L"dstorage.dll") ? "loaded" : "not loaded") + ".");
-		const std::wstring fix = FindDirectStorageFix();
+			FileVersionOf(g_gameFolder + L"\\dstoragecore.dll") + "; dstorage.dll is " + (loaded ? "loaded" : "not loaded") + ".");
+		const std::wstring fix = FindDirectStorageFix();	// only with CHECK_FOR_CONFLICTS=0: otherwise this part is off
 		if (!fix.empty())
-			WriteLog(kTag, "Note: " + ToUtf8(fix) + " is installed - what is logged includes its changes.");
+			WriteLog(kTag, "Note: " + ToUtf8(fix) + " is installed as well - it changes DirectStorage's file opens, too.");
 
 		if (IsDryRun())
 		{
+			if (unlock)
+				WriteLog(kTag, "DRY_RUN: would let DirectStorage open only .rpf and .cache files (UNLOCK_FILES).");
 			if (logCalls)
 				WriteLog(kTag, "DRY_RUN: would hook dstorage.dll to log the game's DirectStorage calls.");
 			if (logOpens)
@@ -711,7 +985,7 @@ namespace TweaksV
 		const MH_STATUS init = MH_Initialize();
 		if (init != MH_OK && init != MH_ERROR_ALREADY_INITIALIZED)
 		{
-			WriteLog(kTag, std::string("MinHook could not be initialised (") + MH_StatusToString(init) + ") - nothing is logged.");
+			WriteLog(kTag, std::string("MinHook could not be initialised (") + MH_StatusToString(init) + ") - nothing is unlocked or logged.");
 			return;
 		}
 
@@ -722,23 +996,34 @@ namespace TweaksV
 		g_kernelBase = RangeOf(GetModuleHandleW(L"KernelBase.dll"));
 		g_kernel32 = RangeOf(GetModuleHandleW(L"kernel32.dll"));
 
-		if (logCalls)
+		if (unlock || logCalls)
 		{
-			if (!GetModuleHandleW(L"dstorage.dll"))
+			if (!loaded)
 			{
-				WriteLog(kTag, "LOG_CALLS: dstorage.dll is not loaded - the game's DirectStorage calls are not logged.");
+				WriteLog(kTag, std::string("dstorage.dll is not loaded, so the game does not use DirectStorage here: there is ") +
+					"nothing to " + (unlock ? "unlock." : "log."));
 			}
 			else
 			{
-				int hooked = 0;
-				hooked += InstallHook(L"dstorage.dll", "DStorageSetConfiguration", reinterpret_cast<LPVOID>(&HookSetConfiguration),
-					reinterpret_cast<LPVOID*>(&g_originalSetConfiguration)) ? 1 : 0;
-				hooked += InstallHook(L"dstorage.dll", "DStorageSetConfiguration1", reinterpret_cast<LPVOID>(&HookSetConfiguration1),
-					reinterpret_cast<LPVOID*>(&g_originalSetConfiguration1)) ? 1 : 0;
-				hooked += InstallHook(L"dstorage.dll", "DStorageGetFactory", reinterpret_cast<LPVOID>(&HookGetFactory),
-					reinterpret_cast<LPVOID*>(&g_originalGetFactory)) ? 1 : 0;
-				WriteLog(kTag, "LOG_CALLS: the game's DirectStorage calls are logged (" + std::to_string(hooked) +
-					" of 3 functions hooked).");
+				// the factory's OpenFile is hooked when the game creates the factory (HookFactoryOpenFile)
+				const bool factory = InstallHook(L"dstorage.dll", "DStorageGetFactory", reinterpret_cast<LPVOID>(&HookGetFactory),
+					reinterpret_cast<LPVOID*>(&g_originalGetFactory));
+				if (logCalls)
+				{
+					int hooked = factory ? 1 : 0;
+					hooked += InstallHook(L"dstorage.dll", "DStorageSetConfiguration", reinterpret_cast<LPVOID>(&HookSetConfiguration),
+						reinterpret_cast<LPVOID*>(&g_originalSetConfiguration)) ? 1 : 0;
+					hooked += InstallHook(L"dstorage.dll", "DStorageSetConfiguration1", reinterpret_cast<LPVOID>(&HookSetConfiguration1),
+						reinterpret_cast<LPVOID*>(&g_originalSetConfiguration1)) ? 1 : 0;
+					WriteLog(kTag, "LOG_CALLS: the game's DirectStorage calls are logged (" + std::to_string(hooked) +
+						" of 3 functions hooked).");
+				}
+				if (unlock && factory)
+					WriteLog(kTag, "UNLOCK_FILES: when the game creates its DirectStorage factory, OpenFile is hooked so that "
+						"in the game folder only .rpf and .cache files can be opened.");
+				else if (unlock)
+					ReportFailure(kTag, "The files in the game folder are not unlocked this session: DStorageGetFactory could "
+						"not be hooked (details in TweaksV.log).");
 			}
 		}
 

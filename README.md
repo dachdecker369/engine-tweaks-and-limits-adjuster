@@ -16,12 +16,14 @@ TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.
 
 With DirectStorage on, GTA V Enhanced opens the files in its folder at start-up, not just its archives, and keeps them open. Other programs can then only read them: while the game runs, mods can't write their own files there and scripts can't be reloaded.
 
-For now, `[DIRECTSTORAGE_SETTINGS]` in `TweaksV.ini` only logs this. It is for testing and changes nothing in the game:
+`UNLOCK_FILES=1` under `[DIRECTSTORAGE_SETTINGS]` in `TweaksV.ini` (off by default) lets DirectStorage open only the `.rpf` and `.cache` files in the game folder, the ones it reads there. Every other file in the game folder stays free. Files outside the game folder are never refused: the game reads its saves and settings through DirectStorage, too.
 
-- `LOG_CALLS=1` logs the game's calls into DirectStorage.
+For testing, two more switches log what happens and change nothing:
+
+- `LOG_CALLS=1` logs the game's calls into DirectStorage, including every file it asks DirectStorage to open.
 - `LOG_FILE_OPENS=1` logs every file and folder in the game folder that is opened, with its access, sharing, result and caller.
 
-A fix that lets DirectStorage open only `.rpf` and `.cache` files is next. The idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/DirectStorageFix); TweaksV's code is its own.
+The idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/DirectStorageFix); TweaksV's code is its own. With `DirectStorageFix.asi` installed, TweaksV switches its own DirectStorage part off.
 
 ## Design
 
@@ -59,7 +61,7 @@ Developer checks - not for release (add the switch to the `msbuild` line above):
 ## Testing
 
 1. Use GTA V Enhanced in Story Mode with BattlEye disabled. Never go online with mods.
-2. Remove the standalone versions of the five original plugins. Otherwise standalone modules take priority and disable the respective portions of `TweaksV.asi`.
+2. Remove the standalone versions of the five original plugins and alloc8or's `DirectStorageFix.asi`. Otherwise standalone modules take priority and disable the respective portions of `TweaksV.asi`.
 3. `TweaksV.asi` goes in the game folder next to `GTA5_Enhanced.exe`.
 4. Add the ASI loader file `xinput1_4.dll` from the [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) download. It is the only file needed; Script Hook V itself is not.
 

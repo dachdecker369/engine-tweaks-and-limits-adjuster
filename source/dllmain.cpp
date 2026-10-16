@@ -70,7 +70,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 				RunPlugin("RageOpenV", [&] { phase1 = RageOpenV::DllMain(hModule, ul_reason_for_call, lpReserved) != FALSE; });
 			if (TweaksV::IsFeatureOn("STRAIGHTTOSTORYMODE_SETTINGS"))
 				RunPlugin("StraightToStoryMode", [] { StraightToStoryMode::initializeGame(); });
-			if (TweaksV::IsFeatureOn("DIRECTSTORAGE_SETTINGS"))		// TweaksV's own part; for now it only logs
+			if (TweaksV::IsFeatureOn("DIRECTSTORAGE_SETTINGS"))		// TweaksV's own part
 				RunPlugin("DirectStorage", [] { TweaksV::InitDirectStorage(); });
 
 			if (!phase1)											// 8. otherwise RageOpenV's hook
