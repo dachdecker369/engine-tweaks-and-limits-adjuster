@@ -1,6 +1,6 @@
 # TweaksV
 
-TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.com/Chiheb-Bacha) into one plugin: `TweaksV.asi`.
+TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.com/Chiheb-Bacha) into one plugin, `TweaksV.asi`, and adds a DirectStorage fix of its own.
 
 ## Plugins Merged
 
@@ -31,7 +31,7 @@ The idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/Di
 - **Generated Files:** `TweaksV.ini` and `TweaksV.log` are created on the first boot. Every feature can be switched off or on.
   - They go in the game folder, or in `%LOCALAPPDATA%\TweaksV` if the game folder is read-only.
   - The files in the game folder have priority.
-- **Merged Only:** Every original function keeps its name, each plugin lives in its own C++ namespace, and every change is marked `// TweaksV:`. Files keep their names except the `Game` and `Logging` shared files.
+- **Merged Code:** Every original function keeps its name, each plugin lives in its own C++ namespace, and every change is marked `// TweaksV:`. Files keep their names, except each plugin's `Game` and `Logging` files, which get the plugin's name in front (`StraightToStoryMode_Game.cpp`). TweaksV's own code, the DirectStorage part included, is in the `TweaksV*` files and `dllmain.cpp`.
 - **Upstream:** `upstream/` folder holds the original code as zip archives - makes future updates easier to compare.
 
 ## Building
@@ -67,7 +67,7 @@ Developer checks - not for release (add the switch to the `msbuild` line above):
 
 ## Credits
 
-All credit for the original research and code goes to the authors listed in [CREDITS.md](CREDITS.md).
+All credit for the merged plugins' research and code, and for the idea behind the DirectStorage part, goes to the authors listed in [CREDITS.md](CREDITS.md).
 
 Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

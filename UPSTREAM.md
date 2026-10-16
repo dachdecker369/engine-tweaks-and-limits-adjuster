@@ -1,3 +1,7 @@
+# Upstream
+
+The original projects TweaksV is based on, archived as they were merged.
+
 ## Archive
 
 | | |
@@ -12,4 +16,5 @@
 ## Notes
 
 - **Git History:** Archived ZIPs contain no `.git` data and no submodules. The original `.gitignore`, `.gitattributes` and `.gitmodules` files inside are unchanged.
-- **Edits** Changes belong in `source/`. Mark with a `// TweaksV:` comment.
+- **Edits:** Changes belong in `source/`. Mark with a `// TweaksV:` comment.
+- **DirectStorageFix:** alloc8or's [DirectStorageFix](https://github.com/alloc8or/DirectStorageFix) is not archived here. TweaksV's DirectStorage part uses none of its code, only the idea (see [CREDITS.md](CREDITS.md)).
