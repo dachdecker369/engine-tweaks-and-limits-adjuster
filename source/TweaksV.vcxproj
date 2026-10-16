@@ -33,7 +33,7 @@
     <!-- TweaksV's version: in BuildInfo.h (the log header) and version.rc (the file's version info) -->
     <TweaksVVersionMajor>1</TweaksVVersionMajor>
     <TweaksVVersionMinor>0</TweaksVVersionMinor>
-    <TweaksVVersionPatch>1</TweaksVVersionPatch>
+    <TweaksVVersionPatch>2</TweaksVVersionPatch>
     <TweaksVRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..'))</TweaksVRoot>
     <TargetName>TweaksV</TargetName>
     <TargetExt>.asi</TargetExt>
@@ -123,6 +123,9 @@
     <ClCompile Include="TweaksVConflicts.cpp">
       <WarningLevel>Level4</WarningLevel>
     </ClCompile>
+    <ClCompile Include="TweaksVDirectStorage.cpp">
+      <WarningLevel>Level4</WarningLevel>
+    </ClCompile>
     <ClCompile Include="TweaksVIni.cpp">
       <WarningLevel>Level4</WarningLevel>
     </ClCompile>
@@ -160,6 +163,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TweaksVConflicts.h" />
+    <ClInclude Include="TweaksVDirectStorage.h" />
     <ClInclude Include="TweaksVIni.h" />
     <ClInclude Include="TweaksVIniDefault.h" />
     <ClInclude Include="TweaksVLog.h" />

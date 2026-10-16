@@ -73,5 +73,12 @@ SKIP_SPLASH_SCREEN=1
 SKIP_LEGAL_SCREEN=1
 ; Skips straight into Story Mode
 SKIP_LANDING_PAGE=1
+
+[DIRECTSTORAGE_SETTINGS]
+ENABLED=1
+; TESTING ONLY: logs the game's DirectStorage calls (changes nothing)
+LOG_CALLS=0
+; TESTING ONLY: logs every file in the game folder the game opens, and how (changes nothing)
+LOG_FILE_OPENS=0
 )INI";
 }

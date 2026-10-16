@@ -12,6 +12,17 @@ TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.
 | [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV) |
 | [StraightToStoryMode](https://github.com/Chiheb-Bacha/StraightToStoryMode) |
 
+## DirectStorage
+
+With DirectStorage on, GTA V Enhanced opens the files in its folder at start-up, not just its archives, and keeps them open. Other programs can then only read them: while the game runs, mods can't write their own files there and scripts can't be reloaded.
+
+For now, `[DIRECTSTORAGE_SETTINGS]` in `TweaksV.ini` only logs this. It is for testing and changes nothing in the game:
+
+- `LOG_CALLS=1` logs the game's calls into DirectStorage.
+- `LOG_FILE_OPENS=1` logs every file and folder in the game folder that is opened, with its access, sharing, result and caller.
+
+A fix that lets DirectStorage open only `.rpf` and `.cache` files is next. The idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/DirectStorageFix); TweaksV's code is its own.
+
 ## Design
 
 - **GTA V Enhanced Only:** TweaksV does nothing in Legacy.

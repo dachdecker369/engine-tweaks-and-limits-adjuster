@@ -23,6 +23,10 @@ TweaksV merges the projects below. All credit for the original research and code
 - **Bas Timmer (NTAuthority) et al.** - the stub allocator
 - **crosire, kagikn and contributors** - the ScriptHookVDotNet memory scanner - https://github.com/scripthookvdotnet/scripthookvdotnet
 
+## Ideas behind TweaksV's own parts
+
+- **alloc8or** - DirectStorageFix, the idea behind TweaksV's DirectStorage part (only its description is used, none of its code) - https://github.com/alloc8or/DirectStorageFix
+
 ## Libraries and tools
 
 - **Tsuda Kageyu** - MinHook - https://github.com/TsudaKageyu/minhook

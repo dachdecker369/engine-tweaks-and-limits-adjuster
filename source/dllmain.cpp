@@ -2,16 +2,17 @@
 // TweaksV - merges HeapAdjusterEnhanced, ModkitLimitAdjusterEnhanced,
 // PackfileLimitAdjusterEnhanced, RageOpenV and StraightToStoryMode (by
 // Chiheb-Bacha) into one ASI plugin for GTA V Enhanced.
-// License: to be agreed before the first public release (see README.md).
+// License: GPL-3.0-only (see LICENSE).
 //
-// The one real DllMain (plan 5.5). The five plugins are merged in Phase D; their
-// calls go where step 7 is marked below.
+// The one real DllMain (plan 5.5). The five plugins' start functions are called at
+// step 7 below, TweaksV's own DirectStorage part right after them.
 
 #include <windows.h>
 
 #include "ClearLog.h"		// Shared: ClearLog()
 #include "IsEnhanced.h"		// Shared: IsEnhanced()
 #include "TweaksVConflicts.h"
+#include "TweaksVDirectStorage.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
 #include "TweaksVSummary.h"
@@ -69,6 +70,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 				RunPlugin("RageOpenV", [&] { phase1 = RageOpenV::DllMain(hModule, ul_reason_for_call, lpReserved) != FALSE; });
 			if (TweaksV::IsFeatureOn("STRAIGHTTOSTORYMODE_SETTINGS"))
 				RunPlugin("StraightToStoryMode", [] { StraightToStoryMode::initializeGame(); });
+			if (TweaksV::IsFeatureOn("DIRECTSTORAGE_SETTINGS"))		// TweaksV's own part; for now it only logs
+				RunPlugin("DirectStorage", [] { TweaksV::InitDirectStorage(); });
 
 			if (!phase1)											// 8. otherwise RageOpenV's hook
 				TweaksV::ShowStartupSummaryLater();					//    shows it, in Phase 1

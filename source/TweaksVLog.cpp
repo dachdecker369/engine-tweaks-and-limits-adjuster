@@ -239,7 +239,8 @@ namespace TweaksV
 			", ModkitLimitAdjusterEnhanced " + OnOff(IsFeatureOn("MODKIT_SETTINGS")) +
 			", PackfileLimitAdjusterEnhanced " + OnOff(IsFeatureOn("PACKFILE_SETTINGS")) +
 			", RageOpenV " + OnOff(IsFeatureOn("RAGEOPENV_SETTINGS")) +
-			", StraightToStoryMode " + OnOff(IsFeatureOn("STRAIGHTTOSTORYMODE_SETTINGS")));
+			", StraightToStoryMode " + OnOff(IsFeatureOn("STRAIGHTTOSTORYMODE_SETTINGS")) +
+			", DirectStorage " + OnOff(IsFeatureOn("DIRECTSTORAGE_SETTINGS")));
 		header.push_back("Sizes: HEAP_SIZE=" + GetIniString("HEAP_SETTINGS", "HEAP_SIZE", "2000") +
 			", MODKITARRAY_SIZE=" + GetIniString("MODKIT_SETTINGS", "MODKITARRAY_SIZE", "65536") +
 			", PACKFILEARRAY_SIZE=" + GetIniString("PACKFILE_SETTINGS", "PACKFILEARRAY_SIZE", "13000"));
@@ -253,6 +254,8 @@ namespace TweaksV
 		header.push_back("StraightToStoryMode: " + Switch("STRAIGHTTOSTORYMODE_SETTINGS", "SKIP_SPLASH_SCREEN", true) + " " +
 			Switch("STRAIGHTTOSTORYMODE_SETTINGS", "SKIP_LEGAL_SCREEN", true) + " " +
 			Switch("STRAIGHTTOSTORYMODE_SETTINGS", "SKIP_LANDING_PAGE", true));
+		header.push_back("DirectStorage: " + Switch("DIRECTSTORAGE_SETTINGS", "LOG_CALLS", false) + " " +
+			Switch("DIRECTSTORAGE_SETTINGS", "LOG_FILE_OPENS", false));
 		header.push_back("TweaksV: " + Switch("TWEAKSV", "LOG_TO_FILE", true) + " " +
 			Switch("TWEAKSV", "CONSOLE", false) + " " +
 			Switch("TWEAKSV", "SHOW_ERROR_POPUPS", true) + " " +
