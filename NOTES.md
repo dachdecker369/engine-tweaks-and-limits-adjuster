@@ -28,7 +28,7 @@
   - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match;
   - A new search: only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. It compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than the original search, which went through the whole image almost byte by byte.
 
-- **One patch module:** every change to the game's code goes through `TweaksVPatch`, one writer for bytes and one for redirected calls:
+- **One patch module:** every patch to the game's code goes through `TweaksVPatch`, one writer for bytes and one for redirected calls (a hook on a function's start - RageOpenV's file and archive functions, DirectStorage's - is MinHook's, see T-HARDEN):
   - A group of writes is all or nothing: every page is made writable first, so a page that cannot be changed leaves the game as it was;
   - Every page gets its own protection back, and the processor sees the new code;
   - A redirected call goes through a 16-byte jump near the game, which is written once and then only read and executed - never writable and executable at once (the originals' trampolines were both);
@@ -106,7 +106,7 @@
 - **Hook:** `TweaksV.asi` stays loaded once enabled until the game exits.
 
 - **Build:** all of TweaksV's code, its own and the merged plugins', builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
-  - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four.
+  - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four. Control Flow Guard and CET only take effect in a game that turns them on itself, which GTA V Enhanced 1.0.1158.16 does not; TweaksV carries them so that it never leaves a gap in a game that does, nor is refused by one.
 
 - **Tests:** `test\` holds fake-game test suites (302 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 

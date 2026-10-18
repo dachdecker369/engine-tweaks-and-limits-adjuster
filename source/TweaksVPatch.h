@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - the one place that changes the game's code: WriteCode writes bytes, RedirectCalls sends
+// TweaksV - the one place that patches the game's code: WriteCode writes bytes, RedirectCalls sends
 // calls to TweaksV. Both are all or nothing, give every page its own protection back and honour
 // DRY_RUN and DIAGNOSTIC_MODE, so no part of TweaksV has to. Plus small helpers for reading code.
+// A hook on a function's start - RageOpenV's file and archive functions, DirectStorage's - is
+// MinHook's (memory.h, TweaksVDirectStorage.cpp).
 #pragma once
 
 #include <windows.h>

@@ -80,10 +80,11 @@ public:
 		return memory(address ? address + offset : 0); // TweaksV: a pattern miss (0) stays 0
 	}
 
-	// TweaksV: rip(), nop(), make_jmp(), make_call(), set_call() and put() removed - TweaksV writes
+	// TweaksV: rip(), nop(), make_jmp(), make_call(), set_call() and put() removed - TweaksV patches
 	// game code only through TweaksVPatch.h (WriteCode, RedirectCalls), which keeps every write all
 	// or nothing, gives each page its own protection back and honours DRY_RUN and DIAGNOSTIC_MODE.
-	// ret(), call() and both make_jmp_ret() overloads were never used.
+	// A hook on a function's start is MinHook's (hook() below). ret(), call() and both
+	// make_jmp_ret() overloads were never used.
 
 	// TweaksV: returns false if the hook could not be created. It is queued, not enabled: each
 	// group enables all of its hooks at once with apply_hooks(), instead of every hook freezing

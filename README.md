@@ -32,6 +32,7 @@ The idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/Di
   - They go in the game folder, or in `%LOCALAPPDATA%\TweaksV` if the game folder is read-only.
   - The files in the game folder have priority.
 - **Merged Code:** Every original function keeps its name, each plugin lives in its own C++ namespace, and every change is marked `// TweaksV:`. Files keep their names, except each plugin's `Game` and `Logging` files, which get the plugin's name in front (`StraightToStoryMode_Game.cpp`). TweaksV's own code, the DirectStorage part included, is in the `TweaksV*` files and `dllmain.cpp`.
+- **Shared Code:** Each setting is one entry in the table in `TweaksVSettings.h`, each byte pattern one in `TweaksVPatterns.h` (listed in [PATTERNS.md](PATTERNS.md)), and each feature one in `TweaksVFeatures.cpp`. Patches to the game's code go through `TweaksVPatch`, hooks on its functions through MinHook. A new feature is an entry in these tables, plus its own code.
 - **Upstream:** `upstream/` folder holds the original code as zip archives - makes future updates easier to compare.
 
 ## Building

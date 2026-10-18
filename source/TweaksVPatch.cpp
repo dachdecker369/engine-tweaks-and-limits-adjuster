@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - the one place that changes the game's code (see TweaksVPatch.h).
+// TweaksV - the one place that patches the game's code (see TweaksVPatch.h).
 
 #include "TweaksVPatch.h"
 
