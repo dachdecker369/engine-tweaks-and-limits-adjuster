@@ -60,26 +60,25 @@ bool ParseHeaderHook(rage::fiPackfile* a1, const char* name, bool readHeader, vo
 		// TweaksV: always - the edition check around the shift is removed (F-ROV-7)
 		a1 = reinterpret_cast<rage::fiPackfile*>(reinterpret_cast<uintptr_t>(a1) + 0x8);
 		logger::log("mods", "[%s] fileCount /%d", __FUNCTION__, a1->filesCount);
+		// TweaksV: only an OPEN archive is changed, so the entry table of an encrypted one - every
+		// archive of the game - is no longer walked (upstream walked it and changed nothing)
+		if (currentEncryption != OPEN)
+			return ret;
 		// TweaksV: only a plausible entry table is walked (B-ROV-06)
 		if (!a1->entryTable || a1->filesCount < 0 || a1->filesCount > kMaxRpfEntries)
 		{
-			if (currentEncryption == OPEN)
-				logger::write("error", "[%s] %s: implausible entry table (%d entries) - left as it is", __FUNCTION__,
-					name ? name : "?", a1->filesCount);
+			logger::write("error", "[%s] %s: implausible entry table (%d entries) - left as it is", __FUNCTION__,
+				name ? name : "?", a1->filesCount);
 			return ret;
 		}
 		for (int i = 0; i < a1->filesCount; ++i)
 		{
 			Entry* v21 = (Entry*)(a1->entryTable + 16 * i);
 			if (v21->IsBinary() && v21->bin.nameOffset > 0 && v21->bin.isEncrypted)
-			{
-				if (currentEncryption == OPEN)
-					v21->bin.isEncrypted = 0xFEFFFFF;
-			}
+				v21->bin.isEncrypted = 0xFEFFFFF;
 		}
 
-		if (currentEncryption == OPEN)
-			a1->currentFileOffset = 0xFEFFFFF;
+		a1->currentFileOffset = 0xFEFFFFF;
 	}
 	return ret;
 }

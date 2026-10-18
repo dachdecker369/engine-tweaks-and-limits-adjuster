@@ -6,13 +6,11 @@
 #pragma once
 #include <cstdint>
 #include <string>
-#include <vector> // TweaksV: for the byte+mask overload below
 
 namespace MemScanner
 {
+    // TweaksV: the first match of a pattern such as "48 8D 0D ? ? ? ?" in GTA5_Enhanced.exe's code, or
+    // nullptr. The name is the original's; the search is TweaksV's (see MemScanner.cpp). The overloads
+    // with a start address or a size, and the byte+mask one, are removed: nothing used them.
     uint8_t* FindPatternBmh(const std::string& pattern);
-    uint8_t* FindPatternBmh(const std::string& pattern, uint8_t* startAddress);
-    uint8_t* FindPatternBmh(const std::string& pattern, uint8_t* startAddress, uint64_t size);
-    // TweaksV: the internal byte+mask overload, declared so HeapAdjuster's BytePattern can use it
-    uint8_t* FindPatternBmh(const std::vector<uint8_t>& pattern, const std::string& mask, uint8_t* startAddress, uint64_t size);
 }

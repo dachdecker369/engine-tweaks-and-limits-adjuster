@@ -1,6 +1,6 @@
 # Patterns
 
-Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game build each one was last verified on. The labels (`H-E1`, `P-E-R31a`, ...) are the ones the source comments use. Patterns are written exactly as in the source, where `?` matches any byte. RVA is where each pattern matched on 1.0.1158.16, counted from the start of `GTA5_Enhanced.exe` in memory.
+Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game build each one was last verified on. TweaksV searches only the game's code (its executable sections). The labels (`H-E1`, `P-E-R31a`, ...) are the ones the source comments use. Patterns are written exactly as in the source, where `?` matches any byte. RVA is where each pattern matched on 1.0.1158.16, counted from the start of `GTA5_Enhanced.exe` in memory.
 
 ## Status
 
@@ -8,7 +8,7 @@ Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game bui
 |---|---|
 | **Game Build** | 1.0.1158.16 |
 | **Found** | 72 of the 72 patterns this build uses |
-| **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-M0..M2` and `R-E-D1..D2` run only with `NEWMODS=1` and a newmods folder in the game directory (with `NEWMODS=1` and `DIAGNOSTIC_MODE=1`, also without the folder). |
+| **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-F1..F8` run only with a mods folder in the game directory (with `DIAGNOSTIC_MODE=1`, also without one). `R-E-M0..M2` and `R-E-D1..D2` run only with `NEWMODS=1` and a newmods folder in the game directory (with `NEWMODS=1` and `DIAGNOSTIC_MODE=1`, also without the folder). |
 | **Matches** | All match exactly once. To check: boot once with `DIAGNOSTIC_MODE=1` and `CONSOLE=1` enabled. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once. |
 
 Build uses 72 of 76 patterns:

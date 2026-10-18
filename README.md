@@ -53,7 +53,11 @@ msbuild source\TweaksV.slnx -p:Configuration=Release -p:Platform=x64
 - **No Redistributables:** C runtime is statically linked so players don't need it.
 - **Commits:** When the folder is a git repo, `TweaksV.log` lists the commit the build came from; otherwise it lists "unknown".
 
-Developer checks - not for release (add the switch to the `msbuild` line above):
+Developer checks - not for release:
+
+- **Tests:** `bash test/run_all.sh` in Git Bash, in the repository folder. It builds the Release and test builds of TweaksV and small fake-game programs, runs every test suite against them and deletes what it made in `object\` (`--keep` leaves it, `--no-build` skips building TweaksV). Building Release replaces `x64\Release\TweaksV.asi`.
+
+Add these switches to the `msbuild` line above:
 
 - **Code Analysis:** `-p:TweaksVAnalyze=true` runs the MSVC code analysis (`/analyze`). Builds into `object\Analyze`.
 - **Test Builds:** `-p:TweaksVTestBuild=true` gives `object\Test\Release\TweaksV.asi`. Add `TEST_BREAK_PATTERN=<pattern>` under `[TWEAKSV]` in `TweaksV.ini`, with the pattern written exactly as in [PATTERNS.md](PATTERNS.md). Pattern then counts as missing, and then you can watch its part be skipped cleanly. The log header will list `TEST BUILD`.

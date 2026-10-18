@@ -16,6 +16,7 @@ namespace RageOpenV // TweaksV: one namespace per original plugin
 // calling this function again (plan 4.2) - it was a plain bool (B-ROV-10)
 static std::atomic<bool> bInited{ false };
 void (*origGetSystemTimeAsFileTime)(LPFILETIME lpSystemTimeAsFileTime);
+static PVOID g_timeHookTarget = nullptr; // TweaksV: GetSystemTimeAsFileTime itself, to unhook it after the start-up
 
 // TweaksV: RageOpenV looks for mods\ and newmods\ in the current directory, as the original did;
 // says so in the log when that is not the game folder (B-ROV-21)
@@ -101,6 +102,13 @@ void HookGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
 		// TweaksV: one start-up summary for both moments (plan 5.5) - from a worker thread, because
 		// this hook runs on whichever thread first asks for the time and must not block it
 		TweaksV::ShowStartupSummaryLater();
+
+		// TweaksV: the hook's one job is done, so the game's later calls - it asks for the time
+		// constantly - go straight to Windows again. Disabled, not removed: a thread that is inside
+		// this function right now still calls the original through the trampoline, which stays.
+		if (g_timeHookTarget && MH_DisableHook(g_timeHookTarget) != MH_OK)
+			TweaksV::WriteLog("RageOpenV", "The GetSystemTimeAsFileTime hook could not be switched off - it stays and only "
+				"passes the calls on.");
 	}
 	origGetSystemTimeAsFileTime(lpSystemTimeAsFileTime);
 }
@@ -131,7 +139,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  dwReason, LPVOID lpReserved)
 		// Calling HookGetSystemTimeAsFileTime directly inside DllMain doesn't work (loader lock shenanigans)
 		// memory::IAT doesn't work on Enhanced since imports are obfuscated
 		// (TweaksV: the other edition's mention is dropped from the first line - F-ROV-3)
-		if (!memory::HookApi(L"kernel32.dll", "GetSystemTimeAsFileTime", (PVOID)HookGetSystemTimeAsFileTime, (PVOID*)&origGetSystemTimeAsFileTime)) {
+		if (!memory::HookApi(L"kernel32.dll", "GetSystemTimeAsFileTime", (PVOID)HookGetSystemTimeAsFileTime, (PVOID*)&origGetSystemTimeAsFileTime,
+			&g_timeHookTarget)) { // TweaksV: + the target, to unhook it after the start-up
 			logger::write("error", "Hooking failed error (%ld)", GetLastError()); // TweaksV: "error" - was "info"
 			TweaksV::ReportFailure("RageOpenV", "RageOpenV could not start: the GetSystemTimeAsFileTime hook failed "
 				"(details in TweaksV.log). The mods folder, OPEN archives and newmods are off this session.");

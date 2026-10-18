@@ -2,8 +2,9 @@
 // ClosedIV by martonp96 - https://github.com/Chiheb-Bacha/RageOpenV (GPL-3.0).
 // Modified for TweaksV; every change is marked "TweaksV:".
 #include "main.h"
-#include <unordered_map>
-#include <shared_mutex>
+#include <cstring>				// TweaksV: strnlen, memcpy
+#include <string_view>			// TweaksV
+#include <unordered_set>		// TweaksV: the mods folder index (was an unordered_map cache)
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
 #include "TweaksVIni.h"		// TweaksV: MODS_FOLDER, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVLog.h"		// TweaksV
@@ -23,48 +24,119 @@ inline GetFileTimeFn g_origGetFileTime1 = nullptr, g_origGetFileTime2 = nullptr;
 inline GetFileSizeFn g_origGetFileSize1 = nullptr, g_origGetFileSize2 = nullptr;
 inline GetAttrsFn g_origGetAttribs1 = nullptr, g_origGetAttribs2 = nullptr;
 
-static const uint8_t EXISTS = 1;
-static const uint8_t NOT_EXISTS = 2;
-static std::unordered_map<std::string, uint8_t> g_modsCache;
-static std::shared_mutex g_modsCacheMutex;
+// TweaksV: the mods folder is read once, before the hooks go on: every file and folder in it, as a
+// path relative to it in lower case with '/' between the names. The hooks only look paths up in
+// this set, which never changes afterwards - no file system call, no memory allocation and no lock
+// on the game's file calls (upstream built a string, took a lock and asked the file system for every
+// new path). Bounded: at most kMaxModsEntries entries, kMaxModsDepth folders deep, paths of at most
+// kMaxModsPath characters. A path with ".." or a drive is never in the set, so nothing outside the
+// mods folder is ever used.
+static constexpr size_t kMaxModsEntries = 200000;
+static constexpr size_t kMaxModsDepth = 32;
+static constexpr size_t kMaxModsPath = 259;
 
-static bool TryModsPath(const char* path, std::string& outModsPath)
+struct ModsPathHash
 {
-    // TweaksV: nothing may throw back into the game - on any error the file is not redirected
-    try
-    {
-    outModsPath = std::string("mods/") + path;
+    using is_transparent = void;
+    size_t operator()(std::string_view path) const noexcept { return std::hash<std::string_view>{}(path); }
+};
+static std::unordered_set<std::string, ModsPathHash, std::equal_to<>> g_modsIndex;
 
-    // Used a hashmap for lookups so that we don't call GetFileAttributeA every time
+// TweaksV: a game path the way the index holds it: lower case (ASCII), '/' between the names, no
+// leading or doubled '/'. False if it is empty or longer than kMaxModsPath.
+static bool NormalizeModsPath(const char* path, char (&out)[kMaxModsPath + 1], size_t& length)
+{
+    length = 0;
+    for (const char* p = path; *p; ++p)
     {
-        std::shared_lock lock(g_modsCacheMutex);
-        auto it = g_modsCache.find(outModsPath);
-        if (it != g_modsCache.end())
-            return it->second == EXISTS;
+        char c = *p == '\\' ? '/' : *p;
+        if (c == '/' && (length == 0 || out[length - 1] == '/'))
+            continue;
+        if (c >= 'A' && c <= 'Z')
+            c = static_cast<char>(c - 'A' + 'a');
+        if (length == kMaxModsPath)
+            return false;
+        out[length++] = c;
     }
+    out[length] = '\0';
+    return length > 0;
+}
 
-    bool exists = GetFileAttributesA(outModsPath.c_str()) != INVALID_FILE_ATTRIBUTES;
+// TweaksV: reads the mods folder (in the current directory, as upstream) into g_modsIndex. A name
+// the ANSI code page cannot hold is skipped - the game, which asks with ANSI paths, could not ask
+// for it either. Returns the number of entries; complete is false if a limit was reached.
+static size_t BuildModsIndex(bool& complete)
+{
+    struct Folder { std::wstring path; std::string relative; size_t depth; };
+    std::vector<Folder> todo{ { L"mods", std::string(), 1 } };
+    complete = true;
+    while (!todo.empty() && complete)
     {
-        std::unique_lock lock(g_modsCacheMutex);
-        g_modsCache[outModsPath] = exists ? EXISTS : NOT_EXISTS;
+        const Folder folder = std::move(todo.back());
+        todo.pop_back();
+        WIN32_FIND_DATAW found{};
+        const HANDLE find = FindFirstFileExW((folder.path + L"\\*").c_str(), FindExInfoBasic, &found, FindExSearchNameMatch,
+            nullptr, FIND_FIRST_EX_LARGE_FETCH);
+        if (find == INVALID_HANDLE_VALUE)
+            continue;
+        do
+        {
+            if (wcscmp(found.cFileName, L".") == 0 || wcscmp(found.cFileName, L"..") == 0)
+                continue;
+            char name[kMaxModsPath + 1];
+            BOOL lossy = FALSE;
+            const int size = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, found.cFileName, -1, name, sizeof(name), nullptr, &lossy);
+            if (size <= 1 || lossy)
+                continue;
+            std::string relative = folder.relative.empty() ? std::string(name) : folder.relative + "/" + name;
+            if (relative.size() > kMaxModsPath)
+                continue;
+            for (char& c : relative)
+                if (c >= 'A' && c <= 'Z')
+                    c = static_cast<char>(c - 'A' + 'a');
+            if (g_modsIndex.size() >= kMaxModsEntries)
+            {
+                complete = false;
+                break;
+            }
+            const bool isFolder = (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+            if (isFolder && folder.depth >= kMaxModsDepth)
+                complete = false;
+            else if (isFolder)
+                todo.push_back({ folder.path + L"\\" + found.cFileName, relative, folder.depth + 1 });
+            g_modsIndex.insert(std::move(relative));
+        } while (FindNextFileW(find, &found));
+        FindClose(find);
     }
-    return exists;
-    }
-    catch (...)
-    {
+    return g_modsIndex.size();
+}
+
+// TweaksV: the path to pass on for a file or folder the mods folder has, into out: "mods/" and the
+// game's own spelling of the path, as upstream passed it on. False if the mods folder does not have it.
+static bool TryModsPath(const char* path, char (&out)[kMaxModsPath + 6])
+{
+    char normalized[kMaxModsPath + 1];
+    size_t length = 0;
+    if (!path || !NormalizeModsPath(path, normalized, length) || !g_modsIndex.contains(std::string_view(normalized, length)))
         return false;
-    }
+    const size_t original = strnlen(path, kMaxModsPath + 1);
+    if (original > kMaxModsPath)
+        return false;
+    memcpy(out, "mods/", 5);
+    memcpy(out + 5, path, original);
+    out[5 + original] = '\0';
+    return true;
 }
 
 static HANDLE OpenBulkImpl(void* device, const char* path, __int64* a3, OpenBulkFn orig)
 {
     logger::log("info", "[%s] Called with path /%s", __FUNCTION__, path);
 
-    std::string modsPath;
-    if (path && TryModsPath(path, modsPath))
+    char modsPath[kMaxModsPath + 6]; // TweaksV: on the stack - was a std::string per call
+    if (TryModsPath(path, modsPath))
     {
-        logger::log("mods", "[%s] Redirecting to /%s", __FUNCTION__, modsPath.c_str());
-        HANDLE result = orig(device, modsPath.c_str(), a3);
+        logger::log("mods", "[%s] Redirecting to /%s", __FUNCTION__, modsPath);
+        HANDLE result = orig(device, modsPath, a3);
         if (result && result != INVALID_HANDLE_VALUE)
             return result;
     }
@@ -75,11 +147,11 @@ static FILETIME GetFileTimeImpl(void* device, const char* path, GetFileTimeFn or
 {
     logger::log("info", "[%s] Called with path /%s", __FUNCTION__, path);
 
-    std::string modsPath;
-    if (path && TryModsPath(path, modsPath))
+    char modsPath[kMaxModsPath + 6]; // TweaksV: on the stack - was a std::string per call
+    if (TryModsPath(path, modsPath))
     {
-        logger::log("mods", "[%s] Redirecting to /%s", __FUNCTION__, modsPath.c_str());
-        return orig(device, modsPath.c_str());
+        logger::log("mods", "[%s] Redirecting to /%s", __FUNCTION__, modsPath);
+        return orig(device, modsPath);
     }
     return orig(device, path);
 }
@@ -88,11 +160,11 @@ static uint64_t GetFileSizeImpl(void* device, const char* path, GetFileSizeFn or
 {
     logger::log("info", "[%s] Called with path /%s", __FUNCTION__, path);
 
-    std::string modsPath;
-    if (path && TryModsPath(path, modsPath))
+    char modsPath[kMaxModsPath + 6]; // TweaksV: on the stack - was a std::string per call
+    if (TryModsPath(path, modsPath))
     {
-        logger::log("mods", "[%s] Redirecting to /%s", __FUNCTION__, modsPath.c_str());
-        return orig(device, modsPath.c_str());
+        logger::log("mods", "[%s] Redirecting to /%s", __FUNCTION__, modsPath);
+        return orig(device, modsPath);
     }
     return orig(device, path);
 }
@@ -101,11 +173,11 @@ static uint64_t GetAttribsImpl(void* device, const char* path, GetAttrsFn orig)
 {
     logger::log("info", "[%s] Called with path /%s", __FUNCTION__, path);
 
-    std::string modsPath;
-    if (path && TryModsPath(path, modsPath))
+    char modsPath[kMaxModsPath + 6]; // TweaksV: on the stack - was a std::string per call
+    if (TryModsPath(path, modsPath))
     {
-        logger::log("mods", "[%s] Redirecting to /%s", __FUNCTION__, modsPath.c_str());
-        return orig(device, modsPath.c_str());
+        logger::log("mods", "[%s] Redirecting to /%s", __FUNCTION__, modsPath);
+        return orig(device, modsPath);
     }
     return orig(device, path);
 }
@@ -148,6 +220,16 @@ static memory::InitFuncs FileReadHooks([] {
     // TweaksV: the MODS_FOLDER switch; only the GTA V Enhanced patterns are kept (F-ROV-6)
     if (!TweaksV::GetIniBool("RAGEOPENV_SETTINGS", "MODS_FOLDER", true)) {
         TweaksV::WriteLog("RageOpenV", "MODS_FOLDER=0 - files in the mods folder are not used.");
+        return;
+    }
+
+    // TweaksV: without a mods folder there is nothing to redirect, so the game's file functions are not
+    // hooked at all (the folder is looked for in the current directory, as upstream). DIAGNOSTIC_MODE
+    // still checks their patterns.
+    const DWORD modsAttributes = GetFileAttributesW(L"mods");
+    const bool haveFolder = modsAttributes != INVALID_FILE_ATTRIBUTES && (modsAttributes & FILE_ATTRIBUTE_DIRECTORY);
+    if (!haveFolder && !TweaksV::IsDiagnosticMode()) {
+        TweaksV::WriteLog("RageOpenV", "No mods folder in the current directory - the file functions are not hooked.");
         return;
     }
 
@@ -196,11 +278,25 @@ static memory::InitFuncs FileReadHooks([] {
         TweaksV::ReportFailure("RageOpenV", "Files in the mods folder are not used this session: " + problem + ".");
         return;
     }
+    if (!haveFolder) { // TweaksV: only DIAGNOSTIC_MODE gets here without one
+        TweaksV::WriteLog("RageOpenV", "No mods folder in the current directory - the patterns were checked "
+            "(DIAGNOSTIC_MODE), the file functions are not hooked.");
+        return;
+    }
 
     if (TweaksV::IsDryRun()) { // TweaksV: DRY_RUN stops after pass 1
         TweaksV::WriteLog("RageOpenV", "DRY_RUN: would hook the 8 file functions for the mods folder.");
         return;
     }
+
+    // TweaksV: the mods folder is read now, before the hooks go on (see g_modsIndex)
+    bool complete = true;
+    const size_t entries = BuildModsIndex(complete);
+    TweaksV::WriteLog("RageOpenV", "The mods folder has " + std::to_string(entries) + " files and folders.");
+    if (!complete)
+        TweaksV::ReportFailure("RageOpenV", "Only part of the mods folder is used this session: it has more than " +
+            std::to_string(kMaxModsEntries) + " files and folders, or folders more than " + std::to_string(kMaxModsDepth) +
+            " levels deep.");
 
     // TweaksV: pass 2 - the original hooks, queued and then switched on together (B-ROV-09); if any
     // of them fails, the ones already made are removed again

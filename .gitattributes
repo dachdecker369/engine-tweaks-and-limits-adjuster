@@ -1,2 +1,6 @@
 * text=auto
 *.zip binary
+# the test scripts run in Git Bash, the INI files they copy are converted to CRLF by the scripts
+*.sh text eol=lf
+test/*.ini text eol=lf
+*.cmd text eol=crlf

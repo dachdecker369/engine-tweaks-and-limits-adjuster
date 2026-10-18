@@ -262,7 +262,8 @@ public:
 	// TweaksV: HookIAT() removed - import hooking cannot work on GTA V Enhanced (its imports are
 	// obfuscated, as the note in main.cpp says) and nothing called it (F-ROV-9)
 
-	static bool HookApi(const wchar_t* module, const char* funcName, PVOID pNewFunc, PVOID* pOldFunc)
+	// TweaksV: + pTarget, the hooked function, for disabling the hook again later
+	static bool HookApi(const wchar_t* module, const char* funcName, PVOID pNewFunc, PVOID* pOldFunc, PVOID* pTarget = nullptr)
 	{
 		LPVOID target = nullptr; // TweaksV: so that only this hook is enabled below
 		auto status = MH_CreateHookApiEx(module, funcName, pNewFunc, pOldFunc, &target);
@@ -276,6 +277,8 @@ public:
 			MH_RemoveHook(target); // TweaksV
 			return false;
 		}
+		if (pTarget) // TweaksV
+			*pTarget = target;
 		return true;
 	}
 

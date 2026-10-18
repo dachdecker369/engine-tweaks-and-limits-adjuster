@@ -11,7 +11,8 @@
 - **MemScanner fixes:**
   - A pattern miss is logged and returns null instead of exiting the game;
   - Malformed patterns no longer throw;
-  - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match.
+  - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match;
+  - A new search: only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. It compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than the original search, which went through the whole image almost byte by byte.
 
 - **HeapAdjusterEnhanced merged:** `[HEAP_SETTINGS] HEAP_SIZE` (default 2000 MB) is read from `TweaksV.ini`, and its original code is kept in its own namespace. Fixes:
   - A missing pattern no longer crashes the game;
@@ -59,6 +60,9 @@
   - The console patch is only applied when the console is on (`CONSOLE=1`);
   - Newmods: files are closed properly, folder listing works, file sizes are right, reading at the end of a file no longer hangs, and nothing is mounted without a newmods folder (DIAGNOSTIC_MODE still checks its patterns);
   - Its log switches (`LOG_INFO`, `LOG_MODS`, `LOG_DEVICE`) work at runtime, and cost nothing when off;
+  - The mods folder is read once at start-up, and the game's file calls look their paths up in that list: no file system call, memory allocation or lock per call. Without a mods folder, the game's file functions are not hooked at all (DIAGNOSTIC_MODE still checks their patterns). A path with `..` is never redirected, and the list holds at most 200,000 files and folders, 32 levels deep (more is reported in the start-up summary);
+  - The `GetSystemTimeAsFileTime` hook switches itself off once its one-time start-up has run;
+  - The OPEN-archive hook no longer walks the entry table of encrypted archives, which it never changes;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
 - **DirectStorage (TweaksV's own part):** `[DIRECTSTORAGE_SETTINGS]` in `TweaksV.ini` (`ENABLED`, `UNLOCK_FILES`, `LOG_CALLS`, `LOG_FILE_OPENS`):
@@ -73,6 +77,8 @@
 
 - **Hook:** `TweaksV.asi` stays loaded once enabled until the game exits.
 
+- **Tests:** `test\` holds fake-game test suites (260 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. `bash test/run_all.sh` builds and runs them (see README).
+
 ## Open Issues
 
 Known bugs and open issues in TweaksV.
@@ -84,3 +90,14 @@ Known bugs and open issues in TweaksV.
 - **Status:** unconfirmed. The original behaviour is kept until it is known how the game calls this. If the game ever seeks from the end of a file with a non-zero distance, `TweaksV.log` says so once, in a line that names B-ROV-18. Nothing needs to be done unless that line appears.
 - **Tested:** one boot on 1.0.1158.16 with `NEWMODS=1`, `LOG_DEVICE=1` and an empty `newmods` folder. The newmods devices were mounted without a problem, but the game opened no file through them, so this code never ran. Confirming the sign needs a boot in which the game loads a file from the `newmods` folder.
 - **Workaround:** `NEWMODS=0` (the default) under `[RAGEOPENV_SETTINGS]` in `TweaksV.ini` turns newmods off.
+
+### T-DEBT: shared code still written more than once
+
+- **What:**
+  - Each setting and its default is written in several places (the key list, the default INI text, the readers, the log header).
+  - There are five copies of the code that makes game code writable and restores it, and two of the code that redirects a call.
+  - The patterns are text in nine files.
+  - About 240 comments in the source, and some in the tests, still cite the sections and bug IDs of the original merge plan, which is not part of the repository.
+  - Every test suite has its own copy of the test helpers.
+  - The scanner keeps the original's name, `FindPatternBmh`.
+- **When it goes:** in the refactoring that follows the faster scanner (one settings table, one patch module, one pattern table, the comments), before the next release.
