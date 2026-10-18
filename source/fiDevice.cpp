@@ -212,28 +212,28 @@ HANDLE rage::fiDeviceLocal::FindFileBegin(const char* path, rage::fiFindData* fi
 	logger::write("device", "[%s]", __FUNCTION__);
 	WIN32_FIND_DATAW foundData;
 
-	wchar_t fileName[MAX_PATH] = { 0 };
-	auto pathLen = strlen(path);
-	bool slashFound = false;
-	if (pathLen)
-	{
-		if (path[pathLen - 1] == '/' || path[pathLen - 1] == '\\')
-			slashFound = true;
-	}
+	// TweaksV: the path and the search pattern are built at their real length - in the fixed 256- and
+	// 260-character buffers they had, a long path stopped the game (swprintf_s ends the process when
+	// its buffer is too small); a path too long to search now fails like a missing folder
+	const size_t pathLen = path ? strlen(path) : 0;
+	const bool slashFound = pathLen && (path[pathLen - 1] == '/' || path[pathLen - 1] == '\\');
 
 	// TweaksV: an empty full path (an error) must not turn into "\*", the root of the drive
 	const std::string fullPath = ToFullPath(path);
 	if (fullPath.empty())
 		return INVALID_HANDLE_VALUE;
 
-	wchar_t wcPath[256] = { 0 };
 	// TweaksV: CP_ACP - path::string() gives the ANSI code page, not UTF-8 (was 0xFDE9)
-	MultiByteToWideChar(CP_ACP, 0, fullPath.c_str(), -1, wcPath, 256);
+	const int wideLength = MultiByteToWideChar(CP_ACP, 0, fullPath.c_str(), -1, nullptr, 0);
+	if (wideLength <= 1)
+		return INVALID_HANDLE_VALUE;
+	std::wstring pattern(static_cast<size_t>(wideLength - 1), L'\0');
+	MultiByteToWideChar(CP_ACP, 0, fullPath.c_str(), -1, pattern.data(), wideLength);
 
-	// TweaksV: swprintf_s formats INTO fileName; wprintf_s printed to stdout with fileName as the
-	// format, so FindFirstFileW always got an empty path and the search always failed
-	swprintf_s(fileName, MAX_PATH, slashFound ? L"%s*" : L"%s\\*", wcPath);
-	HANDLE firstFileHandle = FindFirstFileW(fileName, &foundData);
+	// TweaksV: was swprintf_s into a 260-character buffer - before that wprintf_s, which printed to
+	// stdout with the buffer as the format, so FindFirstFileW always got an empty path and failed
+	pattern += slashFound ? L"*" : L"\\*";
+	HANDLE firstFileHandle = FindFirstFileW(pattern.c_str(), &foundData);
 	if (firstFileHandle == INVALID_HANDLE_VALUE)
 		return INVALID_HANDLE_VALUE;
 
@@ -293,7 +293,14 @@ rage::fiDevice* rage::fiDeviceLocal::GetLowLevelDevice()
 void* rage::fiDeviceLocal::FixRelativeName(char* dest, int length, const char* source)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
-	memcpy(dest, source, length);
+	// TweaksV: copies the name and no more, always ending it - upstream copied length bytes whatever
+	// the name's own length, reading past its end
+	if (!dest || length <= 0)
+		return dest;
+	const size_t size = source ? strnlen(source, static_cast<size_t>(length) - 1) : 0;
+	if (size)
+		memcpy(dest, source, size);
+	dest[size] = '\0';
 	return dest;
 }
 

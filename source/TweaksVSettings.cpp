@@ -121,6 +121,7 @@ namespace TweaksV
 		for (size_t i = 0; i < kCount; i++)
 			Load(kSettings[i], g_values[i]);
 		g_loaded = true;
+		ReleaseIniFile();	// every setting is read: TweaksV.ini is not read again this session
 
 		const int layout = g_values[IndexOf(kIniVersion)].number;
 		if (layout > kIniLayoutVersion)
@@ -235,7 +236,9 @@ namespace TweaksV
 		}
 #ifdef TWEAKSV_TEST_BUILD
 		const std::string& broken = GetText(kTestBreakPattern);
-		lines.push_back("TEST BUILD - not for release. TEST_BREAK_PATTERN=" + (broken.empty() ? std::string("(none)") : broken));
+		const std::string& logLimit = GetText(kTestLogLimitKb);
+		lines.push_back("TEST BUILD - not for release. TEST_BREAK_PATTERN=" + (broken.empty() ? std::string("(none)") : broken) +
+			" TEST_LOG_LIMIT_KB=" + (logLimit.empty() ? std::string("(none)") : logLimit));
 #endif
 		return lines;
 	}

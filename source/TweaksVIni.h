@@ -23,8 +23,13 @@ namespace TweaksV
 
 	// Picks the TweaksV.ini to use (see GetIniPathW) and writes the full default file
 	// (DefaultIniText) if there is none. For an existing file, only adds keys that are
-	// missing - never changes a value.
+	// missing - never changes a value. The file is used only if it is what its path says
+	// (TweaksVFiles.h), and is then held until ReleaseIniFile(); a file that fails the check
+	// is reported and not read at all, so every setting keeps its default.
 	void CreateOrUpdateIni();
+
+	// Lets go of the TweaksV.ini that CreateOrUpdateIni() holds - once LoadSettings() has read it.
+	void ReleaseIniFile();
 
 	// The TweaksV.ini line of the log header: the path, and where it came from.
 	std::string DescribeIniLocation();

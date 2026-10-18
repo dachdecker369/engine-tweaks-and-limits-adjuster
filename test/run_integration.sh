@@ -78,10 +78,12 @@ cp full_game.exe GTA5.exe; LOCALAPPDATA="$AW" timeout 60 ./GTA5.exe TweaksV.asi 
 check "nothing applied" "has '$GAME_HEAP' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$ROV_OFF' && has '$STORY_OFF'"
 check "no TweaksV.ini or TweaksV.log anywhere" "[ ! -e TweaksV.ini ] && [ ! -e TweaksV.log ] && [ ! -e appdata/TweaksV ]"
 
-echo "== I5 no Visual C++ runtime needed (/MT): only system DLLs imported"
+echo "== I5 the build: no Visual C++ runtime needed (/MT), only system DLLs imported, the exploit mitigations on"
 deps=$(cmd //c "$(cygpath -w "$T/deps.cmd")" "$(cygpath -w TweaksV.asi)" 2>/dev/null | tr -d '\r' | grep -i '\.dll' | tr -d ' ' | sort | tr '\n' ' ')
 echo "      imports: $deps"
 check "KERNEL32, USER32 and VERSION only" "[ \"$deps\" = 'KERNEL32.dll USER32.dll VERSION.dll ' ]"
+heads=$(cmd //c "$(cygpath -w "$T/headers.cmd")" "$(cygpath -w TweaksV.asi)" 2>/dev/null | tr -d '\r')
+check "ASLR with high entropy, DEP, Control Flow Guard and CET" "grep -q 'High Entropy Virtual Addresses' <<< \"\$heads\" && grep -q 'Dynamic base' <<< \"\$heads\" && grep -q 'NX compatible' <<< \"\$heads\" && grep -q 'Control Flow Guard' <<< \"\$heads\" && grep -q 'CET compatible' <<< \"\$heads\""
 
 echo "== I6 renamed to zTweaksV.asi: the same TweaksV.ini and TweaksV.log, everything works"
 fresh_ini; cp TweaksV.asi zTweaksV.asi; out=$(ASI=zTweaksV.asi game full_game.exe); rm -f zTweaksV.asi
@@ -99,6 +101,92 @@ echo "== I8 DIAGNOSTIC_MODE without a newmods folder: the newmods patterns are s
 fresh_ini; setkey DIAGNOSTIC_MODE 1; rmdir newmods; out=$(game full_game.exe); mkdir -p newmods
 check "newmods not hooked, the rest applied" "has 'newmods hooks 0/2' && has 'file hooks 8/8' && has 'open calls 5/5'"
 check "its 5 patterns found once each and logged, no problem" "[ \$(grep -c -E 'Pattern R-E-(M[0-2]|D[12]) found: .* 1 match,' TweaksV.log) -eq 5 ] && log_has 'the patterns were checked (DIAGNOSTIC_MODE), nothing is mounted' && ! log_has 'PROBLEM'"
+
+echo "== I9 the Windows user name stays out of the log: the profile folder is written as %USERPROFILE%, in both its forms"
+bw=$(cygpath -w "$B")	# the game folder, here the profile folder too
+fresh_ini; out=$(USERPROFILE="$bw" game full_game.exe)
+check "the paths in it start with %USERPROFILE%, the folder's own name is nowhere in the log" "log_has 'TweaksV.asi: %USERPROFILE%.TweaksV.asi' && ! grep -qiF -- \"\$bw\" TweaksV.log"
+# A profile folder with a long name has a short one too (C:\Users\NAME~1), which %TEMP% often has. Here
+# %LOCALAPPDATA% has it, and the log header names the TweaksV.ini there that the game folder's wins over.
+pl="$B/Some Long User Name"; mkdir -p "$pl/AppData/TweaksV"; cp TweaksV.ini "$pl/AppData/TweaksV/"
+pw=$(cygpath -w "$pl"); ps=$(cygpath -d "$pl")
+cp full_game.exe GTA5_Enhanced.exe; rm -f TweaksV.log
+USERPROFILE="$pw" LOCALAPPDATA="$ps\\AppData" timeout 60 ./GTA5_Enhanced.exe TweaksV.asi > harness.out 2>&1
+check "its short form as well: the log names %USERPROFILE%\\AppData\\TweaksV, neither form is in it" "[ \"\$ps\" != \"\$pw\" ] && log_has 'wins over the unused copy in %USERPROFILE%.AppData.TweaksV)' && ! grep -qiF -- \"\$ps\" TweaksV.log && ! grep -qiF -- \"\$pw\" TweaksV.log"
+rm -rf "$pl"
+
+echo "== I10 TweaksV.log stops growing at its limit (16 KB here, set with TEST_LOG_LIMIT_KB in a test build)"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; addkey TEST_LOG_LIMIT_KB 16; out=$(ASI=TweaksV_test.asi game full_game.exe)
+check "at most 16 KB, ending with the line that says so" "[ \$(stat -c %s TweaksV.log) -le 16384 ] && tail -n 1 TweaksV.log | grep -q 'TweaksV.log has reached its limit of 16 KB - nothing more is written to it this session.'"
+check "the game is patched all the same" "has '$ALL_ON_HEAP' && has '$STORY_ON' && has '$ROV_ON'"
+
+# Where TweaksV's own files belong: a link, a compressed file, a read-only folder, a file in use.
+# link_run [OPTION...] runs the fake game without game(), which would delete TweaksV.log.
+link_run() { cp full_game.exe GTA5_Enhanced.exe; rm -f harness.out; LOCALAPPDATA="$AW" timeout 60 ./GTA5_Enhanced.exe TweaksV.asi "$@" > harness.out 2>&1; out=$(tr -d '\r' < harness.out); }
+
+echo "== I11 TweaksV.log in the game folder is a hard link to another file: that file is left alone"
+fresh_ini; rm -f TweaksV.log; rm -rf appdata/TweaksV; echo "not the log" > victim.txt; ln victim.txt TweaksV.log
+link_run
+check "the other file is unchanged" "[ \"\$(cat victim.txt)\" = 'not the log' ]"
+check "the log goes to %LOCALAPPDATA%\\TweaksV and says why; the game is patched" "grep -q 'PROBLEM: The TweaksV.log in the game folder is not used: it is a hard link' appdata/TweaksV/TweaksV.log && has '$ALL_ON_HEAP'"
+rm -f TweaksV.log victim.txt; rm -rf appdata/TweaksV
+
+echo "== I12 TweaksV.ini in the game folder is a hard link to another file: neither read nor written"
+fresh_ini; setkey SKIP_SPLASH_SCREEN 0 STRAIGHTTOSTORYMODE_SETTINGS; sed -b -i '/^HEAP_SIZE=/d' TweaksV.ini
+mv TweaksV.ini victim.ini; cp victim.ini victim.before; ln victim.ini TweaksV.ini
+out=$(ASI=TweaksV_test.asi game full_game.exe)
+check "the other file is unchanged - its missing key was not added" "cmp -s victim.ini victim.before"
+check "reported; every setting at its built-in default, not the file's (the splash screen is skipped)" "log_has 'PROBLEM: TweaksV.ini (.*) is not used: it is a hard link' && has 'splash: E9 86 01 00 00 90' && has 'heap: 2000 MB'"
+check "the log header says so" "log_has 'TweaksV.ini: .*(not used: it is a hard link'"
+rm -f TweaksV.ini victim.ini victim.before
+
+echo "== I13 and %LOCALAPPDATA%\\TweaksV is a junction to another folder: nothing is written through it"
+fresh_ini; rm -f TweaksV.log; rm -rf appdata/TweaksV elsewhere; mkdir -p elsewhere; echo "not the log" > victim.txt; ln victim.txt TweaksV.log
+cmd //c "$(cygpath -w "$T/junction.cmd")" "$(cygpath -w "$B/appdata/TweaksV")" "$(cygpath -w "$B/elsewhere")"
+link_run
+check "the junction is there; nothing was left in its target, the other file unchanged" "[ -d appdata/TweaksV ] && [ -z \"\$(ls -A elsewhere)\" ] && [ \"\$(cat victim.txt)\" = 'not the log' ]"
+check "the game is patched all the same" "has '$ALL_ON_HEAP' && has '$STORY_ON'"
+cmd //c "$(cygpath -w "$T/junction.cmd")" remove "$(cygpath -w "$B/appdata/TweaksV")"
+check "the junction is removed again - the link only, its target is still there" "[ ! -e appdata/TweaksV ] && [ -d elsewhere ]"
+rm -f TweaksV.log victim.txt; rm -rf elsewhere
+
+# Windows keeps a compressed file as a reparse point, as it does a link, but shows it as a plain file.
+echo "== I14 TweaksV.ini and TweaksV.log compressed by Windows (compact /exe, as CompactGUI does): both used as usual"
+fresh_ini; rm -rf appdata/TweaksV
+for i in $(seq 100); do printf '; a comment line, so that Windows has something to compress\r\n'; done >> TweaksV.ini
+for i in $(seq 400); do printf '12:00:00.000 [TweaksV] a line of an older log\r\n'; done > TweaksV.log
+MSYS_NO_PATHCONV=1 compact /c /exe:xpress4k "$(cygpath -w TweaksV.ini)" "$(cygpath -w TweaksV.log)" > /dev/null
+compressed=$(MSYS_NO_PATHCONV=1 compact "$(cygpath -w TweaksV.ini)" "$(cygpath -w TweaksV.log)" | tr -d '\r')
+link_run
+check "both files were compressed" "[[ \"\$compressed\" == *'2 are compressed and 0 are not compressed'* ]]"
+check "TweaksV.ini is read (its HEAP_SIZE, not the default), TweaksV.log rewritten in the game folder, no problem" "has '$ALL_ON_HEAP' && log_has '\[TweaksV\] TweaksV [0-9]' && ! log_has 'an older log' && ! log_has 'PROBLEM' && [ ! -e appdata/TweaksV ]"
+rm -f TweaksV.log
+
+# Read-only as under C:\Program Files: a deny entry for this user on the folder alone (not on the files
+# in it) lets nothing be added to it. The test build, as TweaksV.ini starts out with SHOW_ERROR_POPUPS=1.
+echo "== I15 a read-only game folder (as under C:\\Program Files): both files in %LOCALAPPDATA%\\TweaksV, only logged"
+rm -rf ro appdata/TweaksV; mkdir -p ro; cp full_game.exe ro/GTA5_Enhanced.exe; cp TweaksV_test.asi ro/TweaksV.asi
+sid=$(MSYS_NO_PATHCONV=1 "$(cygpath -S)/whoami.exe" /user /fo csv /nh | tr -d '\r' | sed -n 's/.*,"\(S-[0-9-]*\)"$/\1/p')
+MSYS_NO_PATHCONV=1 icacls "$(cygpath -w ro)" /deny "*$sid:(WD,AD)" > /dev/null
+ro_run() { rm -f harness.out; (cd ro && LOCALAPPDATA="$AW" timeout 60 ./GTA5_Enhanced.exe TweaksV.asi > ../harness.out 2>&1); out=$(tr -d '\r' < harness.out); }
+fb=appdata/TweaksV
+check "the folder is read-only (a check of the test itself)" "[ -n '$sid' ] && ! touch ro/probe.txt 2>/dev/null"
+ro_run
+check "TweaksV.ini created there with the defaults, TweaksV.log written there: logged, no problem" "[ -f $fb/TweaksV.ini ] && grep -q 'The game folder is read-only (Windows error 5, access denied), so TweaksV.ini was created with the default settings in ' $fb/TweaksV.log && grep -q 'The game folder is read-only (Windows error 5, access denied), so TweaksV.log is written to ' $fb/TweaksV.log && ! grep -q 'PROBLEM' $fb/TweaksV.log"
+check "nothing in the game folder; the game is patched with the defaults" "[ ! -e ro/TweaksV.ini ] && [ ! -e ro/TweaksV.log ] && has 'heap: 2000 MB' && has 'splash: E9 86 01 00 00 90'"
+sed -b -i 's/^HEAP_SIZE=.*\r$/HEAP_SIZE=1500\r/; s/^SHOW_ERROR_POPUPS=.*\r$/SHOW_ERROR_POPUPS=0\r/' $fb/TweaksV.ini
+ro_run
+check "the next start reads that TweaksV.ini (HEAP_SIZE=1500) and says where it is" "has 'heap: 1500 MB' && grep -q 'TweaksV.ini: .*TweaksV.ini (the game folder has no TweaksV.ini)' $fb/TweaksV.log && ! grep -q 'PROBLEM' $fb/TweaksV.log"
+MSYS_NO_PATHCONV=1 icacls "$(cygpath -w ro)" /remove:d "*$sid" > /dev/null
+check "the folder is writable again (the test's clean-up)" "touch ro/probe.txt"
+rm -rf ro appdata/TweaksV
+
+echo "== I16 another program holds TweaksV.log in the game folder open: the log goes to %LOCALAPPDATA%\\TweaksV, a problem"
+fresh_ini; rm -rf appdata/TweaksV; echo "an older log" > TweaksV.log
+link_run lockedlog
+check "the log was held, and is left as it was" "has 'log held' && [ \"\$(cat TweaksV.log)\" = 'an older log' ]"
+check "the log is written to %LOCALAPPDATA%\\TweaksV, and the start-up summary says why; the game is patched" "grep -q 'PROBLEM: The TweaksV.log in the game folder is not used: Windows error 32, file in use. TweaksV.log is written to ' appdata/TweaksV/TweaksV.log && grep -q 'Start-up summary not shown (SHOW_ERROR_POPUPS=0): 1 problem' appdata/TweaksV/TweaksV.log && has '$ALL_ON_HEAP'"
+rm -f TweaksV.log; rm -rf appdata/TweaksV
 
 echo
 echo "INTEGRATION SCENARIOS: $pass passed, $fail failed"

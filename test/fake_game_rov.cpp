@@ -10,6 +10,7 @@
 //   rovredirected      the DecryptHeader call already leads outside the game
 //   rovmountredirected the initial mount call already leads outside the game
 //   rovcachepatched    the RPF cache check function already starts with a ret
+//   rovdeviceprobe     after the newmods mount, the device TweaksV mounted is called with crafted paths
 #include <windows.h>
 #include <cstdint>
 #include <cstdio>
@@ -25,11 +26,12 @@ __declspec(allocate(".fakefn")) unsigned char g_fakeCode[0x2000] = { 0xCC };
 static std::vector<std::string> g_fileCalls, g_setPathCalls, g_mountCalls, g_archiveCalls;
 static void RecordFile(const char* p) { g_fileCalls.push_back(p ? p : "(null)"); }
 static void RecordSetPath(const char* p) { g_setPathCalls.push_back(p ? p : "(null)"); }
-static void RecordMount(const char* p) { g_mountCalls.push_back(p ? p : "(null)"); }
+static void* g_device = nullptr;	// the first device RageOpenV mounted: one of TweaksV's rage::fiDeviceLocal
+static void RecordMount(const char* p, void* device) { g_mountCalls.push_back(p ? p : "(null)"); if (!g_device) g_device = device; }
 static void RecordArchive(const char* p) { g_archiveCalls.push_back(p ? p : "(null)"); }
 static void (*volatile g_recordFile)(const char*) = RecordFile;
 static void (*volatile g_recordSetPath)(const char*) = RecordSetPath;
-static void (*volatile g_recordMount)(const char*) = RecordMount;
+static void (*volatile g_recordMount)(const char*, void*) = RecordMount;
 static void (*volatile g_recordArchive)(const char*) = RecordArchive;
 
 // The game's own functions behind the redirected calls.
@@ -116,7 +118,7 @@ struct Asm
 			p = end;
 		}
 	}
-	void callPtr(void (*volatile* pointer)(const char*))	// FF 15 disp32 -> call [pointer]
+	template <typename F> void callPtr(F* volatile* pointer)	// FF 15 disp32 -> call [pointer]
 	{
 		b({ 0xFF, 0x15 });
 		const int32_t disp = static_cast<int32_t>((intptr_t)pointer - (intptr_t)(g_fakeCode + pos + 4));
@@ -196,9 +198,9 @@ static void BuildFakeCode(bool notStart, bool missing, bool jump)
 	a.hex("41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec 88 00 00 00 89 d6 49 89 ce 31 c0");
 	a.hex("48 81 c4 88 00 00 00 5b 5d 5f 5e 41 5c 41 5d 41 5e 41 5f c3");
 
-	a.pos = FnStart(F_MOUNT) - g_fakeCode;			// ...; cmp qword [rcx+0x10],0; jz +0; mov rdi,rdx; record; return true
+	a.pos = FnStart(F_MOUNT) - g_fakeCode;			// ...; cmp qword [rcx+0x10],0; jz +0; mov rdi,rdx; record(path, device); return true
 	a.hex("56 57 53 48 81 ec 60 02 00 00 48 83 79 10 00 0f 84 00 00 00 00 48 89 d7");
-	a.b({ 0x48, 0x89, 0xF9 }); a.callPtr(&g_recordMount); a.b({ 0xB0, 0x01 });
+	a.b({ 0x48, 0x89, 0xCA }); a.b({ 0x48, 0x89, 0xF9 }); a.callPtr(&g_recordMount); a.b({ 0xB0, 0x01 });	// mov rdx, rcx; mov rcx, rdi
 	a.hex("48 81 c4 60 02 00 00 5b 5f 5e c3");
 
 	a.pos = FnStart(F_SETPATH) - g_fakeCode;			// ...; mov rdi,r9; mov ebx,r8d; record
@@ -219,9 +221,12 @@ static bool Has(int argc, wchar_t** argv, const wchar_t* option)
 
 static unsigned char g_apiBefore[5];
 
+static bool g_deviceProbe = false;	// rovdeviceprobe
+
 void RovSetup(int argc, wchar_t** argv)
 {
 	BuildFakeCode(Has(argc, argv, L"rovnotstart"), Has(argc, argv, L"rovmissing"), Has(argc, argv, L"rovjump"));
+	g_deviceProbe = Has(argc, argv, L"rovdeviceprobe");
 
 	SetCallTarget(g_rovCacheSite, const_cast<unsigned char*>(g_rovCacheCallee));
 	if (Has(argc, argv, L"rovcachepatched"))
@@ -266,6 +271,60 @@ void RovFirstTimeRequest()
 	g_apiHookedAtFirstRequest = memcmp(TimeApi(), g_apiBefore, 5) != 0;
 	FILETIME now{};
 	GetSystemTimeAsFileTime(&now);
+}
+
+// rovdeviceprobe: TweaksV's newmods device, called through its vtable as the game would, with crafted
+// paths. The slots are those of source\fiDevice.h: Open 1, Close 12, FindFileBegin 25, FindFileEnd 27,
+// FixRelativeName 29. run_rageopenv.sh puts inside.txt in newmods\dlcpacks\test and outside.txt in
+// the game folder.
+static std::wstring ProbeDevice(void* device)
+{
+	void** vtable = *reinterpret_cast<void***>(device);
+	const auto open = reinterpret_cast<HANDLE (*)(void*, const char*, bool)>(vtable[1]);
+	const auto close = reinterpret_cast<uint32_t (*)(void*, HANDLE)>(vtable[12]);
+	const auto findBegin = reinterpret_cast<HANDLE (*)(void*, const char*, void*)>(vtable[25]);
+	const auto findEnd = reinterpret_cast<int (*)(void*, HANDLE)>(vtable[27]);
+	const auto fixName = reinterpret_cast<void* (*)(void*, char*, int, const char*)>(vtable[29]);
+
+	const HANDLE inside = open(device, "dlcpacks:/test/inside.txt", true);
+	const bool insideOk = inside != INVALID_HANDLE_VALUE;
+	if (insideOk)
+		close(device, inside);
+	const bool dotsRefused = open(device, "dlcpacks:/../../outside.txt", true) == INVALID_HANDLE_VALUE;
+	char folder[MAX_PATH] = {};
+	GetCurrentDirectoryA(MAX_PATH, folder);
+	const std::string rooted = std::string(folder + 2) + "\\outside.txt";	// "\...\outside.txt": rooted, no drive
+	const bool rootedRefused = open(device, rooted.c_str(), true) == INVALID_HANDLE_VALUE;
+
+	alignas(8) unsigned char findData[0x118] = {};
+	const HANDLE search = findBegin(device, "dlcpacks:/test/", findData);
+	const bool searchOk = search != INVALID_HANDLE_VALUE;
+	if (searchOk)
+		findEnd(device, search);
+	const std::string longPath = "dlcpacks:/" + std::string(300, 'a') + "/";
+	const bool longRefused = findBegin(device, longPath.c_str(), findData) == INVALID_HANDLE_VALUE;
+
+	// a name that ends just before a page nobody may read: the copy must stop at the name's end
+	bool nameOk = false;
+	auto* pages = static_cast<unsigned char*>(VirtualAlloc(nullptr, 0x2000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+	DWORD old = 0;
+	if (pages && VirtualProtect(pages + 0x1000, 0x1000, PAGE_NOACCESS, &old))
+	{
+		char* name = reinterpret_cast<char*>(pages + 0x1000 - 4);
+		memcpy(name, "abc", 4);
+		char dest[64];
+		memset(dest, 'x', sizeof(dest));
+		fixName(device, dest, static_cast<int>(sizeof(dest)), name);
+		nameOk = strcmp(dest, "abc") == 0;
+	}
+	if (pages)
+		VirtualFree(pages, 0, MEM_RELEASE);
+
+	wchar_t text[200];
+	swprintf(text, 200, L"device: inside %ls, dots %ls, rooted %ls, search %ls, long search %ls, name %ls",
+		insideOk ? L"ok" : L"WRONG", dotsRefused ? L"refused" : L"OPENED", rootedRefused ? L"refused" : L"OPENED",
+		searchOk ? L"ok" : L"WRONG", longRefused ? L"refused" : L"WRONG", nameOk ? L"ok" : L"WRONG");
+	return text;
 }
 
 static std::string Joined(const std::vector<std::string>& items)
@@ -391,6 +450,8 @@ void RovReport()
 		reinterpret_cast<char (*)(void*, const char*, char, int32_t, int64_t)>(FnStart(F_OPENARCHIVE))(packfile, "dlcpacks:/test/", 0, 1, 0);
 		wprintf(L", original mount %d, mounts: %hs, paths: %hs, archive: %hs", g_initialMountCalls, Joined(g_mountCalls).c_str(),
 			Joined(g_setPathCalls).c_str(), Joined(g_archiveCalls).c_str());
+		if (g_deviceProbe && g_device)
+			wprintf(L" | %ls", ProbeDevice(g_device).c_str());
 	}
 	wprintf(L" | ");
 }

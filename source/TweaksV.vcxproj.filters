@@ -40,6 +40,9 @@
     <ClCompile Include="TweaksVFeatures.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVFiles.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVIni.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -124,6 +127,9 @@
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVFeatures.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVFiles.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVIni.h">

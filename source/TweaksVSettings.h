@@ -71,13 +71,14 @@ namespace TweaksV
 		Switch(kTweaksVSection, "ENABLED", true),
 		Switch(kTweaksVSection, "LOG_TO_FILE", true, "Writes TweaksV.log (in the game folder, or in %LOCALAPPDATA%\\TweaksV\\)"),
 		Switch(kTweaksVSection, "CONSOLE", false, "Open a console window that shows the log while the game runs"),
-		Switch(kTweaksVSection, "SHOW_ERROR_POPUPS", true, "Show one message box at start-up if a feature could not be applied"),
+		Switch(kTweaksVSection, "SHOW_ERROR_POPUPS", true, "Show a message box if a feature could not be applied or stops working"),
 		Switch(kTweaksVSection, "CHECK_FOR_CONFLICTS", true, "Warn about old stand-alone plugins that TweaksV replaces"),
 		Switch(kTweaksVSection, "DIAGNOSTIC_MODE", false, "TESTING ONLY: logs every memory pattern TweaksV looks for"),
 		Switch(kTweaksVSection, "DRY_RUN", false, "TESTING ONLY: logs everything and turns off game patching"),
 		Number(kTweaksVSection, "INI_VERSION", kIniLayoutVersion, 1, 1000000,
 			"The layout of this file - TweaksV keeps it up to date, do not change it", false),
 		TestText(kTweaksVSection, "TEST_BREAK_PATTERN"),
+		TestText(kTweaksVSection, "TEST_LOG_LIMIT_KB"),
 
 		Switch(kHeapSection, "ENABLED", true),
 		Number(kHeapSection, "HEAP_SIZE", 2000, 1, 2047, "Heap size in MB"),
@@ -127,6 +128,7 @@ namespace TweaksV
 	inline constexpr const Setting& kDryRun = FindSetting(kTweaksVSection, "DRY_RUN");
 	inline constexpr const Setting& kIniVersion = FindSetting(kTweaksVSection, "INI_VERSION");
 	inline constexpr const Setting& kTestBreakPattern = FindSetting(kTweaksVSection, "TEST_BREAK_PATTERN");
+	inline constexpr const Setting& kTestLogLimitKb = FindSetting(kTweaksVSection, "TEST_LOG_LIMIT_KB");
 	inline constexpr const Setting& kHeapSize = FindSetting(kHeapSection, "HEAP_SIZE");
 	inline constexpr const Setting& kModkitArraySize = FindSetting(kModkitSection, "MODKITARRAY_SIZE");
 	inline constexpr const Setting& kPackfileArraySize = FindSetting(kPackfileSection, "PACKFILEARRAY_SIZE");

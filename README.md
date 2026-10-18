@@ -60,7 +60,7 @@ Developer checks - not for release:
 Add these switches to the `msbuild` line above:
 
 - **Code Analysis:** `-p:TweaksVAnalyze=true` runs the MSVC code analysis (`/analyze`). Builds into `object\Analyze`.
-- **Test Builds:** `-p:TweaksVTestBuild=true` gives `object\Test\Release\TweaksV.asi`. Add `TEST_BREAK_PATTERN=<label>` under `[TWEAKSV]` in `TweaksV.ini`, with the label of a pattern in [PATTERNS.md](PATTERNS.md), such as `S-E2`. That pattern then counts as missing, and you can watch its part be skipped cleanly. The log header will list `TEST BUILD`.
+- **Test Builds:** `-p:TweaksVTestBuild=true` gives `object\Test\Release\TweaksV.asi`. Add `TEST_BREAK_PATTERN=<label>` under `[TWEAKSV]` in `TweaksV.ini`, with the label of a pattern in [PATTERNS.md](PATTERNS.md), such as `S-E2`. That pattern then counts as missing, and you can watch its part be skipped cleanly. `TEST_LOG_LIMIT_KB=<KB>` lowers the 64 MB limit of `TweaksV.log`, so you can watch it being reached. The log header will list `TEST BUILD`.
 
 ## Testing
 
@@ -68,6 +68,10 @@ Add these switches to the `msbuild` line above:
 2. Remove the standalone versions of the five original plugins and alloc8or's `DirectStorageFix.asi`. Otherwise standalone modules take priority and disable the respective portions of `TweaksV.asi`.
 3. `TweaksV.asi` goes in the game folder next to `GTA5_Enhanced.exe`.
 4. Add the ASI loader file `xinput1_4.dll` from the [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) download. It is the only file needed; Script Hook V itself is not.
+
+## Security
+
+Please report a security problem privately, not in a public issue: [SECURITY.md](SECURITY.md) says how.
 
 ## Credits
 

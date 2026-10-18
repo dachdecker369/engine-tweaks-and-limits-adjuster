@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "TweaksVFiles.h"
 #include "TweaksVLog.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
@@ -21,6 +22,9 @@ namespace TweaksV
 		bool g_iniAvailable = false;
 		std::wstring g_iniPath;							// the TweaksV.ini in use
 		bool g_iniInFallback = false;					// it is the one in %LOCALAPPDATA%\TweaksV
+		HANDLE g_iniHold = INVALID_HANDLE_VALUE;		// holds it from CreateOrUpdateIni() to ReleaseIniFile()
+		bool g_iniReadable = true;						// false: it failed its check and is not read at all
+		std::string g_iniNotUsed;						// why it is not used, for the log header
 
 		// Section and key names are ASCII.
 		std::wstring Widen(const char* text)
@@ -84,23 +88,49 @@ namespace TweaksV
 			g_iniInFallback = inFallback;
 		}
 
-		// Writes the full default TweaksV.ini as a new file. Returns ERROR_SUCCESS or the Windows error.
-		DWORD WriteDefaultIni(const std::wstring& path)
+		// Writes the full default TweaksV.ini as a new file in folder, only where it is what its path says
+		// (TweaksVFiles.h). Comes back without a handle: error is ERROR_SUCCESS once it is written, and
+		// unsafe says why nothing was written where a link is in the way.
+		OwnFile WriteDefaultIni(const std::wstring& folder, FileFolder where)
 		{
-			const std::string text = DefaultIniText();
-			const HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
-			if (file == INVALID_HANDLE_VALUE)
-				return GetLastError();
+			OwnFile file = OpenOwnFile(folder, L"TweaksV.ini", where, CREATE_NEW, false);
+			if (file.handle == INVALID_HANDLE_VALUE)
+				return file;
 
+			const std::string text = DefaultIniText();
 			DWORD written = 0;
-			const BOOL ok = WriteFile(file, text.data(), static_cast<DWORD>(text.size()), &written, nullptr);
-			DWORD error = ok ? ERROR_SUCCESS : GetLastError();
+			const BOOL ok = WriteFile(file.handle, text.data(), static_cast<DWORD>(text.size()), &written, nullptr);
+			file.error = ok ? ERROR_SUCCESS : GetLastError();
 			if (ok && written != text.size())
-				error = ERROR_WRITE_FAULT;
-			CloseHandle(file);
-			if (error != ERROR_SUCCESS)
-				DeleteFileW(path.c_str());
-			return error;
+				file.error = ERROR_WRITE_FAULT;
+			if (file.error != ERROR_SUCCESS)	// not left half written
+			{
+				FILE_DISPOSITION_INFO remove{ TRUE };
+				SetFileInformationByHandle(file.handle, FileDispositionInfo, &remove, sizeof(remove));
+			}
+			CloseHandle(file.handle);
+			file.handle = INVALID_HANDLE_VALUE;
+			return file;
+		}
+
+		// Holds the TweaksV.ini in use (g_iniPath) once it has passed its check (TweaksVFiles.h), until
+		// ReleaseIniFile(): whatever TweaksV reads and writes by its path then reaches this very file. A
+		// file that fails the check is not read at all, and TweaksV uses its built-in defaults.
+		bool HoldIni()
+		{
+			const OwnFile held = HoldOwnFile(g_iniInFallback ? GetFallbackFolder() : GetGameFolder(), L"TweaksV.ini",
+				g_iniInFallback ? FileFolder::Own : FileFolder::Game);
+			if (held.handle != INVALID_HANDLE_VALUE)
+			{
+				g_iniHold = held.handle;
+				g_iniAvailable = true;
+				return true;
+			}
+			g_iniReadable = false;
+			g_iniNotUsed = held.Reason();
+			ReportFailure("TweaksV", "TweaksV.ini (" + ToUtf8(g_iniPath) + ") is not used: " + g_iniNotUsed +
+				". TweaksV uses its built-in defaults this session.");
+			return false;
 		}
 
 		// Adds every key of the table that the TweaksV.ini in use is missing, with its default.
@@ -200,53 +230,74 @@ namespace TweaksV
 		const std::wstring fallbackIni = FallbackIni();
 
 		// An existing TweaksV.ini: the game folder's always wins, else the one in
-		// %LOCALAPPDATA%\TweaksV. Only missing keys are added.
+		// %LOCALAPPDATA%\TweaksV. It is held while TweaksV reads it; only missing keys are added.
 		if (FileExists(gameIni) || (!fallbackIni.empty() && FileExists(fallbackIni)))
 		{
 			const bool inFallback = !FileExists(gameIni);
 			SetIniPath(inFallback ? fallbackIni : gameIni, inFallback);
-			g_iniAvailable = true;
-			AddMissingKeys();
+			if (HoldIni())
+				AddMissingKeys();
 			return;
 		}
 
-		// None yet: create it in the game folder - or, if that folder is read-only (e.g.
-		// under C:\Program Files), in %LOCALAPPDATA%\TweaksV. Not a problem, so it is only logged.
-		const DWORD gameError = WriteDefaultIni(gameIni);
-		if (gameError == ERROR_SUCCESS || gameError == ERROR_FILE_EXISTS)
+		// None yet: create it in the game folder - or, if that fails, in %LOCALAPPDATA%\TweaksV. A
+		// read-only game folder (e.g. under C:\Program Files) is normal, so it is only logged; any
+		// other reason, such as a link in the way, is a problem.
+		const OwnFile game = WriteDefaultIni(GetGameFolder(), FileFolder::Game);
+		if (game.unsafe.empty() && (game.error == ERROR_SUCCESS || game.error == ERROR_FILE_EXISTS))
 		{
 			SetIniPath(gameIni, false);
-			g_iniAvailable = true;
-			if (gameError == ERROR_SUCCESS)
-				WriteLog("TweaksV", "Created TweaksV.ini with the default settings.");
-			else
-				AddMissingKeys(); // created by someone else in the meantime
+			if (HoldIni())
+			{
+				if (game.error == ERROR_SUCCESS)
+					WriteLog("TweaksV", "Created TweaksV.ini with the default settings.");
+				else
+					AddMissingKeys(); // created by someone else in the meantime
+			}
 			return;
 		}
 
-		DWORD fallbackError = ERROR_PATH_NOT_FOUND;
+		OwnFile fallback{};
+		fallback.error = ERROR_ENVVAR_NOT_FOUND;	// no LOCALAPPDATA
 		if (!fallbackIni.empty())
 		{
 			CreateDirectoryW(GetFallbackFolder().c_str(), nullptr);
-			fallbackError = WriteDefaultIni(fallbackIni);
-			if (fallbackError == ERROR_SUCCESS)
+			fallback = WriteDefaultIni(GetFallbackFolder(), FileFolder::Own);
+			if (fallback.unsafe.empty() && fallback.error == ERROR_SUCCESS)
 			{
 				SetIniPath(fallbackIni, true);
-				g_iniAvailable = true;
-				WriteLog("TweaksV", "The game folder is read-only (" + DescribeError(gameError) + "), so TweaksV.ini "
-					"was created with the default settings in " + ToUtf8(GetFallbackFolder()) + ".");
+				if (!HoldIni())
+					return;
+				if (game.ReadOnly())
+					WriteLog("TweaksV", "The game folder is read-only (" + DescribeError(game.error) + "), so TweaksV.ini "
+						"was created with the default settings in " + ToUtf8(GetFallbackFolder()) + ".");
+				else
+					ReportFailure("TweaksV", "TweaksV.ini was not created in the game folder: " + game.Reason() + ". It was "
+						"created with the default settings in " + ToUtf8(GetFallbackFolder()) + " instead.");
 				return;
 			}
 		}
 
-		SetIniPath(gameIni, false); // every reader returns its built-in default
-		ReportFailure("TweaksV", "TweaksV.ini could not be created in the game folder (" + DescribeError(gameError) +
-			") or in %LOCALAPPDATA%\\TweaksV (" + DescribeError(fallbackError) + "). TweaksV uses its built-in defaults.");
+		SetIniPath(gameIni, false);
+		g_iniReadable = false; // every reader returns its built-in default
+		ReportFailure("TweaksV", "TweaksV.ini could not be created in the game folder (" + game.Reason() +
+			") or in %LOCALAPPDATA%\\TweaksV (" + fallback.Reason() + "). TweaksV uses its built-in defaults.");
+	}
+
+	void ReleaseIniFile()
+	{
+		if (g_iniHold != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(g_iniHold);
+			g_iniHold = INVALID_HANDLE_VALUE;
+		}
 	}
 
 	std::string DescribeIniLocation()
 	{
 		const std::string path = ToUtf8(GetIniPathW());
+		if (!g_iniNotUsed.empty())
+			return path + " (not used: " + g_iniNotUsed + " - built-in defaults are used)";
 		if (!g_iniAvailable)
 			return path + " (could not be created - built-in defaults are used)";
 		if (g_iniInFallback)
@@ -259,6 +310,8 @@ namespace TweaksV
 
 	std::wstring ReadIniValue(const char* section, const char* key)
 	{
+		if (!g_iniReadable)	// a TweaksV.ini that failed its check is not read: every setting keeps its default
+			return {};
 		wchar_t buffer[256]{};
 		GetPrivateProfileStringW(Widen(section).c_str(), Widen(key).c_str(), L"", buffer,
 			static_cast<DWORD>(std::size(buffer)), GetIniPathW());

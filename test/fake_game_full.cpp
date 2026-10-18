@@ -16,8 +16,11 @@
 //   twor31a        a second, identical copy of the 1158.13+ packfile reference (its pattern matches twice)
 //   junkr31a       the game's obfuscated code that the old 1158.13+ reference pattern also matched
 //   dstorage       loads the stand-in dstorage.dll (fake_dstorage.cpp) before TweaksV, calls it after
+//   dsotherinterface  with dstorage: first asks for a DirectStorage interface TweaksV does not know
 //   fileopens      opens files in its folder (and one outside) after TweaksV has started
 //   nodyncode      no code may be changed or made once TweaksV loads (Windows' dynamic code policy)
+//   lockedlog      while TweaksV starts, holds the TweaksV.log in its folder open as another program
+//                  might: for reading, shared for reading only
 //   wait           stays 11 seconds longer before it reports
 #include <windows.h>
 #include <cstdint>
@@ -419,7 +422,7 @@ static void CheckStub(const unsigned char* callTarget)
 // DirectStorage (TweaksV's UNLOCK_FILES and LOG_CALLS): the calls the game makes into dstorage.dll,
 // and the factory's OpenFile for 3 archives (one with a full path) and 3 other files.
 static wchar_t g_dstorageResult[400];
-static void CallDStorage(HMODULE dstorage)
+static void CallDStorage(HMODULE dstorage, bool otherInterfaceFirst)
 {
 	using GetFactory = HRESULT(WINAPI*)(REFIID, void**);
 	using SetConfiguration = HRESULT(WINAPI*)(const void*);
@@ -438,6 +441,12 @@ static void CallDStorage(HMODULE dstorage)
 	void* factory = nullptr;
 	const HRESULT a = setConfiguration(configuration);
 	const HRESULT b = setConfiguration1(configuration);
+	if (otherInterfaceFirst)	// dsotherinterface: first an interface TweaksV does not know
+	{
+		static const GUID otherId = { 0x12345678, 0x1234, 0x5678, { 0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78 } };
+		void* other = nullptr;
+		getFactory(otherId, &other);
+	}
 	const HRESULT c = getFactory(factoryId, &factory);
 	int length = swprintf(g_dstorageResult, 400, L"dstorage: configuration 0x%lX/0x%lX, factory 0x%lX %ls | ",
 		static_cast<unsigned long>(a), static_cast<unsigned long>(b), static_cast<unsigned long>(c), factory ? L"set" : L"null");
@@ -584,7 +593,13 @@ int wmain(int argc, wchar_t** argv)
 		if (!SetProcessMitigationPolicy(ProcessDynamicCodePolicy, &policy, sizeof(policy)))
 			wprintf(L"dynamic code policy not set: %lu | ", GetLastError());
 	}
+	const HANDLE lockedLog = HasOption(argc, argv, L"lockedlog") ? CreateFileW(L"TweaksV.log", GENERIC_READ,
+		FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr) : INVALID_HANDLE_VALUE;
+	if (HasOption(argc, argv, L"lockedlog"))
+		wprintf(L"log %ls | ", lockedLog != INVALID_HANDLE_VALUE ? L"held" : L"NOT held");
 	HMODULE module = LoadLibraryW(asi);
+	if (lockedLog != INVALID_HANDLE_VALUE)
+		CloseHandle(lockedLog);
 	if (!module)
 	{
 		wprintf(L"LoadLibrary(%ls) failed: %lu\n", asi, GetLastError());
@@ -593,7 +608,9 @@ int wmain(int argc, wchar_t** argv)
 	RovFirstTimeRequest();	// the game asks for the time: RageOpenV's hook runs its one-time start-up
 	Sleep(1500); // the start-up summary thread runs
 	if (dstorage)
-		CallDStorage(dstorage);
+		CallDStorage(dstorage, HasOption(argc, argv, L"dsotherinterface"));
+	if (HasOption(argc, argv, L"dsotherinterface"))
+		Sleep(1500);	// the problem after the start-up summary is shown (or logged) a second after it is reported
 	if (HasOption(argc, argv, L"fileopens"))
 		OpenFiles();
 	if (HasOption(argc, argv, L"wait"))

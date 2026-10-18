@@ -141,7 +141,9 @@ namespace rage
 			// TweaksV: must never throw - it runs inside the game's file calls; any error gives an
 			// empty path, which matches no file. The newmods folder (in the current
 			// directory, as upstream) is worked out once. The mapping is upstream's: "X:/path" ->
-			// newmods\X\path, whatever SetPath was given.
+			// newmods\X\path, whatever SetPath was given. A path that leads out of the newmods
+			// folder - a rooted one, which replaced the folder, or one with a ".." - matches no
+			// file either.
 			try
 			{
 				static const std::filesystem::path newmods = [] {
@@ -160,7 +162,14 @@ namespace rage
 				if (pos != std::string::npos)
 					fName.erase(pos, 1);
 
-				cwd /= fName;
+				const std::filesystem::path relative(fName); // TweaksV
+				if (relative.has_root_name() || relative.has_root_directory())
+					return std::string();
+				for (const auto& part : relative)
+					if (part == "..")
+						return std::string();
+
+				cwd /= relative;
 
 				cwd.make_preferred();
 

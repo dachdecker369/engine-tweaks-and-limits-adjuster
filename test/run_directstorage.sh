@@ -107,5 +107,10 @@ check "UNLOCK_FILES=1: 8 asked, 3 archives opened, 3 refused, 2 outside opened" 
 fresh_ini; setkey UNLOCK_FILES 0 DIRECTSTORAGE_SETTINGS; setkey LOG_CALLS 1 DIRECTSTORAGE_SETTINGS; out=$(game full_game.exe dstorage wait)
 check "UNLOCK_FILES=0: 8 asked, all opened" "log_has 'OpenFile: in its first 10 seconds the game asked DirectStorage for 8 files: 3 .rpf and .cache files, 3 other files in the game folder and 2 outside it (UNLOCK_FILES=0 - all of them opened).'"
 
+echo "== D12 the game first asks for an interface TweaksV does not know: a problem after the start-up summary"
+fresh_ini; setkey UNLOCK_FILES 1 DIRECTSTORAGE_SETTINGS; out=$(game full_game.exe dstorage dsotherinterface)
+check "reported, and given a message box of its own after the start-up summary (here SHOW_ERROR_POPUPS=0)" "log_has 'PROBLEM: The files in the game folder are not unlocked this session: the game asked for another DirectStorage interface' && log_has 'Problem after the start-up summary not shown (SHOW_ERROR_POPUPS=0): 1 problem(s)'"
+check "the factory TweaksV knows is still unlocked" "has '$UNLOCKED'"
+
 echo
 echo "DIRECTSTORAGE SCENARIOS: $pass passed, $fail failed"

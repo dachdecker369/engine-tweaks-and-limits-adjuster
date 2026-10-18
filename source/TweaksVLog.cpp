@@ -5,13 +5,17 @@
 
 #include <windows.h>
 
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <string>
 #include <vector>
 
 #include "BuildInfo.h"
 #include "GameVersion.h"
+#include "TweaksVFiles.h"
 #include "TweaksVIni.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
@@ -24,6 +28,7 @@ namespace TweaksV
 	{
 		constexpr size_t kMaxLine = 2048;		// the longest line written: 2 KB
 		constexpr size_t kMaxPending = 1024;	// lines kept until the log is started
+		constexpr uint64_t kMaxLogBytes = 64ull * 1024 * 1024;	// TweaksV.log grows to 64 MB at most
 
 		SRWLOCK g_lock = SRWLOCK_INIT;
 		HANDLE g_file = INVALID_HANDLE_VALUE;
@@ -33,6 +38,69 @@ namespace TweaksV
 		bool g_toFile = true;					// LOG_TO_FILE
 		bool g_console = false;					// OpenConsole() succeeded
 		std::vector<std::string> g_pending;
+		uint64_t g_logLimit = kMaxLogBytes;		// test builds can lower it (TEST_LOG_LIMIT_KB)
+		uint64_t g_logBytes = 0;				// written to the file this session
+		bool g_logFull = false;					// the limit was reached: nothing more goes to the file
+
+		// A folder as it appears in log lines: UTF-8, no separator at the end. Empty if it is too short
+		// to stand for a folder of its own - never a bare drive such as "C:".
+		std::string AsLogFolder(std::wstring_view folder)
+		{
+			std::string utf8 = ToUtf8(folder);
+			while (!utf8.empty() && (utf8.back() == '\\' || utf8.back() == '/'))
+				utf8.pop_back();
+			return utf8.size() >= 4 ? utf8 : std::string();
+		}
+
+		// The user's profile folder (USERPROFILE, e.g. C:\Users\Name) as it appears in log lines, so
+		// that it can be written as %USERPROFILE%: logs get posted in public, and the folder is
+		// usually named after the Windows user. Its short form as well (C:\Users\NAME~1), which %TEMP%
+		// often has. Empty forms are left out; worked out once.
+		const std::vector<std::string>& ProfileFolders()
+		{
+			static const std::vector<std::string> folders = []
+			{
+				std::vector<std::string> forms;
+				wchar_t buffer[MAX_PATH]{};
+				const DWORD length = GetEnvironmentVariableW(L"USERPROFILE", buffer, MAX_PATH);
+				if (length == 0 || length >= MAX_PATH)
+					return forms;
+				const std::string full = AsLogFolder(std::wstring_view(buffer, length));
+				if (full.empty())
+					return forms;
+				forms.push_back(full);
+				wchar_t shortBuffer[MAX_PATH]{};
+				const DWORD shortLength = GetShortPathNameW(buffer, shortBuffer, MAX_PATH);
+				if (shortLength > 0 && shortLength < MAX_PATH)
+				{
+					const std::string shortForm = AsLogFolder(std::wstring_view(shortBuffer, shortLength));
+					if (!shortForm.empty() && _stricmp(shortForm.c_str(), full.c_str()) != 0)
+						forms.push_back(shortForm);
+				}
+				return forms;
+			}();
+			return folders;
+		}
+
+		// Writes every mention of the profile folder in line as %USERPROFILE%, whatever its case. Only a
+		// whole folder name counts: it must be followed by a separator or end the line, so that the
+		// profile C:\Users\Al does not turn C:\Users\Alex into nonsense.
+		void HideProfileFolder(std::string& line)
+		{
+			for (const std::string& folder : ProfileFolders())
+			{
+				for (size_t at = 0; at + folder.size() <= line.size(); ++at)
+				{
+					const size_t end = at + folder.size();
+					if ((end == line.size() || line[end] == '\\' || line[end] == '/') &&
+						_strnicmp(line.c_str() + at, folder.c_str(), folder.size()) == 0)
+					{
+						line.replace(at, folder.size(), "%USERPROFILE%");
+						at += sizeof("%USERPROFILE%") - 2;
+					}
+				}
+			}
+		}
 
 		std::string FormatLine(std::string_view tag, std::string_view text)
 		{
@@ -47,6 +115,7 @@ namespace TweaksV
 			line.append(tag);
 			line += "] ";
 			line.append(text);
+			HideProfileFolder(line);
 			if (line.size() > kMaxLine - 2)
 			{
 				line.resize(kMaxLine - 5);
@@ -55,14 +124,30 @@ namespace TweaksV
 			return line;
 		}
 
-		// Caller holds g_lock.
+		// "64 MB" or, for a limit that is not whole megabytes (test builds), "16 KB".
+		std::string DescribeLogLimit()
+		{
+			const uint64_t mb = 1024 * 1024;
+			return g_logLimit % mb == 0 ? std::to_string(g_logLimit / mb) + " MB" : std::to_string(g_logLimit / 1024) + " KB";
+		}
+
+		// Caller holds g_lock. Once the file holds g_logLimit bytes, a last line says so and nothing more
+		// goes to the file; the console still gets every line.
 		void WriteLineLocked(const std::string& line)
 		{
-			if (g_toFile && g_file != INVALID_HANDLE_VALUE)
+			constexpr size_t kLastLineRoom = 256;	// kept free for the line that says the limit is reached
+			if (g_toFile && g_file != INVALID_HANDLE_VALUE && !g_logFull)
 			{
-				const std::string data = line + "\r\n";
+				std::string data = line + "\r\n";
+				if (g_logBytes + data.size() + kLastLineRoom > g_logLimit)
+				{
+					data = FormatLine("TweaksV", "TweaksV.log has reached its limit of " + DescribeLogLimit() +
+						" - nothing more is written to it this session.") + "\r\n";
+					g_logFull = true;
+				}
 				DWORD written = 0;
-				WriteFile(g_file, data.data(), static_cast<DWORD>(data.size()), &written, nullptr);
+				if (WriteFile(g_file, data.data(), static_cast<DWORD>(data.size()), &written, nullptr))
+					g_logBytes += written;
 			}
 			if (g_console)
 			{
@@ -70,12 +155,6 @@ namespace TweaksV
 				fputc('\n', stdout);
 				fflush(stdout);
 			}
-		}
-
-		HANDLE CreateLogFile(const std::wstring& path)
-		{
-			return CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-				nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 		}
 
 		std::wstring ModulePath(HMODULE module)
@@ -105,7 +184,7 @@ namespace TweaksV
 				std::to_string(version.Build) + "." + std::to_string(version.Revision);
 		}
 
-		// "0x6870ABCD (2026-07-10 12:34:56 UTC)" from the exe's PE header.
+		// "0x6870ABCD (YYYY-MM-DD hh:mm:ss UTC)" from the exe's PE header.
 		std::string GamePeTimestamp()
 		{
 			const auto base = reinterpret_cast<const BYTE*>(GetModuleHandleW(nullptr));
@@ -161,7 +240,13 @@ namespace TweaksV
 	void ClearLogFile()
 	{
 		const bool toFile = IsOn(kLogToFile);
-		const std::wstring primary = GetGameFolder() + L"\\TweaksV.log";
+		const std::wstring primaryPath = GetGameFolder() + L"\\TweaksV.log";
+
+#ifdef TWEAKSV_TEST_BUILD
+		// test builds only: TEST_LOG_LIMIT_KB under [TWEAKSV] lowers the limit, so the tests can reach it
+		const std::string& testLimit = GetText(kTestLogLimitKb);
+		const unsigned long testLimitKb = testLimit.empty() ? 0 : strtoul(testLimit.c_str(), nullptr, 10);
+#endif
 
 		AcquireSRWLockExclusive(&g_lock);
 		g_toFile = toFile;
@@ -171,45 +256,59 @@ namespace TweaksV
 			g_file = INVALID_HANDLE_VALUE;
 		}
 		g_path.clear();
+		g_logBytes = 0;
+		g_logFull = false;
+#ifdef TWEAKSV_TEST_BUILD
+		if (testLimitKb >= 1 && testLimitKb <= 65536)
+			g_logLimit = static_cast<uint64_t>(testLimitKb) * 1024;
+#endif
 
-		DWORD primaryError = ERROR_SUCCESS;
-		std::wstring fallback;
+		// Only a TweaksV.log that is what its path says is written (TweaksVFiles.h): first in the game
+		// folder, else - the game folder read-only, a link there, the file in use - in %LOCALAPPDATA%\TweaksV.
+		OwnFile primary{}, fallback{};
+		std::wstring fallbackPath;
 		if (g_toFile)
 		{
-			g_file = CreateLogFile(primary);
-			if (g_file != INVALID_HANDLE_VALUE)
+			primary = OpenOwnFile(GetGameFolder(), L"TweaksV.log", FileFolder::Game, OPEN_ALWAYS, true);
+			if (primary.handle != INVALID_HANDLE_VALUE)
 			{
-				g_path = primary;
+				g_file = primary.handle;
+				g_path = primaryPath;
 			}
 			else
 			{
-				// Game folder read-only: use %LOCALAPPDATA%\TweaksV instead.
-				primaryError = GetLastError();
 				const std::wstring folder = GetFallbackFolder();
 				if (!folder.empty())
 				{
 					CreateDirectoryW(folder.c_str(), nullptr);
-					fallback = folder + L"\\TweaksV.log";
-					g_file = CreateLogFile(fallback);
-					if (g_file != INVALID_HANDLE_VALUE)
-						g_path = fallback;
+					fallbackPath = folder + L"\\TweaksV.log";
+					fallback = OpenOwnFile(folder, L"TweaksV.log", FileFolder::Own, OPEN_ALWAYS, true);
+					if (fallback.handle != INVALID_HANDLE_VALUE)
+					{
+						g_file = fallback.handle;
+						g_path = fallbackPath;
+					}
 				}
 			}
 		}
 		g_cleared = true;
-		const bool usingFallback = g_toFile && !fallback.empty() && g_path == fallback;
+		const bool usingFallback = g_toFile && !fallbackPath.empty() && g_path == fallbackPath;
 		const bool noFile = g_toFile && g_file == INVALID_HANDLE_VALUE;
 		ReleaseSRWLockExclusive(&g_lock);
 
-		// Written after releasing the lock: WriteLog and ReportFailure take it. A
-		// read-only game folder is normal (e.g. under C:\Program Files), so the fallback
-		// is only logged; failing in both places is a problem.
-		if (usingFallback)
-			WriteLog("TweaksV", "The game folder is read-only (" + DescribeError(primaryError) +
-				"), so TweaksV.log is written to " + ToUtf8(fallback) + ".");
+		// Written after releasing the lock: WriteLog and ReportFailure take it. A read-only game folder
+		// is normal (e.g. under C:\Program Files), so that fallback is only logged; any other reason - a
+		// link where the log belongs, the file in use - and no log at all are problems.
+		if (usingFallback && primary.ReadOnly())
+			WriteLog("TweaksV", "The game folder is read-only (" + DescribeError(primary.error) +
+				"), so TweaksV.log is written to " + ToUtf8(fallbackPath) + ".");
+		else if (usingFallback)
+			ReportFailure("TweaksV", "The TweaksV.log in the game folder is not used: " + primary.Reason() +
+				". TweaksV.log is written to " + ToUtf8(fallbackPath) + " instead.");
 		else if (noFile)
-			ReportFailure("TweaksV", "TweaksV.log could not be created in the game folder or in %LOCALAPPDATA%\\TweaksV (" +
-				DescribeError(primaryError) + "). Nothing is logged to a file this session.");
+			ReportFailure("TweaksV", "TweaksV.log could not be written in the game folder (" + primary.Reason() + ") or in "
+				"%LOCALAPPDATA%\\TweaksV (" + (fallbackPath.empty() ? std::string("LOCALAPPDATA is not set") : fallback.Reason()) +
+				"). Nothing is logged to a file this session.");
 	}
 
 	void WriteLogHeader()
@@ -326,6 +425,7 @@ namespace TweaksV
 		case ERROR_WRITE_PROTECT:		text = "write-protected"; break;
 		case ERROR_DISK_FULL:
 		case ERROR_HANDLE_DISK_FULL:	text = "disk full"; break;
+		case ERROR_ENVVAR_NOT_FOUND:	text = "environment variable not set"; break;
 		default: break;
 		}
 		std::string result = "Windows error " + std::to_string(error);

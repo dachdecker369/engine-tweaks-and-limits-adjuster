@@ -7,6 +7,10 @@ B="${TWEAKSV_TEST_DIR:-$R/object/TestRun}"
 mkdir -p "$B/appdata" || exit 1
 AW="$(cygpath -w "$B/appdata")"
 
+# Test builds of TweaksV show no message box with this set, so no run waits on one (release builds
+# ignore it).
+export TWEAKSV_TEST_NO_BOXES=1
+
 # check DESCRIPTION CONDITION: CONDITION is evaluated, the result printed and counted.
 pass=0; fail=0
 check() { if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  $1"; fail=$((fail+1)); fi; }

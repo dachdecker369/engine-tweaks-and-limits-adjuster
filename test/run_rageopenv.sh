@@ -138,5 +138,10 @@ echo "== R18 FreeLibrary while hooked: TweaksV.asi stays loaded (pinned), no cra
 fresh_ini; cp plain_game.exe GTA5_Enhanced.exe; LOCALAPPDATA="$AW" timeout 60 ./GTA5_Enhanced.exe TweaksV.asi unload > harness.out 2>&1
 check "loaded and 'unloaded' without a crash" "grep -q 'loaded and unloaded' harness.out"
 
+echo "== R19 the newmods device called with crafted paths: nothing outside the newmods folder, no fixed buffers"
+fresh_ini; mkdir -p newmods/dlcpacks/test; echo in > newmods/dlcpacks/test/inside.txt; echo out > outside.txt
+out=$(game full_game.exe rovdeviceprobe); rm -rf newmods/dlcpacks outside.txt
+check "a file inside is opened and found; '..', a rooted path and a 300-character search are refused; a name is copied without reading past it" "has 'device: inside ok, dots refused, rooted refused, search ok, long search refused, name ok'"
+
 echo
 echo "RAGEOPENV SCENARIOS: $pass passed, $fail failed"

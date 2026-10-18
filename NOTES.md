@@ -5,11 +5,22 @@
   - A value TweaksV cannot use - not a number, not on or off, outside its limits - is shown in the start-up summary as well as the log, with the value used instead.
   - `INI_VERSION` under `[TWEAKSV]` says which layout the file has, so a later TweaksV can tell an older file apart; a file from a newer TweaksV is reported.
 - **`TweaksV.log`:** one log with a header (versions, paths, switches).
+  - Paths in the Windows user's profile folder are written as `%USERPROFILE%\...`, also where the folder has its short form (`C:\Users\NAME~1`, as `%TEMP%` often has): logs get posted in public, and that folder is usually named after the user.
+  - It grows to 64 MB at most, room for hours of the logs for testing; a last line says when it stops.
 - **Read-only game folders:** both files go to `%LOCALAPPDATA%\TweaksV` when the game folder is read-only, for example a Rockstar Games Launcher install under `C:\Program Files`.
   - A `TweaksV.ini` in the game folder always wins.
-  - A read-only folder is normal, so it is only logged; it shows no message box.
+  - A read-only folder is normal, so it is only logged; it shows no message box. Any other reason, such as a `TweaksV.log` that another program holds open, is a problem in the start-up summary.
+- **Links:** TweaksV writes only to its own files, never through a link to another file - which matters when the game runs as administrator:
+  - A `TweaksV.log` in the game folder that is a link (a symbolic or a hard link) is left alone, and the log goes to `%LOCALAPPDATA%\TweaksV`;
+  - A `TweaksV.ini` that is a link is neither read nor written: every setting keeps its built-in default;
+  - `%LOCALAPPDATA%\TweaksV` must not be a link (a junction) itself; the game folder may be one, for an install moved to another drive;
+  - Each of these is a problem in the start-up summary;
+  - While TweaksV reads `TweaksV.ini` at start-up, the file cannot be renamed, deleted or replaced;
+  - A file Windows keeps compressed (`compact`, CompactGUI) is not a link and is used as usual.
 
 - **Conflicts:** old stand-alone plugins (HeapAdjuster.asi, OpenRPF.asi, ...) are detected. Their TweaksV part is switched off for the session and listed in a start-up summary.
+
+- **Problems on screen:** every problem at start-up is listed in one message box, the start-up summary (`SHOW_ERROR_POPUPS=1`, the default). A part that stops working later, such as the DirectStorage hook a few seconds in, gets a message box of its own, at most three per session.
 
 - **MemScanner fixes:**
   - A pattern miss is logged and returns null instead of exiting the game;
@@ -75,6 +86,7 @@
   - Page protection is restored after every write, and the redirected calls go through stubs that are never writable and executable at once;
   - The console patch is only applied when the console is on (`CONSOLE=1`);
   - Newmods: files are closed properly, folder listing works, file sizes are right, reading at the end of a file no longer hangs, and nothing is mounted without a newmods folder (DIAGNOSTIC_MODE still checks its patterns);
+  - Newmods: a path that leads out of the `newmods` folder (a rooted one, or one with `..`) matches no file; paths are built at their real length instead of in fixed 256-character buffers, where a long one stopped the game; a name is copied without reading past its end;
   - Its log switches (`LOG_INFO`, `LOG_MODS`, `LOG_DEVICE`) work at runtime, and cost nothing when off;
   - The mods folder is read once at start-up, and the game's file calls look their paths up in that list: no file system call, memory allocation or lock per call. Without a mods folder, the game's file functions are not hooked at all (DIAGNOSTIC_MODE still checks their patterns). A path with `..` is never redirected, and the list holds at most 200,000 files and folders, 32 levels deep (more is reported in the start-up summary);
   - The `GetSystemTimeAsFileTime` hook switches itself off once its one-time start-up has run;
@@ -94,8 +106,9 @@
 - **Hook:** `TweaksV.asi` stays loaded once enabled until the game exits.
 
 - **Build:** all of TweaksV's code, its own and the merged plugins', builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
+  - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four.
 
-- **Tests:** `test\` holds fake-game test suites (277 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (302 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 
@@ -109,13 +122,8 @@ Known bugs and open issues in TweaksV.
 - **Tested:** one boot on 1.0.1158.16 with `NEWMODS=1`, `LOG_DEVICE=1` and an empty `newmods` folder. The newmods devices were mounted without a problem, but the game opened no file through them, so this code never ran. Confirming the sign needs a boot in which the game loads a file from the `newmods` folder.
 - **Workaround:** `NEWMODS=0` (the default) under `[RAGEOPENV_SETTINGS]` in `TweaksV.ini` turns newmods off.
 
-### T-HARDEN: hardening still to do
+### T-HARDEN: MinHook's trampolines are writable and executable
 
-- **What:** low-severity items from the code review:
-  - MinHook, the hook library, keeps its trampolines in memory that is writable and executable;
-  - `TweaksV.log` and `TweaksV.ini` are written without checking for links;
-  - newmods (off by default) uses fixed 256-character path buffers and does not check that a path stays inside the `newmods` folder;
-  - `TweaksV.log` shows the Windows user name in its paths;
-  - the log switches for testing (`LOG_CALLS`, `LOG_FILE_OPENS`) and RageOpenV's (`LOG_INFO`, `LOG_MODS`, `LOG_DEVICE`) let `TweaksV.log` grow without a limit;
-  - a part that stops working after the start-up summary, such as the DirectStorage `OpenFile` hook, is reported only in the log.
-- **When it goes:** in the next refactoring step, security hardening, before the next release.
+- **What:** MinHook, the hook library, keeps the trampolines of TweaksV's hooks in memory that is writable and executable at once. That only helps an attack that can already write to the game's memory. The rest of the code review's hardening is done: links, the user name and the size limit of `TweaksV.log`, newmods' paths, problems after the start-up summary, the exploit mitigations.
+- **Status:** accepted. It is MinHook's own design, and `vendor\MinHook` stays unchanged; TweaksV's own stubs are never writable and executable at once.
+- **When it goes:** when MinHook keeps its trampolines read and execute only, or TweaksV moves to a hook library that does.

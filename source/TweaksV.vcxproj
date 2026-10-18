@@ -32,8 +32,8 @@
   <PropertyGroup>
     <!-- TweaksV's version: in BuildInfo.h (the log header) and version.rc (the file's version info) -->
     <TweaksVVersionMajor>1</TweaksVVersionMajor>
-    <TweaksVVersionMinor>2</TweaksVVersionMinor>
-    <TweaksVVersionPatch>2</TweaksVVersionPatch>
+    <TweaksVVersionMinor>3</TweaksVVersionMinor>
+    <TweaksVVersionPatch>0</TweaksVVersionPatch>
     <TweaksVRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..'))</TweaksVRoot>
     <TargetName>TweaksV</TargetName>
     <TargetExt>.asi</TargetExt>
@@ -68,6 +68,9 @@
       <ConformanceMode>true</ConformanceMode>
       <!-- strict warnings for all of TweaksV's code, its own and the merged plugins' (MinHook: below) -->
       <WarningLevel>Level4</WarningLevel>
+      <!-- exploit mitigations: Control Flow Guard and the exception data CET needs (with CETCompat below) -->
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <GuardEHContMetadata>true</GuardEHContMetadata>
       <ExceptionHandling>Sync</ExceptionHandling>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -85,6 +88,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>version.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ImportLibrary>$(IntDir)$(TargetName).lib</ImportLibrary>
+      <CETCompat>true</CETCompat>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -122,6 +126,7 @@
     <ClCompile Include="TweaksVConflicts.cpp" />
     <ClCompile Include="TweaksVDirectStorage.cpp" />
     <ClCompile Include="TweaksVFeatures.cpp" />
+    <ClCompile Include="TweaksVFiles.cpp" />
     <ClCompile Include="TweaksVIni.cpp" />
     <ClCompile Include="TweaksVLog.cpp" />
     <ClCompile Include="TweaksVPatch.cpp" />
@@ -163,6 +168,7 @@
     <ClInclude Include="TweaksVConflicts.h" />
     <ClInclude Include="TweaksVDirectStorage.h" />
     <ClInclude Include="TweaksVFeatures.h" />
+    <ClInclude Include="TweaksVFiles.h" />
     <ClInclude Include="TweaksVIni.h" />
     <ClInclude Include="TweaksVLog.h" />
     <ClInclude Include="TweaksVPatch.h" />
