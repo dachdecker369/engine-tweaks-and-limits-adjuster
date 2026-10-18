@@ -9,7 +9,7 @@ Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game bui
 | **Game Build** | 1.0.1158.16 |
 | **Found** | 72 of the 72 patterns this build uses |
 | **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-F1..F8` run only with a mods folder in the game directory (with `DIAGNOSTIC_MODE=1`, also without one). `R-E-M0..M2` and `R-E-D1..D2` run only with `NEWMODS=1` and a newmods folder in the game directory (with `NEWMODS=1` and `DIAGNOSTIC_MODE=1`, also without the folder). |
-| **Matches** | All match exactly once. To check: boot once with `DIAGNOSTIC_MODE=1` and `CONSOLE=1` enabled. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once. |
+| **Matches** | All match exactly once. To check: boot once with `DIAGNOSTIC_MODE=1`, `CONSOLE=1` and `NEWMODS=1` enabled. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once. |
 
 Build uses 72 of 76 patterns:
 - Packfile picks one of three direct size patterns and one of two references by game build.
@@ -19,7 +19,7 @@ The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstor
 
 ### When Game Updates
 
-1. Start the game with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1`. Then game binary isn't patched. `TweaksV.log` lists every pattern not found.
+1. Start the game with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1` - and `CONSOLE=1` and `NEWMODS=1`, so every pattern is looked for. Then game binary isn't patched. `TweaksV.log` lists every pattern not found.
 2. Check whether the original plugin has been updated (`UPSTREAM.md`).
 3. Update the pattern, confirm that it matches exactly once, then update this file.
 4. DirectStorage: if `UNLOCK_FILES=1` reports a problem (another interface, or an `OpenFile` outside DirectStorage's DLLs), look at the factory's functions with `LOG_CALLS=1` and `DIAGNOSTIC_MODE=1`.
