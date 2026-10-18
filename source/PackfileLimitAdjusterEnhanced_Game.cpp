@@ -16,7 +16,7 @@
 #include "GameVersion.h"
 #include <cstring>					// TweaksV: memcmp, memset
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
-#include "TweaksVIni.h"		// TweaksV: TweaksV.ini, DRY_RUN, DIAGNOSTIC_MODE
+#include "TweaksVSettings.h"	// TweaksV: PACKFILEARRAY_SIZE, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVPatch.h"	// TweaksV: DescribeAddress, MakeWritable, RestoreProtection
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
 
@@ -38,6 +38,7 @@ static bool fatalError = false;
 // TweaksV: the new array always has the maximum size, whatever PACKFILEARRAY_SIZE says, because
 // it is moved before the game's own size is read (plan 2.3, 5.9 R4). Archive indices are 16-bit.
 static const uint32_t MaxPackFileArray_Size = 65535;
+static_assert(static_cast<int>(MaxPackFileArray_Size) == TweaksV::kPackfileArraySize.maxValue, "PACKFILEARRAY_SIZE's maximum must be the array's size"); // TweaksV
 
 static const char* const kTag = "PackfileLimitAdjusterEnhanced"; // TweaksV: for the shared helpers' log lines
 
@@ -73,11 +74,7 @@ void initializeGame()
 {
 	// TweaksV: ClearLog() removed - TweaksV.log is cleared once per start (plan 5.7)
 
-	PackFileArray_Size = (uint32_t)GetPrivateProfileIntA("PACKFILE_SETTINGS", "PACKFILEARRAY_SIZE", 13000, TweaksV::GetIniPathA()); // TweaksV: TweaksV.ini (was .\PackfileLimitAdjusterEnhanced.ini); default 13000 (the original's was 12000)
-	if (PackFileArray_Size == 0) { // TweaksV: 0 or not a number - use the default (plan 5.6)
-		Logging("TweaksV.ini: PACKFILEARRAY_SIZE is not a valid size - using the default, 13000.");
-		PackFileArray_Size = 13000;
-	}
+	PackFileArray_Size = (uint32_t)TweaksV::GetNumber(TweaksV::kPackfileArraySize); // TweaksV: from TweaksV's settings table, which checks it (was .\PackfileLimitAdjusterEnhanced.ini); default 13000 (the original's was 12000)
 	// TweaksV: the game edition check is removed - TweaksV only runs in GTA5_Enhanced.exe (F-PACK-2)
 
 	// TweaksV: two patterns depend on the game build; without it the right ones cannot be chosen

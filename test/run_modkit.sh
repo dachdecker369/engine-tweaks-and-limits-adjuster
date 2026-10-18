@@ -39,12 +39,12 @@ check "clamp logged" "log_has 'MODKITARRAY_SIZE=500 is outside 1024..65536 - usi
 echo "== K4 MODKITARRAY_SIZE=70000 is clamped to 65536"
 fresh_ini; setmodkitkey MODKITARRAY_SIZE 70000; out=$(game full_game.exe)
 check "limits for 65536" "[[ \"\$out\" == *\"$MAX_LIMITS\"* ]]"
-check "clamp logged" "log_has 'MODKITARRAY_SIZE=70000 is outside 1024..65536 - using 65536'"
+check "clamp reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[MODKIT_SETTINGS\] MODKITARRAY_SIZE=70000 is outside 1..65536 - using 65536.'"
 
 echo "== K5 MODKITARRAY_SIZE=abc falls back to the default 65536"
 fresh_ini; setmodkitkey MODKITARRAY_SIZE abc; out=$(game full_game.exe)
 check "limits for 65536" "[[ \"\$out\" == *\"$MAX_LIMITS\"* ]]"
-check "invalid value logged" "log_has 'MODKITARRAY_SIZE is not a valid size - using the default, 65536'"
+check "invalid value reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[MODKIT_SETTINGS\] MODKITARRAY_SIZE=abc is not a number - using 65536.'"
 
 echo "== K6 DRY_RUN=1: everything found and checked, nothing written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"

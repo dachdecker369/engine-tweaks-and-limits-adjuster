@@ -3,7 +3,7 @@
 // Modified for TweaksV; every change is marked "TweaksV:".
 #include "main.h"
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
-#include "TweaksVIni.h"		// TweaksV: NEWMODS, DRY_RUN, DIAGNOSTIC_MODE
+#include "TweaksVSettings.h"	// TweaksV: NEWMODS, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVLog.h"		// TweaksV
 #include "TweaksVPatch.h"	// TweaksV: DescribeAddress, CallTarget, StartsWithJump, MakeWritable
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
@@ -124,7 +124,7 @@ char OpenArchiveHook(rage::fiPackfile* a1, const char* path, char smth, int32_t 
 
 static memory::InitFuncs CustomDevice([] {
 	// TweaksV: the NEWMODS switch (off by default); only the GTA V Enhanced patterns are kept (F-ROV-5)
-	if (!TweaksV::GetIniBool("RAGEOPENV_SETTINGS", "NEWMODS", false)) {
+	if (!TweaksV::IsOn(TweaksV::kNewMods)) {
 		TweaksV::WriteLog("RageOpenV", "NEWMODS=0 - the newmods folder is not mounted.");
 		return;
 	}

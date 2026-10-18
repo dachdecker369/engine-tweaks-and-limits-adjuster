@@ -11,6 +11,7 @@
 
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
+#include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
 
 namespace TweaksV
@@ -20,23 +21,22 @@ namespace TweaksV
 		struct OldPlugin
 		{
 			const wchar_t* file;
-			const char* section;	// the TweaksV feature it duplicates
-			const char* feature;
+			const SettingsSection* part;	// the part of TweaksV it duplicates
 		};
 
 		// The plugins TweaksV replaces. ZHeapAdjuster.asi is the rename the HeapAdjuster
 		// author recommends; OpenRPF.asi and OpenIV.asi do RageOpenV's job, and alloc8or's
 		// DirectStorageFix.asi does the job of TweaksV's own DirectStorage part.
 		constexpr OldPlugin kOldPlugins[] = {
-			{ L"HeapAdjuster.asi", "HEAP_SETTINGS", "HeapAdjusterEnhanced" },
-			{ L"ZHeapAdjuster.asi", "HEAP_SETTINGS", "HeapAdjusterEnhanced" },
-			{ L"ModkitLimitAdjusterEnhanced.asi", "MODKIT_SETTINGS", "ModkitLimitAdjusterEnhanced" },
-			{ L"PackfileLimitAdjusterEnhanced.asi", "PACKFILE_SETTINGS", "PackfileLimitAdjusterEnhanced" },
-			{ L"RageOpenV.asi", "RAGEOPENV_SETTINGS", "RageOpenV" },
-			{ L"OpenRPF.asi", "RAGEOPENV_SETTINGS", "RageOpenV" },
-			{ L"OpenIV.asi", "RAGEOPENV_SETTINGS", "RageOpenV" },
-			{ L"StraightToStoryMode.asi", "STRAIGHTTOSTORYMODE_SETTINGS", "StraightToStoryMode" },
-			{ L"DirectStorageFix.asi", "DIRECTSTORAGE_SETTINGS", "DirectStorage" },
+			{ L"HeapAdjuster.asi", &kHeapSection },
+			{ L"ZHeapAdjuster.asi", &kHeapSection },
+			{ L"ModkitLimitAdjusterEnhanced.asi", &kModkitSection },
+			{ L"PackfileLimitAdjusterEnhanced.asi", &kPackfileSection },
+			{ L"RageOpenV.asi", &kRageOpenVSection },
+			{ L"OpenRPF.asi", &kRageOpenVSection },
+			{ L"OpenIV.asi", &kRageOpenVSection },
+			{ L"StraightToStoryMode.asi", &kStoryModeSection },
+			{ L"DirectStorageFix.asi", &kDirectStorageSection },
 		};
 
 		// ASI loaders load .asi files from the game folder and these subfolders.
@@ -61,8 +61,8 @@ namespace TweaksV
 					continue;
 
 				++found;
-				DisableFeatureForSession(plugin.section);
-				ReportFailure("TweaksV", "Old plugin found: " + ToUtf8(path) + ". TweaksV's " + plugin.feature +
+				DisableFeatureForSession(*plugin.part);
+				ReportFailure("TweaksV", "Old plugin found: " + ToUtf8(path) + ". TweaksV's " + plugin.part->feature +
 					" part is switched off for this session so nothing is patched twice. "
 					"Delete the old file - TweaksV replaces it.");
 			}

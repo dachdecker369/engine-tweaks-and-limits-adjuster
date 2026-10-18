@@ -40,6 +40,7 @@
 #include "MinHook.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
+#include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;	// TweaksV.asi itself
@@ -49,7 +50,6 @@ namespace TweaksV
 	namespace
 	{
 		constexpr const char* kTag = "DirectStorage";
-		constexpr const char* kSection = "DIRECTSTORAGE_SETTINGS";
 
 		constexpr int kLinesPerWay = 2;			// lines per file, caller and sharing; more opens are counted
 		constexpr uint64_t kMaxLines = 20000;	// open lines in all; then the opens are only counted
@@ -951,9 +951,9 @@ namespace TweaksV
 
 	void InitDirectStorage()
 	{
-		const bool unlock = GetIniBool(kSection, "UNLOCK_FILES", true);
-		const bool logCalls = GetIniBool(kSection, "LOG_CALLS", false);
-		const bool logOpens = GetIniBool(kSection, "LOG_FILE_OPENS", false);
+		const bool unlock = IsOn(kUnlockFiles);
+		const bool logCalls = IsOn(kLogCalls);
+		const bool logOpens = IsOn(kLogFileOpens);
 		if (!unlock && !logCalls && !logOpens)
 		{
 			WriteLog(kTag, "UNLOCK_FILES=0, LOG_CALLS=0 and LOG_FILE_OPENS=0 - nothing to do.");

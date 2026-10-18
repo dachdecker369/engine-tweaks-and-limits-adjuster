@@ -7,12 +7,10 @@
 #include "HeapAdjusterEnhanced_Game.h"
 #include <iostream>
 #include <fstream>
-#include <string>
-#include <iostream>
-#include <fstream>
+#include <string>			// TweaksV: the second <iostream> and <fstream> are removed
 
 #include "pattern.h"
-#include "TweaksVIni.h"     // TweaksV: TweaksV.ini, DRY_RUN, DIAGNOSTIC_MODE
+#include "TweaksVSettings.h" // TweaksV: HEAP_SIZE, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVLog.h"     // TweaksV: TweaksV.log
 #include "TweaksVSummary.h" // TweaksV: start-up summary
 
@@ -35,13 +33,9 @@ void initializeGame()
 	// TweaksV: the game edition check and the other edition's pattern are removed -
 	// TweaksV only runs in GTA5_Enhanced.exe (F-HEAP-1/2)
 
-	// TweaksV: moved here from the global initialiser; same section and key, read
-	// from TweaksV.ini (B-HEAP-05); the default is 2000 MB (the original's was 1024)
-	heapSize = GetPrivateProfileInt(L"HEAP_SETTINGS", L"HEAP_SIZE", 2000, TweaksV::GetIniPathW());
-	if (heapSize <= 0) { // TweaksV: 0, negative or not a number (B-HEAP-03)
-		TweaksV::WriteLog("HeapAdjusterEnhanced", "TweaksV.ini: HEAP_SIZE is not a valid size - using the default, 2000.");
-		heapSize = 2000;
-	}
+	// TweaksV: moved here from the global initialiser; same section and key, from TweaksV's
+	// settings table, which checks it (1..2047 MB; the default is 2000 MB, the original's was 1024)
+	heapSize = TweaksV::GetNumber(TweaksV::kHeapSize);
 
 	BytePattern pattern((BYTE*)"\xBA\x00\x00\x00\x00\x45\x31\xC0\x41\xB1\x01\xE8\x00\x00\x00\x00\x48\x8D\x0D", "x????xxxxxxx????xxx");
 	if (!pattern.bSuccess) { // TweaksV: never checked - a miss made loc = 0x1 and crashed below (B-HEAP-01)
@@ -71,15 +65,18 @@ void initializeGame()
 		TweaksV::WriteLog("HeapAdjusterEnhanced", "WARNING: the heap size found (" + std::to_string(vanillaHeapSize) +
 			" MB) is larger than the game's own - another heap adjuster may be active.");
 
-	// TweaksV: clamp to [the game's own size, 2047 MB]; the game supports at most 2047 MB (B-HEAP-02/03)
+	// TweaksV: clamp to [the game's own size, 2047 MB]; the game supports at most 2047 MB, the
+	// setting's maximum (B-HEAP-02/03)
+	const int maxHeapSize = TweaksV::kHeapSize.maxValue;
 	const int requestedHeapSize = heapSize;
 	if (heapSize < vanillaHeapSize)
 		heapSize = vanillaHeapSize;
-	if (heapSize > 2047)
-		heapSize = 2047;
+	if (heapSize > maxHeapSize)
+		heapSize = maxHeapSize;
 	if (heapSize != requestedHeapSize)
 		TweaksV::WriteLog("HeapAdjusterEnhanced", "TweaksV.ini: HEAP_SIZE=" + std::to_string(requestedHeapSize) +
-			" is outside " + std::to_string(vanillaHeapSize) + "..2047 - using " + std::to_string(heapSize) + ".");
+			" is outside " + std::to_string(vanillaHeapSize) + ".." + std::to_string(maxHeapSize) + " - using " +
+			std::to_string(heapSize) + ".");
 
 	// TweaksV: 64-bit math - heapSize * 1024 * 1024 overflowed int from 2048 up (B-HEAP-02)
 	const long long newHeapBytes = (long long)heapSize * 1024 * 1024;

@@ -43,12 +43,12 @@ check "clamp logged" "log_has 'PACKFILEARRAY_SIZE=1000 is outside 4500..65535 - 
 echo "== P4 PACKFILEARRAY_SIZE=70000 is clamped to 65535"
 fresh_ini; setpackkey PACKFILEARRAY_SIZE 70000; out=$(game full_game.exe)
 check "limits 65535" "has 'D3=65535 D2=4500 D1=4500 I=65535' && has 'config 3000 -> 65535'"
-check "clamp logged" "log_has 'PACKFILEARRAY_SIZE=70000 is outside 4500..65535 - using 65535'"
+check "clamp reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_SETTINGS\] PACKFILEARRAY_SIZE=70000 is outside 1..65535 - using 65535.'"
 
 echo "== P5 PACKFILEARRAY_SIZE=abc falls back to the default 13000"
 fresh_ini; setpackkey PACKFILEARRAY_SIZE abc; out=$(game full_game.exe)
 check "limits 13000" "has 'D3=13000 D2=4500 D1=4500 I=13000'"
-check "invalid value logged" "log_has 'PACKFILEARRAY_SIZE is not a valid size - using the default, 13000'"
+check "invalid value reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_SETTINGS\] PACKFILEARRAY_SIZE=abc is not a number - using 13000.'"
 
 echo "== P6 DRY_RUN=1: everything found and checked, nothing written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"

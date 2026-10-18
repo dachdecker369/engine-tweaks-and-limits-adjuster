@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 #include "TweaksVLog.h" // TweaksV: was "Logging.h" (each plugin had its own log file)
-#include "TweaksVIni.h" // TweaksV: IsDiagnosticMode()
+#include "TweaksVSettings.h" // TweaksV: IsDiagnosticMode(), TEST_BREAK_PATTERN
 
 namespace MemScanner
 {
@@ -353,7 +353,7 @@ namespace MemScanner
 
         bool IsBrokenForTest(const std::string& patternStr)
         {
-            static const std::string broken = NormalizePattern(TweaksV::GetIniString("TWEAKSV", "TEST_BREAK_PATTERN", ""));
+            static const std::string broken = NormalizePattern(TweaksV::GetText(TweaksV::kTestBreakPattern));
             return !broken.empty() && NormalizePattern(patternStr) == broken;
         }
 #endif

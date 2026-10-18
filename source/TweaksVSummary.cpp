@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "TweaksVIni.h"
 #include "TweaksVLog.h"
+#include "TweaksVSettings.h"
 
 namespace TweaksV
 {
@@ -55,7 +55,7 @@ namespace TweaksV
 
 		if (items.empty())
 			return;
-		if (!GetIniBool("TWEAKSV", "SHOW_ERROR_POPUPS", true))
+		if (!IsOn(kShowErrorPopups))
 		{
 			WriteLog("TweaksV", "Start-up summary not shown (SHOW_ERROR_POPUPS=0): " + std::to_string(items.size() + dropped) +
 				" problem(s), see above.");

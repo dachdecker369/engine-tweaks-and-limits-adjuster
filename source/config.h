@@ -3,7 +3,7 @@
 // Modified for TweaksV; every change is marked "TweaksV:".
 #pragma once
 #include <cstring>					// TweaksV: strcmp
-#include "TweaksVIni.h"	// TweaksV: TweaksV.ini - was #include "inicpp.h" (D9, B-ROV-07)
+#include "TweaksVSettings.h"	// TweaksV: TweaksV.ini's settings - was #include "inicpp.h" (D9, B-ROV-07)
 
 namespace RageOpenV // TweaksV: one namespace per original plugin
 {
@@ -28,17 +28,16 @@ public:
 	static T get_config(const char* key)
 	{
 		// TweaksV: [config] keys live in [TWEAKSV] now; the only one, "console", is CONSOLE
-		// (Appendix D - Win32 INI key names ignore case)
-		return static_cast<T>(TweaksV::GetIniBool("TWEAKSV", key, false));
+		return static_cast<T>(strcmp(key, "console") == 0 && TweaksV::IsOn(TweaksV::kConsole));
 	}
 
 	static bool get_log(const char* key)
 	{
-		// TweaksV: [log] info/mods/device are LOG_INFO/LOG_MODS/LOG_DEVICE in [RAGEOPENV_SETTINGS]
-		// (Appendix D), read once and kept; "rpf" was never read and is gone
-		static const bool info = TweaksV::GetIniBool("RAGEOPENV_SETTINGS", "LOG_INFO", false);
-		static const bool mods = TweaksV::GetIniBool("RAGEOPENV_SETTINGS", "LOG_MODS", false);
-		static const bool device = TweaksV::GetIniBool("RAGEOPENV_SETTINGS", "LOG_DEVICE", false);
+		// TweaksV: [log] info/mods/device are LOG_INFO/LOG_MODS/LOG_DEVICE in [RAGEOPENV_SETTINGS],
+		// read once and kept; "rpf" was never read and is gone
+		static const bool info = TweaksV::IsOn(TweaksV::kLogInfo);
+		static const bool mods = TweaksV::IsOn(TweaksV::kLogMods);
+		static const bool device = TweaksV::IsOn(TweaksV::kLogDevice);
 		if (strcmp(key, "info") == 0)
 			return info;
 		if (strcmp(key, "mods") == 0)

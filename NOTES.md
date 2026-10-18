@@ -1,6 +1,9 @@
 # Notes
 
 - **`TweaksV.ini`:** created on the first start with its default settings. Missing keys are added back; existing values are never changed.
+  - Every setting is defined once, in the table in `TweaksVSettings.h`: its section, key, default, limits and comment. The default file, the keys added back, the log header and every reader come from it, and each setting is read once at start-up.
+  - A value TweaksV cannot use - not a number, not on or off, outside its limits - is shown in the start-up summary as well as the log, with the value used instead.
+  - `INI_VERSION` under `[TWEAKSV]` says which layout the file has, so a later TweaksV can tell an older file apart; a file from a newer TweaksV is reported.
 - **`TweaksV.log`:** one log with a header (versions, paths, switches).
 - **Read-only game folders:** both files go to `%LOCALAPPDATA%\TweaksV` when the game folder is read-only, for example a Rockstar Games Launcher install under `C:\Program Files`.
   - A `TweaksV.ini` in the game folder always wins.
@@ -94,10 +97,9 @@ Known bugs and open issues in TweaksV.
 ### T-DEBT: shared code still written more than once
 
 - **What:**
-  - Each setting and its default is written in several places (the key list, the default INI text, the readers, the log header).
   - There are five copies of the code that makes game code writable and restores it, and two of the code that redirects a call.
   - The patterns are text in nine files.
   - About 240 comments in the source, and some in the tests, still cite the sections and bug IDs of the original merge plan, which is not part of the repository.
   - Every test suite has its own copy of the test helpers.
   - The scanner keeps the original's name, `FindPatternBmh`.
-- **When it goes:** in the refactoring that follows the faster scanner (one settings table, one patch module, one pattern table, the comments), before the next release.
+- **When it goes:** in the next refactoring steps (one patch module, one pattern table, the comments), before the next release. The settings are done: they are one table now.

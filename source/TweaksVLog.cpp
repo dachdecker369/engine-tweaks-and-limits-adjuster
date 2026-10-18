@@ -13,6 +13,7 @@
 #include "BuildInfo.h"
 #include "GameVersion.h"
 #include "TweaksVIni.h"
+#include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
 
 extern "C" IMAGE_DOS_HEADER __ImageBase; // this module (TweaksV.asi)
@@ -138,16 +139,6 @@ namespace TweaksV
 			const bool exists = attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY);
 			return ToUtf8(folder) + (exists ? " (present)" : " (not present)");
 		}
-
-		const char* OnOff(bool value)
-		{
-			return value ? "on" : "off";
-		}
-
-		std::string Switch(const char* section, const char* key, bool defaultValue)
-		{
-			return std::string(key) + "=" + (GetIniBool(section, key, defaultValue) ? "1" : "0");
-		}
 	}
 
 	void WriteLog(std::string_view tag, std::string_view text)
@@ -169,7 +160,7 @@ namespace TweaksV
 
 	void ClearLogFile()
 	{
-		const bool toFile = GetIniBool("TWEAKSV", "LOG_TO_FILE", true);
+		const bool toFile = IsOn(kLogToFile);
 		const std::wstring primary = GetGameFolder() + L"\\TweaksV.log";
 
 		AcquireSRWLockExclusive(&g_lock);
@@ -235,38 +226,8 @@ namespace TweaksV
 		header.push_back("TweaksV.log: " + ToUtf8(GetLogPathW()));
 		header.push_back("mods folder: " + FolderState(game + L"\\mods"));
 		header.push_back("newmods folder: " + FolderState(game + L"\\newmods"));
-		header.push_back(std::string("Features: HeapAdjusterEnhanced ") + OnOff(IsFeatureOn("HEAP_SETTINGS")) +
-			", ModkitLimitAdjusterEnhanced " + OnOff(IsFeatureOn("MODKIT_SETTINGS")) +
-			", PackfileLimitAdjusterEnhanced " + OnOff(IsFeatureOn("PACKFILE_SETTINGS")) +
-			", RageOpenV " + OnOff(IsFeatureOn("RAGEOPENV_SETTINGS")) +
-			", StraightToStoryMode " + OnOff(IsFeatureOn("STRAIGHTTOSTORYMODE_SETTINGS")) +
-			", DirectStorage " + OnOff(IsFeatureOn("DIRECTSTORAGE_SETTINGS")));
-		header.push_back("Sizes: HEAP_SIZE=" + GetIniString("HEAP_SETTINGS", "HEAP_SIZE", "2000") +
-			", MODKITARRAY_SIZE=" + GetIniString("MODKIT_SETTINGS", "MODKITARRAY_SIZE", "65536") +
-			", PACKFILEARRAY_SIZE=" + GetIniString("PACKFILE_SETTINGS", "PACKFILEARRAY_SIZE", "13000"));
-		header.push_back("RageOpenV: " + Switch("RAGEOPENV_SETTINGS", "MODS_FOLDER", true) + " " +
-			Switch("RAGEOPENV_SETTINGS", "OPEN_RPF", true) + " " +
-			Switch("RAGEOPENV_SETTINGS", "SKIP_RPF_CACHE_CHECK", true) + " " +
-			Switch("RAGEOPENV_SETTINGS", "NEWMODS", false) + " " +
-			Switch("RAGEOPENV_SETTINGS", "LOG_INFO", false) + " " +
-			Switch("RAGEOPENV_SETTINGS", "LOG_MODS", false) + " " +
-			Switch("RAGEOPENV_SETTINGS", "LOG_DEVICE", false));
-		header.push_back("StraightToStoryMode: " + Switch("STRAIGHTTOSTORYMODE_SETTINGS", "SKIP_SPLASH_SCREEN", true) + " " +
-			Switch("STRAIGHTTOSTORYMODE_SETTINGS", "SKIP_LEGAL_SCREEN", true) + " " +
-			Switch("STRAIGHTTOSTORYMODE_SETTINGS", "SKIP_LANDING_PAGE", true));
-		header.push_back("DirectStorage: " + Switch("DIRECTSTORAGE_SETTINGS", "UNLOCK_FILES", true) + " " +
-			Switch("DIRECTSTORAGE_SETTINGS", "LOG_CALLS", false) + " " +
-			Switch("DIRECTSTORAGE_SETTINGS", "LOG_FILE_OPENS", false));
-		header.push_back("TweaksV: " + Switch("TWEAKSV", "LOG_TO_FILE", true) + " " +
-			Switch("TWEAKSV", "CONSOLE", false) + " " +
-			Switch("TWEAKSV", "SHOW_ERROR_POPUPS", true) + " " +
-			Switch("TWEAKSV", "CHECK_FOR_CONFLICTS", true) + " " +
-			Switch("TWEAKSV", "DIAGNOSTIC_MODE", false) + " " +
-			Switch("TWEAKSV", "DRY_RUN", false));
-#ifdef TWEAKSV_TEST_BUILD
-		header.push_back("TEST BUILD - not for release. TEST_BREAK_PATTERN=" +
-			GetIniString("TWEAKSV", "TEST_BREAK_PATTERN", "(none)"));
-#endif
+		for (std::string& line : DescribeSettings())	// which parts are on, then every setting's value
+			header.push_back(std::move(line));
 
 		AcquireSRWLockExclusive(&g_lock);
 		for (const auto& line : header)

@@ -4,7 +4,8 @@
 #include "main.h"
 #include <atomic>						// TweaksV
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
-#include "TweaksVIni.h"			// TweaksV: switches, DRY_RUN, the game folder
+#include "TweaksVIni.h"			// TweaksV: the game folder
+#include "TweaksVSettings.h"	// TweaksV: SKIP_RPF_CACHE_CHECK, DRY_RUN
 #include "TweaksVLog.h"			// TweaksV
 #include "TweaksVPatch.h"		// TweaksV: DescribeAddress, CallTarget
 #include "TweaksVSummary.h"		// TweaksV: start-up summary
@@ -65,7 +66,7 @@ void HookGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
 
 			// rpf cache check skip
 			// TweaksV: the SKIP_RPF_CACHE_CHECK switch - the block was "only on Enhanced" (F-ROV-2)
-			if (TweaksV::GetIniBool("RAGEOPENV_SETTINGS", "SKIP_RPF_CACHE_CHECK", true)) {
+			if (TweaksV::IsOn(TweaksV::kSkipRpfCacheCheck)) {
 				auto addr = memory::scan("e8 ? ? ? ? 48 8d 0d ? ? ? ? 48 8d 15 ? ? ? ? 48 8d 35");
 				// TweaksV: the call must lead into the game, and a ret already there means another
 				// mod has done this (plan 5.9 R2, 4.4)

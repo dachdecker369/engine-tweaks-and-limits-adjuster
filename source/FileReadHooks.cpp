@@ -6,7 +6,7 @@
 #include <string_view>			// TweaksV
 #include <unordered_set>		// TweaksV: the mods folder index (was an unordered_map cache)
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
-#include "TweaksVIni.h"		// TweaksV: MODS_FOLDER, DRY_RUN, DIAGNOSTIC_MODE
+#include "TweaksVSettings.h"	// TweaksV: MODS_FOLDER, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVLog.h"		// TweaksV
 #include "TweaksVPatch.h"	// TweaksV: DescribeAddress, IsFunctionStart, StartsWithJump
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
@@ -218,7 +218,7 @@ uint64_t GetAttribsHook2(void* d, const char* p) {
 
 static memory::InitFuncs FileReadHooks([] {
     // TweaksV: the MODS_FOLDER switch; only the GTA V Enhanced patterns are kept (F-ROV-6)
-    if (!TweaksV::GetIniBool("RAGEOPENV_SETTINGS", "MODS_FOLDER", true)) {
+    if (!TweaksV::IsOn(TweaksV::kModsFolder)) {
         TweaksV::WriteLog("RageOpenV", "MODS_FOLDER=0 - files in the mods folder are not used.");
         return;
     }

@@ -3,7 +3,7 @@
 // Modified for TweaksV; every change is marked "TweaksV:".
 #include "main.h"
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
-#include "TweaksVIni.h"		// TweaksV: OPEN_RPF, DRY_RUN, DIAGNOSTIC_MODE
+#include "TweaksVSettings.h"	// TweaksV: OPEN_RPF, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVLog.h"		// TweaksV
 #include "TweaksVPatch.h"	// TweaksV: DescribeAddress, CallTarget, MakeWritable, RestoreProtection
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
@@ -86,7 +86,7 @@ bool ParseHeaderHook(rage::fiPackfile* a1, const char* name, bool readHeader, vo
 static memory::InitFuncs PackfileEncryptionHooks([] {
 	// Allow unencrypted RPFs
 	// TweaksV: the OPEN_RPF switch; only the GTA V Enhanced patterns are kept (F-ROV-7)
-	if (!TweaksV::GetIniBool("RAGEOPENV_SETTINGS", "OPEN_RPF", true)) {
+	if (!TweaksV::IsOn(TweaksV::kOpenRpf)) {
 		TweaksV::WriteLog("RageOpenV", "OPEN_RPF=0 - unencrypted (OPEN) RPF archives are not enabled.");
 		return;
 	}

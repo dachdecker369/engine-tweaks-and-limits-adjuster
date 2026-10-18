@@ -12,7 +12,7 @@
 #include <fstream>
 #include "ModkitLimitAdjusterEnhanced_Logging.h"
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
-#include "TweaksVIni.h"		// TweaksV: TweaksV.ini, DRY_RUN, DIAGNOSTIC_MODE
+#include "TweaksVSettings.h"	// TweaksV: MODKITARRAY_SIZE, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVPatch.h"	// TweaksV: DescribeAddress, MakeWritable, RestoreProtection
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
 
@@ -29,6 +29,7 @@ static bool fatalError = false;
 // TweaksV: the new array always has the maximum size, whatever MODKITARRAY_SIZE says, so it
 // can never be smaller than the game's own array (B-MOD-04). Modkit IDs are 16-bit.
 static const uint32_t MaxModkitArray_Size = 65536;
+static_assert(static_cast<int>(MaxModkitArray_Size) == TweaksV::kModkitArraySize.maxValue, "MODKITARRAY_SIZE's maximum must be the array's size"); // TweaksV
 
 static const char* const kTag = "ModkitLimitAdjusterEnhanced"; // TweaksV: for the shared helpers' log lines
 
@@ -41,11 +42,7 @@ void initializeGame()
 {
 	// TweaksV: ClearLog() removed - TweaksV.log is cleared once per start (plan 5.7)
 
-	ModkitArray_Size = (uint32_t)GetPrivateProfileIntA("MODKIT_SETTINGS", "MODKITARRAY_SIZE", 65536, TweaksV::GetIniPathA()); // TweaksV: TweaksV.ini (was .\ModkitLimitAdjusterEnhanced.ini)
-	if (ModkitArray_Size == 0) { // TweaksV: 0 or not a number - use the default (plan 5.6)
-		Logging("TweaksV.ini: MODKITARRAY_SIZE is not a valid size - using the default, 65536.");
-		ModkitArray_Size = 65536;
-	}
+	ModkitArray_Size = (uint32_t)TweaksV::GetNumber(TweaksV::kModkitArraySize); // TweaksV: from TweaksV's settings table, which checks it (was .\ModkitLimitAdjusterEnhanced.ini)
 	// TweaksV: the game edition check is removed - TweaksV only runs in GTA5_Enhanced.exe (F-MOD-1/2)
 
 	newArray = (void*)AllocateStubMemory(sizeof(uint16_t) * MaxModkitArray_Size, PAGE_READWRITE); // TweaksV: always the full array, read/write data - was the configured size, RWX (B-MOD-03/04)

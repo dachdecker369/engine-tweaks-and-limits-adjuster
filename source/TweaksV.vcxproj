@@ -32,8 +32,8 @@
   <PropertyGroup>
     <!-- TweaksV's version: in BuildInfo.h (the log header) and version.rc (the file's version info) -->
     <TweaksVVersionMajor>1</TweaksVVersionMajor>
-    <TweaksVVersionMinor>1</TweaksVVersionMinor>
-    <TweaksVVersionPatch>1</TweaksVVersionPatch>
+    <TweaksVVersionMinor>2</TweaksVVersionMinor>
+    <TweaksVVersionPatch>0</TweaksVVersionPatch>
     <TweaksVRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..'))</TweaksVRoot>
     <TargetName>TweaksV</TargetName>
     <TargetExt>.asi</TargetExt>
@@ -135,6 +135,9 @@
     <ClCompile Include="TweaksVPatch.cpp">
       <WarningLevel>Level4</WarningLevel>
     </ClCompile>
+    <ClCompile Include="TweaksVSettings.cpp">
+      <WarningLevel>Level4</WarningLevel>
+    </ClCompile>
     <ClCompile Include="TweaksVSummary.cpp">
       <WarningLevel>Level4</WarningLevel>
     </ClCompile>
@@ -165,9 +168,9 @@
     <ClInclude Include="TweaksVConflicts.h" />
     <ClInclude Include="TweaksVDirectStorage.h" />
     <ClInclude Include="TweaksVIni.h" />
-    <ClInclude Include="TweaksVIniDefault.h" />
     <ClInclude Include="TweaksVLog.h" />
     <ClInclude Include="TweaksVPatch.h" />
+    <ClInclude Include="TweaksVSettings.h" />
     <ClInclude Include="TweaksVSummary.h" />
     <ClInclude Include="ClearLog.h" />
     <ClInclude Include="GameVersion.h" />

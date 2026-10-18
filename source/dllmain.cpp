@@ -4,8 +4,8 @@
 // Chiheb-Bacha) into one ASI plugin for GTA V Enhanced.
 // License: GPL-3.0-only (see LICENSE).
 //
-// The one real DllMain (plan 5.5). The five plugins' start functions are called at
-// step 7 below, TweaksV's own DirectStorage part right after them.
+// The one real DllMain. The five plugins' start functions are called at step 8 below,
+// TweaksV's own DirectStorage part right after them.
 
 #include <windows.h>
 
@@ -15,6 +15,7 @@
 #include "TweaksVDirectStorage.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
+#include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
 #include "HeapAdjusterEnhanced_Game.h"
 #include "ModkitLimitAdjusterEnhanced_Game.h"
@@ -22,11 +23,14 @@
 #include "main.h"
 #include "StraightToStoryMode_Game.h"
 
-// Runs one original entry function; no exception may leave DllMain (plan 5.8).
-template <typename F> static void RunPlugin(const char* tag, F&& f)
+// Starts one part of TweaksV unless its ENABLED=0 or an old copy of it was found. No exception may
+// leave DllMain: one from a part ends only that part.
+template <typename F> static void RunPart(const TweaksV::SettingsSection& part, F&& start)
 {
-	try { f(); }
-	catch (...) { TweaksV::ReportFailure(tag, "unexpected exception - this part is skipped for this session"); }
+	if (!TweaksV::IsFeatureOn(part))
+		return;
+	try { start(); }
+	catch (...) { TweaksV::ReportFailure(part.feature, "unexpected exception - this part is skipped for this session"); }
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
@@ -37,43 +41,37 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
-		try	// no exception may leave DllMain (plan 5.8)
+		try	// no exception may leave DllMain
 		{
 			if (!IsEnhanced())										// 1. GTA V Enhanced only
 				break;
 			TweaksV::CreateOrUpdateIni();							// 2. TweaksV.ini exists from here on
-			if (!TweaksV::GetIniBool("TWEAKSV", "ENABLED", true))	// 3. master switch
+			TweaksV::LoadSettings();								// 3. every setting, read once
+			if (!TweaksV::IsOn(TweaksV::kEnabled))					// 4. master switch
 				break;
 			// TweaksV.asi now stays loaded until the game exits: RageOpenV's and Packfile's hooks
 			// point into it, so an early FreeLibrary would crash the game at the next hooked call.
 			HMODULE self = nullptr;
 			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
 				reinterpret_cast<LPCWSTR>(&DllMain), &self);
-			ClearLog();												// 4. once, for TweaksV.log
+			ClearLog();												// 5. once, for TweaksV.log
 			TweaksV::WriteLogHeader();
-			if (TweaksV::GetIniBool("TWEAKSV", "CONSOLE", false))	// 5.
+			if (TweaksV::IsOn(TweaksV::kConsole))					// 6.
 				TweaksV::OpenConsole();
-			if (TweaksV::GetIniBool("TWEAKSV", "CHECK_FOR_CONFLICTS", true))	// 6.
+			if (TweaksV::IsOn(TweaksV::kCheckForConflicts))			// 7.
 				TweaksV::CheckForConflicts();
 
-			// 7. The original plugins, in the order an ASI loader loaded their .asi files
-			//    (alphabetical). Each is skipped if its ENABLED=0 or an old copy of it
-			//    was found.
+			// 8. The original plugins, in the order an ASI loader loaded their .asi files
+			//    (alphabetical), then TweaksV's own DirectStorage part.
 			bool phase1 = false;	// RageOpenV's GetSystemTimeAsFileTime hook is installed
-			if (TweaksV::IsFeatureOn("HEAP_SETTINGS"))
-				RunPlugin("HeapAdjusterEnhanced", [] { HeapAdjusterEnhanced::initializeGame(); });
-			if (TweaksV::IsFeatureOn("MODKIT_SETTINGS"))
-				RunPlugin("ModkitLimitAdjusterEnhanced", [] { ModkitLimitAdjusterEnhanced::initializeGame(); });
-			if (TweaksV::IsFeatureOn("PACKFILE_SETTINGS"))
-				RunPlugin("PackfileLimitAdjusterEnhanced", [] { PackfileLimitAdjusterEnhanced::initializeGame(); });
-			if (TweaksV::IsFeatureOn("RAGEOPENV_SETTINGS"))			// installs HookGetSystemTimeAsFileTime (Phase 1)
-				RunPlugin("RageOpenV", [&] { phase1 = RageOpenV::DllMain(hModule, ul_reason_for_call, lpReserved) != FALSE; });
-			if (TweaksV::IsFeatureOn("STRAIGHTTOSTORYMODE_SETTINGS"))
-				RunPlugin("StraightToStoryMode", [] { StraightToStoryMode::initializeGame(); });
-			if (TweaksV::IsFeatureOn("DIRECTSTORAGE_SETTINGS"))		// TweaksV's own part
-				RunPlugin("DirectStorage", [] { TweaksV::InitDirectStorage(); });
+			RunPart(TweaksV::kHeapSection, [] { HeapAdjusterEnhanced::initializeGame(); });
+			RunPart(TweaksV::kModkitSection, [] { ModkitLimitAdjusterEnhanced::initializeGame(); });
+			RunPart(TweaksV::kPackfileSection, [] { PackfileLimitAdjusterEnhanced::initializeGame(); });
+			RunPart(TweaksV::kRageOpenVSection, [&] { phase1 = RageOpenV::DllMain(hModule, ul_reason_for_call, lpReserved) != FALSE; });
+			RunPart(TweaksV::kStoryModeSection, [] { StraightToStoryMode::initializeGame(); });
+			RunPart(TweaksV::kDirectStorageSection, [] { TweaksV::InitDirectStorage(); });
 
-			if (!phase1)											// 8. otherwise RageOpenV's hook
+			if (!phase1)											// 9. otherwise RageOpenV's hook
 				TweaksV::ShowStartupSummaryLater();					//    shows it, in Phase 1
 		}
 		catch (...)
@@ -85,5 +83,5 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		TweaksV::CloseLog();
 		break;
 	}
-	return TRUE;													// 9. always
+	return TRUE;													// 10. always
 }

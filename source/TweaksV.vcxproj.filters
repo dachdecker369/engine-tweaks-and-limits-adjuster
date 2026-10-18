@@ -46,6 +46,9 @@
     <ClCompile Include="TweaksVPatch.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVSettings.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVSummary.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -123,13 +126,13 @@
     <ClInclude Include="TweaksVIni.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
-    <ClInclude Include="TweaksVIniDefault.h">
-      <Filter>TweaksV</Filter>
-    </ClInclude>
     <ClInclude Include="TweaksVLog.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVPatch.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVSettings.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVSummary.h">

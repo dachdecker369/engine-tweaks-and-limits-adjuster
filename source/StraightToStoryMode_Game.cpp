@@ -15,7 +15,7 @@
 #include <cstdio>					// TweaksV: snprintf
 #include <cstring>					// TweaksV: memcpy
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
-#include "TweaksVIni.h"		// TweaksV: the switches, DRY_RUN, DIAGNOSTIC_MODE
+#include "TweaksVSettings.h"	// TweaksV: the switches, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVLog.h"		// TweaksV: DescribeError
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
 
@@ -84,9 +84,9 @@ void initializeGame()
 	// TweaksV only runs in GTA5_Enhanced.exe (F-STORY-1..4)
 
 	// TweaksV: one TweaksV.ini switch per screen (B-STORY-04)
-	const bool skipSplashScreen = TweaksV::GetIniBool("STRAIGHTTOSTORYMODE_SETTINGS", "SKIP_SPLASH_SCREEN", true);
-	const bool skipLegalScreen = TweaksV::GetIniBool("STRAIGHTTOSTORYMODE_SETTINGS", "SKIP_LEGAL_SCREEN", true);
-	const bool skipLandingPage = TweaksV::GetIniBool("STRAIGHTTOSTORYMODE_SETTINGS", "SKIP_LANDING_PAGE", true);
+	const bool skipSplashScreen = TweaksV::IsOn(TweaksV::kSkipSplashScreen);
+	const bool skipLegalScreen = TweaksV::IsOn(TweaksV::kSkipLegalScreen);
+	const bool skipLandingPage = TweaksV::IsOn(TweaksV::kSkipLandingPage);
 	bool allApplied = true; // TweaksV: "Patch successful!" only if every requested patch was applied
 
 	// Splash and Legal screen patches were adapted from ChaosModV
