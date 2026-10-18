@@ -37,7 +37,8 @@ check "OPEN archives: 5 calls redirected; OPEN not decrypted, others decrypted; 
 check "newmods: both hooks; the game's mount first, then mods:/ and the five devices" "has '$NEWMODS_OK' && has '$MOUNTS' && has '$PATHS'"
 check "status lines" "log_has 'Files in the mods folder are used (8 file functions hooked)' && log_has 'Unencrypted (OPEN) RPF archives can be loaded (5 calls redirected)' && log_has 'The newmods folder is mounted'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'splash: E9 86 01 00 00 90' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack sizes: D3=12000'"
-check "every patched page back to its own protection" "has 'protect: all restored'"
+check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
+check "the 7 redirected calls each lead to a call stub that is read+execute, never writable" "has 'stubs: 7, all RX'"
 check "no problems; LOG_* off, so no hot-path lines" "! log_has 'PROBLEM' && ! log_has '\[mods\]' && ! log_has '\[info\]' && ! log_has '\[device\]'"
 
 echo "== R2 CONSOLE=1: the call that hides the console is NOPed"
@@ -75,7 +76,7 @@ rm -rf mods/deep "mods/test/ファイル.txt"
 
 echo "== R5 DRY_RUN=1: the time hook is installed so the checks run at their moment; nothing else written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
-check "time hook yes; nothing written" "has 'rov api hook: yes' && has 'rpf: 48 89 5C' && has '$NOTHING'"
+check "time hook yes; nothing written" "has 'rov api hook: yes' && has 'rpf: 48 89 5C' && has '$NOTHING' && has 'stubs: 0,'"
 check "the four 'would' lines" "log_has 'DRY_RUN: would skip the RPF cache check' && log_has 'DRY_RUN: would hook the 8 file functions' && log_has 'DRY_RUN: would redirect the 5 RPF encryption calls' && log_has 'DRY_RUN: would hook the initial mount call'"
 
 echo "== R6 DIAGNOSTIC_MODE=1: every pattern found once, every site logged"

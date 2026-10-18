@@ -12,6 +12,7 @@
 #include "pattern.h"
 #include "TweaksVSettings.h" // TweaksV: HEAP_SIZE, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVLog.h"     // TweaksV: TweaksV.log
+#include "TweaksVPatch.h"   // TweaksV: WriteCode, the one code writer
 #include "TweaksVSummary.h" // TweaksV: start-up summary
 
 namespace HeapAdjusterEnhanced // TweaksV: one namespace per original plugin
@@ -87,27 +88,13 @@ void initializeGame()
 		return;
 	}
 
-	DWORD oldProtect;
-
-	if (!VirtualProtect(loc, 4, PAGE_EXECUTE_READWRITE, &oldProtect)) { // TweaksV: checked (plan 5.9 R3)
-		const DWORD error = GetLastError();
-		TweaksV::ReportFailure("HeapAdjusterEnhanced", "The heap size could not be changed: the game code could not "
-			"be made writable (" + TweaksV::DescribeError(error) + ").");
-		return;
-	}
-
-	*(int*)loc = (int)newHeapBytes; // TweaksV: was heapSize * 1024 * 1024
+	// TweaksV: was VirtualProtect + *(int*)loc = heapSize * 1024 * 1024 + VirtualProtect; TweaksV's one code
+	// writer checks the protection, puts it back and logs the write with DIAGNOSTIC_MODE
 	// default in 889.22 Enhanced was 648MiB,
-
-	VirtualProtect(loc, 4, oldProtect, &oldProtect);
-	FlushInstructionCache(GetCurrentProcess(), loc, 4); // TweaksV: game code was changed (plan 5.9 R3)
-
-	if (TweaksV::IsDiagnosticMode()) { // TweaksV: DIAGNOSTIC_MODE logs every write
-		char text[160];
-		snprintf(text, sizeof(text), "DIAGNOSTIC: wrote 0x%08X (%d MB) over 0x%08X (%d MB) at RVA 0x%llX.",
-			static_cast<unsigned int>(*(int*)loc), heapSize, static_cast<unsigned int>(vanillaHeapSize) * 1024u * 1024u,
-			vanillaHeapSize, (unsigned long long)(loc - (BYTE*)GetModuleHandleW(nullptr)));
-		TweaksV::WriteLog("HeapAdjusterEnhanced", text);
+	if (!TweaksV::WriteCode({ { loc, TweaksV::BytesOf((int)newHeapBytes), "heap size" } }, "HeapAdjusterEnhanced")) {
+		TweaksV::ReportFailure("HeapAdjusterEnhanced", "The heap size could not be changed: the game code could not "
+			"be made writable (details in TweaksV.log).");
+		return;
 	}
 
 	Logging();

@@ -28,7 +28,8 @@ check "hooked call replaces the configured 3000 with 12000 and calls the game's 
 check "original log lines (4500 / 3000 / 12000)" "log_has 'Vanilla Packfile List Size is: 4500' && log_has 'Vanilla Packfile List Size From ConfigFile is: 3000' && log_has 'Packfile List Size Adjusted to: 12000'"
 check "status line" "log_has 'Packfile array moved and its limits raised from 4500 to 12000'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'splash: E9 86 01 00 00 90' && has 'modkit refs: new array (RW, 128 KB)'"
-check "every patched page back to its own protection" "has 'protect: all restored'"
+check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
+check "the redirected call leads to a call stub that is read+execute, never writable" "has ', all RX' && ! has 'stubs: 0,'"
 check "no problems" "! log_has 'PROBLEM'"
 
 echo "== P2 PACKFILEARRAY_SIZE=20000"

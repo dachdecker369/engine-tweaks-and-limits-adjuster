@@ -12,11 +12,10 @@
 #include "StraightToStoryMode_Game.h"
 #include <fstream>
 #include "StraightToStoryMode_Logging.h"
-#include <cstdio>					// TweaksV: snprintf
 #include <cstring>					// TweaksV: memcpy
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
-#include "TweaksVSettings.h"	// TweaksV: the switches, DRY_RUN, DIAGNOSTIC_MODE
-#include "TweaksVLog.h"		// TweaksV: DescribeError
+#include "TweaksVSettings.h"	// TweaksV: the switches, DRY_RUN
+#include "TweaksVPatch.h"		// TweaksV: WriteCode, HexBytes
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
 
 namespace StraightToStoryMode // TweaksV: one namespace per original plugin
@@ -29,51 +28,17 @@ BYTE* landingPage;
 // TweaksV: the TODO "add null checks for patterns and tolerate missing patterns by skipping
 // the patch" is done: a missing pattern skips only that screen (B-STORY-01)
 
-// TweaksV: "12 34 AB" - for log messages
-static std::string HexBytes(const BYTE* bytes, size_t size)
-{
-	std::string text;
-	for (size_t i = 0; i < size; i++)
-	{
-		char byteText[4];
-		snprintf(byteText, sizeof(byteText), i ? " %02X" : "%02X", bytes[i]);
-		text += byteText;
-	}
-	return text;
-}
-
-// TweaksV: one patch write - protection checked and the real old protection restored,
-// instruction cache flushed (plan 5.9 R3); DRY_RUN writes nothing; DIAGNOSTIC_MODE logs
-// the old and new bytes. Returns false if nothing could be written.
+// TweaksV: one patch write, through TweaksV's one code writer (TweaksVPatch.h), which checks the
+// protection and puts it back, flushes the instruction cache and handles DRY_RUN and
+// DIAGNOSTIC_MODE (plan 5.9 R3); a failure goes to the start-up summary. Returns false if nothing
+// could be written.
 static bool WritePatch(BYTE* address, const BYTE* bytes, size_t size, const char* what)
 {
-	if (TweaksV::IsDryRun())
-	{
-		Logging(std::string("DRY_RUN: would patch the ") + what + ": " + HexBytes(address, size) + " -> " + HexBytes(bytes, size));
+	if (TweaksV::WriteCode({ { address, std::vector<uint8_t>(bytes, bytes + size), what } }, "StraightToStoryMode"))
 		return true;
-	}
-
-	DWORD oldProtect;
-	if (!VirtualProtect(address, size, PAGE_EXECUTE_READWRITE, &oldProtect))
-	{
-		const DWORD error = GetLastError();
-		TweaksV::ReportFailure("StraightToStoryMode", std::string("The ") + what + " could not be patched: the game code "
-			"could not be made writable (" + TweaksV::DescribeError(error) + ").");
-		return false;
-	}
-
-	const std::string before = HexBytes(address, size);
-	memcpy(address, bytes, size);
-	VirtualProtect(address, size, oldProtect, &oldProtect);
-	FlushInstructionCache(GetCurrentProcess(), address, size);
-
-	if (TweaksV::IsDiagnosticMode())
-	{
-		char rva[32];
-		snprintf(rva, sizeof(rva), "RVA 0x%llX", (unsigned long long)(address - (BYTE*)GetModuleHandleW(nullptr)));
-		Logging(std::string("DIAGNOSTIC: ") + what + " at " + rva + ": " + before + " -> " + HexBytes(address, size));
-	}
-	return true;
+	TweaksV::ReportFailure("StraightToStoryMode", std::string("The ") + what + " could not be patched: the game code "
+		"could not be made writable (details in TweaksV.log).");
+	return false;
 }
 
 void initializeGame()
@@ -111,7 +76,7 @@ void initializeGame()
 			else if (splash[0] != 0x0F || splash[1] != 0x84) // TweaksV: must be "jz rel32" (B-STORY-02)
 			{
 				TweaksV::ReportFailure("StraightToStoryMode", "The splash screen cannot be skipped: the game code found is "
-					"not the expected instruction (" + HexBytes(splash, 6) + ").");
+					"not the expected instruction (" + TweaksV::HexBytes(splash, 6) + ").");
 				allApplied = false;
 			}
 			else
@@ -152,7 +117,7 @@ void initializeGame()
 			else if (legal[0] != 0x0F || legal[1] != 0x84) // TweaksV: must be "jz rel32", as in the game (0F 84 07 05 00 00 on 1.0.1158.16); the jump distance is not checked, as game updates change it (S-E2, T3)
 			{
 				TweaksV::ReportFailure("StraightToStoryMode", "The legal screen cannot be skipped: the game code found is "
-					"not the expected instruction (" + HexBytes(legal, 6) + ").");
+					"not the expected instruction (" + TweaksV::HexBytes(legal, 6) + ").");
 				allApplied = false;
 			}
 			else if (!WritePatch(legal, nops, 6, "legal screen")) // TweaksV: was VirtualProtect + memcpy + VirtualProtect

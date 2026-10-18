@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Phase E (integration and hardening) scenarios in the fake game: old plugins present (E1, T-NEG-2/3),
 # one pattern deliberately broken per plugin with the TEST build (T-NEG-1), another game exe (T-NEG-5),
-# no C runtime DLLs (T-NEG-6), a renamed .asi (T-NEG-7), DIAGNOSTIC_MODE without a newmods folder.
+# no C runtime DLLs (T-NEG-6), a renamed .asi (T-NEG-7), no code changes allowed (T-NEG-8),
+# DIAGNOSTIC_MODE without a newmods folder.
 # Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
@@ -96,6 +97,13 @@ echo "== T-NEG-7 renamed to zTweaksV.asi: the same TweaksV.ini and TweaksV.log, 
 fresh_ini; cp TweaksV.asi zTweaksV.asi; out=$(game zTweaksV.asi full_game.exe); rm -f zTweaksV.asi
 check "everything applied" "has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'"
 check "TweaksV.log names zTweaksV.asi, no problems" "log_has 'TweaksV.asi: .*zTweaksV.asi' && ! log_has 'PROBLEM'"
+
+echo "== T-NEG-8 no code may be changed (Windows' dynamic code policy): every write fails whole, each part reported"
+fresh_ini; out=$(game TweaksV.asi full_game.exe nodyncode); echo "      $out"
+check "harness survived to its report, the policy was set" "has 'protect: ' && ! has 'dynamic code policy not set'"
+check "nothing written: game code, protection and call targets as they were" "has '$GAME_HEAP' && has '$STORY_OFF' && has '$MODKIT_OFF' && has '$PACK_OFF' && has 'stubs: 0, all RX' && has 'protect: all restored (RX)'"
+check "every part reported" "log_has 'PROBLEM: The heap size could not be changed' && [ \$(count 'PROBLEM: The .* could not be patched') -eq 3 ] && log_has 'PROBLEM: .*modkit' && log_has 'PROBLEM: The packfile limit is not changed' && log_has 'PROBLEM: RageOpenV could not start'"
+check "one start-up summary" "summary_once"
 
 echo "== E2 DIAGNOSTIC_MODE without a newmods folder: the newmods patterns are still checked, nothing mounted"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; rmdir newmods; out=$(game TweaksV.asi full_game.exe); mkdir -p newmods

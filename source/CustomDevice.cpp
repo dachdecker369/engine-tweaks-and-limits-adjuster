@@ -5,7 +5,7 @@
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
 #include "TweaksVSettings.h"	// TweaksV: NEWMODS, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVLog.h"		// TweaksV
-#include "TweaksVPatch.h"	// TweaksV: DescribeAddress, CallTarget, StartsWithJump, MakeWritable
+#include "TweaksVPatch.h"	// TweaksV: DescribeAddress, CallTarget, StartsWithJump, RedirectCalls
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
 
 namespace RageOpenV // TweaksV: one namespace per original plugin
@@ -161,8 +161,6 @@ static memory::InitFuncs CustomDevice([] {
 		problem = "the game's GetDevice was not found in the game code";
 	else if (!rage::fiDevice::FindGameFunctions()) // TweaksV: were searched for lazily, inside the game's calls
 		problem = "the game's fiDevice::Mount or fiDevice::SetPath was not found in the game code";
-	else if (memory::virtual_mem().address == 0) // TweaksV: B-ROV-08
-		problem = "no trampoline memory could be allocated near the game";
 	if (!problem.empty()) {
 		TweaksV::ReportFailure("RageOpenV", "The newmods folder is not mounted this session: " + problem + ".");
 		return;
@@ -187,33 +185,17 @@ static memory::InitFuncs CustomDevice([] {
 		return;
 	}
 
-	// TweaksV: pass 2 - the original writes. The archive hook is made (nothing written yet) and
-	// the mount call made writable before either is switched on; if a step fails, both are undone.
+	// TweaksV: pass 2 - the original writes. The archive hook is switched on first, then the mount
+	// call is redirected (upstream: InitialMountOrig from add(1).rip(), then set_call) through
+	// TweaksV's one call redirector, which sets InitialMountOrig before the call can reach the hook;
+	// if either fails, the archive hook is removed again, so both are on or neither.
 	if (!openArchive.hook(OpenArchiveHook, &OpenArchiveOrig)) {
 		TweaksV::ReportFailure("RageOpenV", "The newmods folder is not mounted this session: the archive function "
 			"could not be hooked (details in TweaksV.log).");
 		return;
 	}
-	std::vector<uint8_t*> site = { (uint8_t*)mountCall.address };
-	std::vector<DWORD> oldProtect;
-	if (!TweaksV::MakeWritable(site, 5, oldProtect, "RageOpenV")) {
-		openArchive.unhook();
-		TweaksV::ReportFailure("RageOpenV", "The newmods folder is not mounted this session: the game code could "
-			"not be made writable (details in TweaksV.log).");
-		return;
-	}
-	uint8_t saved[5];
-	memcpy(saved, site[0], 5);
-
-	bool ok = memory::apply_hooks();
-	if (ok) {
-		InitialMountOrig = mountCall.add(1).rip().as<decltype(InitialMountOrig)>();
-		ok = mountCall.set_call(InitialMountHook);
-		if (!ok)
-			memcpy(site[0], saved, 5); // TweaksV: the call is put back as it was
-	}
-	TweaksV::RestoreProtection(site, 5, oldProtect);
-	if (!ok) {
+	if (!memory::apply_hooks() || !TweaksV::RedirectCalls({ { (uint8_t*)mountCall.address, (const void*)&InitialMountHook,
+			"initial mount call", (void**)&InitialMountOrig } }, {}, "RageOpenV")) {
 		openArchive.unhook();
 		TweaksV::ReportFailure("RageOpenV", "The newmods folder is not mounted this session: the hooks could not be "
 			"installed (details in TweaksV.log).");

@@ -77,13 +77,13 @@ static const unsigned char* CallTargetOf(const volatile unsigned char* site)
 	return const_cast<const unsigned char*>(site) + 5 + rel;
 }
 
-// A trampoline written by RageOpenV's set_call: mov rax, imm64 / jmp rax -> the hook function.
-static const void* TrampolineTarget(const unsigned char* code)
+// A call stub written by TweaksV::RedirectCalls: jmp [rip+0], the hook function's address right after.
+static const void* StubTarget(const unsigned char* code)
 {
-	if (code[0] != 0x48 || code[1] != 0xB8 || code[10] != 0xFF || code[11] != 0xE0)
+	if (memcmp(code, "\xFF\x25\x00\x00\x00\x00", 6) != 0)
 		return nullptr;
 	uint64_t target = 0;
-	memcpy(&target, code + 2, 8);
+	memcpy(&target, code + 6, 8);
 	return reinterpret_cast<const void*>(target);
 }
 
@@ -245,6 +245,14 @@ void RovForEachDataSite(void (*fn)(const volatile unsigned char*, size_t))
 	fn(g_rovDecrypt2b, sizeof(g_rovDecrypt2b)); fn(g_rovParse, sizeof(g_rovParse)); fn(g_rovMount, sizeof(g_rovMount));
 }
 
+// Where every call RageOpenV redirects leads now, for the call stub check.
+void RovForEachCallTarget(void (*fn)(const unsigned char*))
+{
+	for (const CallSite& call : g_rovCalls)
+		fn(CallTargetOf(call.bytes + call.offset));
+	fn(CallTargetOf(g_rovMount + 26));
+}
+
 static const unsigned char* TimeApi()
 {
 	return reinterpret_cast<const unsigned char*>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetSystemTimeAsFileTime"));
@@ -313,14 +321,14 @@ void RovReport()
 	}
 	wprintf(L" | ");
 
-	// The five encryption calls: redirected to a trampoline outside the game?
+	// The five encryption calls: redirected to a call stub outside the game?
 	int redirected = 0;
 	const void* hooks[5] = {};
 	for (int i = 0; i < 5; i++)
 	{
 		const unsigned char* target = CallTargetOf(g_rovCalls[i].bytes + g_rovCalls[i].offset);
 		if (!RovInImage(target) && target != RovOutside())
-			if ((hooks[i] = TrampolineTarget(target)) != nullptr)
+			if ((hooks[i] = StubTarget(target)) != nullptr)
 				redirected++;
 	}
 	wprintf(L"open calls %d/5", redirected);
@@ -373,7 +381,7 @@ void RovReport()
 
 	// newmods: the initial mount call and the archive function.
 	const unsigned char* mountTarget = CallTargetOf(g_rovMount + 26);
-	const void* mountHook = (!RovInImage(mountTarget) && mountTarget != RovOutside()) ? TrampolineTarget(mountTarget) : nullptr;
+	const void* mountHook = (!RovInImage(mountTarget) && mountTarget != RovOutside()) ? StubTarget(mountTarget) : nullptr;
 	const bool archiveHooked = FnStart(F_OPENARCHIVE)[0] == 0xE9;
 	wprintf(L"newmods hooks %d/2", (mountHook ? 1 : 0) + (archiveHooked ? 1 : 0));
 	if (mountHook && archiveHooked)

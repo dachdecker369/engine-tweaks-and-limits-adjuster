@@ -33,7 +33,7 @@
     <!-- TweaksV's version: in BuildInfo.h (the log header) and version.rc (the file's version info) -->
     <TweaksVVersionMajor>1</TweaksVVersionMajor>
     <TweaksVVersionMinor>2</TweaksVVersionMinor>
-    <TweaksVVersionPatch>0</TweaksVVersionPatch>
+    <TweaksVVersionPatch>1</TweaksVVersionPatch>
     <TweaksVRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..'))</TweaksVRoot>
     <TargetName>TweaksV</TargetName>
     <TargetExt>.asi</TargetExt>
@@ -147,7 +147,6 @@
     <ClCompile Include="HeapAdjusterEnhanced_Game.cpp" />
     <ClCompile Include="ModkitLimitAdjusterEnhanced_Game.cpp" />
     <ClCompile Include="ModkitLimitAdjusterEnhanced_Logging.cpp" />
-    <ClCompile Include="Hooking.cpp" />
     <ClCompile Include="PackfileLimitAdjusterEnhanced_Game.cpp" />
     <ClCompile Include="PackfileLimitAdjusterEnhanced_Logging.cpp" />
     <ClCompile Include="CustomDevice.cpp" />
@@ -181,7 +180,6 @@
     <ClInclude Include="pattern.h" />
     <ClInclude Include="ModkitLimitAdjusterEnhanced_Game.h" />
     <ClInclude Include="ModkitLimitAdjusterEnhanced_Logging.h" />
-    <ClInclude Include="Hooking.h" />
     <ClInclude Include="PackfileLimitAdjusterEnhanced_Game.h" />
     <ClInclude Include="PackfileLimitAdjusterEnhanced_Logging.h" />
     <ClInclude Include="config.h" />

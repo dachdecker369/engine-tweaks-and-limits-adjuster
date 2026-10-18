@@ -5,7 +5,7 @@
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
 #include "TweaksVSettings.h"	// TweaksV: OPEN_RPF, DRY_RUN, DIAGNOSTIC_MODE
 #include "TweaksVLog.h"		// TweaksV
-#include "TweaksVPatch.h"	// TweaksV: DescribeAddress, CallTarget, MakeWritable, RestoreProtection
+#include "TweaksVPatch.h"	// TweaksV: DescribeAddress, CallTarget, RedirectCalls
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
 
 namespace RageOpenV // TweaksV: one namespace per original plugin
@@ -99,10 +99,15 @@ static memory::InitFuncs PackfileEncryptionHooks([] {
 	memory decryptHeader2b = memory::scan("e8 ? ? ? ? 48 8b 46 ? 8b 4c 24 ? 48 8d 14 08");
 	memory parseHeader = memory::scan("c6 86 ? ? ? ? ? 48 89 f1 4c 89 fa 45 89 f0 45 31 c9").add(19);
 
-	struct Site { memory* mem; const char* name; };
-	const Site sites[] = { { &findEncryption, "the FindEncryption call" }, { &decryptHeader, "the DecryptHeader call" },
-		{ &decryptHeader2, "the first DecryptHeader2 call" }, { &decryptHeader2b, "the second DecryptHeader2 call" },
-		{ &parseHeader, "the ParseHeader call" } };
+	// TweaksV: each call with the hook it gets and the variable that keeps the function it called
+	// (upstream read it with add(1).rip()); the second DecryptHeader2 call shares the first one's
+	struct Site { memory* mem; const char* name; const void* hook; void** original; };
+	const Site sites[] = {
+		{ &findEncryption, "FindEncryption call", (const void*)&FindEncryptionHook, nullptr },
+		{ &decryptHeader, "DecryptHeader call", (const void*)&DecryptHeaderHook, (void**)&DecryptHeaderOrig },
+		{ &decryptHeader2, "first DecryptHeader2 call", (const void*)&DecryptHeader2Hook, (void**)&DecryptHeader2Orig },
+		{ &decryptHeader2b, "second DecryptHeader2 call", (const void*)&DecryptHeader2Hook, nullptr },
+		{ &parseHeader, "ParseHeader call", (const void*)&ParseHeaderHook, (void**)&ParseHeaderOrig } };
 
 	std::string problem;
 	for (const Site& site : sites)
@@ -110,20 +115,19 @@ static memory::InitFuncs PackfileEncryptionHooks([] {
 		void* address = (void*)site.mem->address;
 		const uint8_t* callee = TweaksV::CallTarget(address);
 		if (!address)
-			problem = std::string(site.name) + " was not found in the game code";
+			problem = std::string("the ") + site.name + " was not found in the game code";
 		else if (!callee)
-			problem = std::string(site.name) + " at " + TweaksV::DescribeAddress(address) + " is not a call";
+			problem = std::string("the ") + site.name + " at " + TweaksV::DescribeAddress(address) + " is not a call";
 		// TweaksV: a call that leads out of the game has been redirected by another mod (plan 4.4)
 		else if (!TweaksV::IsInsideGameImage(callee))
-			problem = std::string(site.name) + " at " + TweaksV::DescribeAddress(address) + " leads outside the game (another mod has redirected it)";
+			problem = std::string("the ") + site.name + " at " + TweaksV::DescribeAddress(address) +
+				" leads outside the game (another mod has redirected it)";
 		if (!problem.empty())
 			break;
 		if (TweaksV::IsDiagnosticMode())
-			TweaksV::WriteLog("RageOpenV", "DIAGNOSTIC: " + std::string(site.name) + " at " + TweaksV::DescribeAddress(address) +
+			TweaksV::WriteLog("RageOpenV", "DIAGNOSTIC: the " + std::string(site.name) + " at " + TweaksV::DescribeAddress(address) +
 				" -> " + TweaksV::DescribeAddress(callee));
 	}
-	if (problem.empty() && memory::virtual_mem().address == 0) // TweaksV: B-ROV-08
-		problem = "no trampoline memory could be allocated near the game";
 	// TweaksV: the second DecryptHeader2 call is given the first one's original, so both must
 	// call the same function (B-ROV-05)
 	if (problem.empty() && TweaksV::CallTarget((void*)decryptHeader2.address) != TweaksV::CallTarget((void*)decryptHeader2b.address))
@@ -140,38 +144,13 @@ static memory::InitFuncs PackfileEncryptionHooks([] {
 		return;
 	}
 
-	// TweaksV: pass 2 - the original writes. All five sites are made writable first and their
-	// bytes kept, so the calls are redirected together or not at all (plan 5.9 R1/R3).
-	std::vector<uint8_t*> writeSites;
+	// TweaksV: pass 2 - the original writes (set_call on each site), now through TweaksV's one call
+	// redirector: all five calls or none, each original set before its call can reach a hook
+	// (plan 5.9 R1/R3)
+	std::vector<TweaksV::CallRedirect> redirects;
 	for (const Site& site : sites)
-		writeSites.push_back((uint8_t*)site.mem->address);
-	uint8_t saved[5][5];
-	for (size_t i = 0; i < writeSites.size(); i++)
-		memcpy(saved[i], writeSites[i], 5);
-	std::vector<DWORD> oldProtects;
-	if (!TweaksV::MakeWritable(writeSites, 5, oldProtects, "RageOpenV")) {
-		TweaksV::ReportFailure("RageOpenV", "Unencrypted (OPEN) RPF archives cannot be loaded this session: the game "
-			"code could not be made writable (details in TweaksV.log).");
-		return;
-	}
-
-	bool ok = findEncryption.set_call(FindEncryptionHook);
-
-	DecryptHeaderOrig = decryptHeader.add(1).rip().as<decltype(DecryptHeaderOrig)>();
-	ok = ok && decryptHeader.set_call(DecryptHeaderHook);
-
-	DecryptHeader2Orig = decryptHeader2.add(1).rip().as<decltype(DecryptHeader2Orig)>();
-	ok = ok && decryptHeader2.set_call(DecryptHeader2Hook);
-	ok = ok && decryptHeader2b.set_call(DecryptHeader2Hook);
-
-	ParseHeaderOrig = parseHeader.add(1).rip().as<decltype(ParseHeaderOrig)>();
-	ok = ok && parseHeader.set_call(ParseHeaderHook);
-
-	if (!ok) // TweaksV: every call is put back as it was
-		for (size_t i = 0; i < writeSites.size(); i++)
-			memcpy(writeSites[i], saved[i], 5);
-	TweaksV::RestoreProtection(writeSites, 5, oldProtects);
-	if (!ok) {
+		redirects.push_back({ (uint8_t*)site.mem->address, site.hook, site.name, site.original });
+	if (!TweaksV::RedirectCalls(redirects, {}, "RageOpenV")) {
 		TweaksV::ReportFailure("RageOpenV", "Unencrypted (OPEN) RPF archives cannot be loaded this session: the calls "
 			"could not be redirected (details in TweaksV.log).");
 		return;

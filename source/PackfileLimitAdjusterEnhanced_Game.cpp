@@ -11,13 +11,13 @@
 #include <cassert>
 #include "PackfileLimitAdjusterEnhanced_Game.h"
 #include <fstream>
-#include "Hooking.h"
+// TweaksV: #include "Hooking.h" removed - the call is redirected by TweaksV::RedirectCalls
 #include "PackfileLimitAdjusterEnhanced_Logging.h"
 #include "GameVersion.h"
 #include <cstring>					// TweaksV: memcmp, memset
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
 #include "TweaksVSettings.h"	// TweaksV: PACKFILEARRAY_SIZE, DRY_RUN, DIAGNOSTIC_MODE
-#include "TweaksVPatch.h"	// TweaksV: DescribeAddress, MakeWritable, RestoreProtection
+#include "TweaksVPatch.h"	// TweaksV: DescribeAddress, WriteCode, RedirectCalls
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
 
 namespace PackfileLimitAdjusterEnhanced // TweaksV: one namespace per original plugin
@@ -185,7 +185,7 @@ static void EnhancedPatch() {
 	address += 0x10;
 	// TweaksV: it must be a call (E8) to a function inside the game - otherwise another mod has
 	// hooked it already (B-PACK-01, plan 5.9 R2)
-	uint8_t* callTarget = (*address == 0xE8) ? address + 5 + *(int32_t*)(address + 1) : nullptr;
+	const uint8_t* callTarget = TweaksV::CallTarget(address);
 	if (TweaksV::IsDiagnosticMode())
 		Logging("DIAGNOSTIC: streaming configuration call at " + TweaksV::DescribeAddress(address) + " -> " +
 			(callTarget ? TweaksV::DescribeAddress(callTarget) : std::string("not a call")));
@@ -213,30 +213,19 @@ static void EnhancedPatch() {
 		return;
 	}
 
-	// TweaksV: pass 2 - the original writes, for the sites found above. Both sizes are made writable
-	// first and the hook - the only step that can still fail - is set before they are written, so
-	// everything changes or nothing does. The protections restored are the real old ones (upstream
-	// set the direct size's page to PAGE_EXECUTE_READWRITE a second time instead, B-PACK-02).
-	std::vector<uint8_t*> sizeSites = { directAddr, indirectAddr };
-	std::vector<DWORD> oldProtects;
-	if (!TweaksV::MakeWritable(sizeSites, sizeof(uint32_t), oldProtects, kTag)) {
-		FatalErrorExit();
-		return;
-	}
-
-	g_origSetStreamingInterface = reinterpret_cast<void(*)(char*)>(callTarget); // TweaksV: set before the call is redirected
-	auto h = HookManager::SetCall((char*)address, SetStreamingInterface);
-	if (!h) { // TweaksV: SetCall checks the call and the stub now (B-PACK-01) - nothing was written
-		TweaksV::RestoreProtection(sizeSites, sizeof(uint32_t), oldProtects);
+	// TweaksV: pass 2 - the original writes, for the sites found above: both sizes and the hooked call
+	// together, through TweaksV's one code writer, so everything changes or nothing does (upstream set
+	// the direct size's page to PAGE_EXECUTE_READWRITE a second time instead, B-PACK-02). The call goes
+	// through a read+execute stub; the original is set before the call is redirected. Was HookManager::SetCall.
+	const bool hooked = TweaksV::RedirectCalls(
+		{ { address, reinterpret_cast<const void*>(&SetStreamingInterface), "streaming configuration call",
+			reinterpret_cast<void**>(&g_origSetStreamingInterface) } },
+		{ { directAddr, TweaksV::BytesOf(PackFileArray_Size), "packfile direct size limit" },
+		  { indirectAddr, TweaksV::BytesOf(PackFileArray_Size), "packfile indirect size limit" } }, kTag);
+	if (!hooked) { // TweaksV: nothing was written
 		Logging("The call that reads the game's streaming configuration could not be redirected.");
 		FatalErrorExit();
-		return;
 	}
-	g_origSetStreamingInterface = h->fn;
-
-	*(uint32_t*)directAddr = PackFileArray_Size;
-	*reinterpret_cast<uint32_t*>(indirectAddr) = PackFileArray_Size;
-	TweaksV::RestoreProtection(sizeSites, sizeof(uint32_t), oldProtects);
 }
 
 // TweaksV: the absolute-address relocation function is removed - only the other game edition used it (F-PACK-5)
@@ -284,19 +273,16 @@ void RelocateRelativePackFileArray(void* newPackFileArray, const std::vector<Pat
 		return;
 	}
 
-	// TweaksV: pass 2 - the original write, for every address found above; every site is made
-	// writable first, so the array moves everywhere or nowhere (plan 5.9 R1/R3)
-	std::vector<DWORD> oldProtects;
-	if (!TweaksV::MakeWritable(addresses, sizeof(int32_t), oldProtects, kTag))
-	{
-		FatalErrorExit();
-		return;
-	}
+	// TweaksV: pass 2 - the original write, for every address found above, through TweaksV's one code
+	// writer: the array moves everywhere or nowhere
+	std::vector<TweaksV::CodeWrite> writes;
 	for (auto address : addresses)
 	{
-		*(int32_t*)address = static_cast<int32_t>((intptr_t)newPackFileArray - (intptr_t)address - 4);
+		writes.push_back({ address, TweaksV::BytesOf(static_cast<int32_t>((intptr_t)newPackFileArray - (intptr_t)address - 4)),
+			"packfile array reference" });
 	}
-	TweaksV::RestoreProtection(addresses, sizeof(int32_t), oldProtects);
+	if (!TweaksV::WriteCode(writes, kTag))
+		FatalErrorExit();
 }
 
 void AdjustPackFileArrayLimit()
@@ -356,7 +342,7 @@ void AdjustPackFileArrayLimit()
 void FatalErrorExit() {
 	Logging("FATAL ERROR - PackfileLimitAdjusterEnhanced is skipped for this session");
 	TweaksV::ReportFailure("PackfileLimitAdjusterEnhanced", "The packfile limit is not changed this session: a required "
-		"check failed (details in TweaksV.log).");
+		"step failed (details in TweaksV.log).");
 	fatalError = true;
 }
 

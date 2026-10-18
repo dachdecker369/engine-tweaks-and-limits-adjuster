@@ -1,6 +1,7 @@
 // TweaksV: carried over from ModkitLimitAdjusterEnhanced (Game.cpp:174-240) by Chiheb-Bacha -
 // identical in PackfileLimitAdjusterEnhanced's Game.cpp -
-// https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced (GPL-3.0).
+// https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced (GPL-3.0). The search follows
+// MinHook's buffer.c (BSD-2-Clause, see THIRD_PARTY_NOTICES.md).
 // Modified for TweaksV; every change is marked "TweaksV:".
 #include "StubMemory.h"
 #include <cstdint>
@@ -34,7 +35,7 @@ LPVOID FindPrevFreeRegion(LPVOID pAddress, LPVOID pMinAddr, DWORD dwAllocationGr
 	return NULL;
 }
 
-void* AllocateStubMemory(size_t size, DWORD protect) // TweaksV: + protect (default PAGE_EXECUTE_READWRITE)
+void* AllocateStubMemory(size_t size, DWORD protect) // TweaksV: + protect (was always PAGE_EXECUTE_READWRITE)
 {
 	// Max range for seeking a memory block. (= 1024MB)
 	const uint64_t MAX_MEMORY_RANGE = 0x40000000;

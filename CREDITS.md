@@ -19,7 +19,7 @@ TweaksV merges the projects below. All credit for the original research and code
 - **alloc8or ("Unknown Modder")** - the original Packfile Limit Adjuster and the Enhanced landing-page patch - https://github.com/alloc8or
 - **Tanuki / 0x-FADED** - the original ModkitLimit Extender - https://github.com/0x-FADED/GTA5-VehicleModKitLimit-Fix
 - **ChaosModV team** - the splash and legal screen skip patches - https://github.com/gta-chaos-mod/ChaosModV
-- **CamxxCore** - the PauseMenuHelper pattern and hook helpers - https://github.com/CamxxCore/PauseMenuHelper
+- **CamxxCore** - the PauseMenuHelper pattern helper - https://github.com/CamxxCore/PauseMenuHelper
 - **Bas Timmer (NTAuthority) et al.** - the stub allocator
 - **crosire, kagikn and contributors** - the ScriptHookVDotNet memory scanner - https://github.com/scripthookvdotnet/scripthookvdotnet
 

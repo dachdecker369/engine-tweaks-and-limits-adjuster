@@ -17,6 +17,12 @@
   - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match;
   - A new search: only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. It compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than the original search, which went through the whole image almost byte by byte.
 
+- **One patch module:** every change to the game's code goes through `TweaksVPatch`, one writer for bytes and one for redirected calls:
+  - A group of writes is all or nothing: every page is made writable first, so a page that cannot be changed leaves the game as it was;
+  - Every page gets its own protection back, and the processor sees the new code;
+  - A redirected call goes through a 16-byte jump near the game, which is written once and then only read and executed - never writable and executable at once (the originals' trampolines were both);
+  - DRY_RUN and DIAGNOSTIC_MODE work the same for every part.
+
 - **HeapAdjusterEnhanced merged:** `[HEAP_SETTINGS] HEAP_SIZE` (default 2000 MB) is read from `TweaksV.ini`, and its original code is kept in its own namespace. Fixes:
   - A missing pattern no longer crashes the game;
   - The target instruction is checked before writing;
@@ -59,7 +65,7 @@
   - Function starts worked out from a pattern are checked, and calls that another mod has already redirected are left alone;
   - Both DecryptHeader2 calls must lead to the same function;
   - The archive encryption tag is kept per thread, so archives opened at the same time no longer mix up;
-  - Page protection is restored after every write, and the trampolines come from checked memory near the game;
+  - Page protection is restored after every write, and the redirected calls go through stubs that are never writable and executable at once;
   - The console patch is only applied when the console is on (`CONSOLE=1`);
   - Newmods: files are closed properly, folder listing works, file sizes are right, reading at the end of a file no longer hangs, and nothing is mounted without a newmods folder (DIAGNOSTIC_MODE still checks its patterns);
   - Its log switches (`LOG_INFO`, `LOG_MODS`, `LOG_DEVICE`) work at runtime, and cost nothing when off;
@@ -80,7 +86,7 @@
 
 - **Hook:** `TweaksV.asi` stays loaded once enabled until the game exits.
 
-- **Tests:** `test\` holds fake-game test suites (260 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (275 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 
@@ -97,9 +103,8 @@ Known bugs and open issues in TweaksV.
 ### T-DEBT: shared code still written more than once
 
 - **What:**
-  - There are five copies of the code that makes game code writable and restores it, and two of the code that redirects a call.
   - The patterns are text in nine files.
   - About 240 comments in the source, and some in the tests, still cite the sections and bug IDs of the original merge plan, which is not part of the repository.
   - Every test suite has its own copy of the test helpers.
   - The scanner keeps the original's name, `FindPatternBmh`.
-- **When it goes:** in the next refactoring steps (one patch module, one pattern table, the comments), before the next release. The settings are done: they are one table now.
+- **When it goes:** in the next refactoring steps (one pattern table, the comments), before the next release. The settings and the patch code are done: one table and one module now.

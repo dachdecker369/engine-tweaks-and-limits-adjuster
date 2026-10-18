@@ -16,6 +16,7 @@
 //   junkr31a       the game's obfuscated code that the old 1158.13+ reference pattern also matched
 //   dstorage       loads the stand-in dstorage.dll (fake_dstorage.cpp) before TweaksV, calls it after
 //   fileopens      opens files in its folder (and one outside) after TweaksV has started
+//   nodyncode      no code may be changed or made once TweaksV loads (Windows' dynamic code policy)
 //   wait           stays 11 seconds longer before it reports
 #include <windows.h>
 #include <cstdint>
@@ -28,6 +29,7 @@ void RovSetup(int argc, wchar_t** argv);
 void RovPhase1();
 void RovReport();
 void RovForEachDataSite(void (*fn)(const volatile unsigned char*, size_t));
+void RovForEachCallTarget(void (*fn)(const unsigned char*));
 
 // The copies of the game code live in an executable section, as in the game: TweaksV only searches
 // the game's code (build.cmd links this section as ERW).
@@ -334,8 +336,9 @@ static void PrintPackfile(int argc, wchar_t** argv)
 	}
 }
 
-// Every patched site is made private read/write before TweaksV loads; afterwards none may be
-// left executable (each page's real protection must be restored).
+// Every site is written once before TweaksV loads, so all their pages are private copies alike; then
+// the whole section is made read+execute, as the game's code is (MakeSitesReadExecute). TweaksV must
+// make each page it patches writable and give it its own protection back.
 static void TouchSite(const Site& site)
 {
 	for (size_t i = 0; i < site.size; i++)
@@ -356,8 +359,21 @@ static void ForEachSite(void (*fn)(const Site&))
 	fn(indirect);
 }
 
-// The protection every site had before TweaksV loaded (the ERW section they live in); TweaksV must
-// put every page it changes back to it.
+static void MakeSitesReadExecute()
+{
+	const auto base = const_cast<unsigned char*>(ImageBase());
+	const auto nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + reinterpret_cast<const IMAGE_DOS_HEADER*>(base)->e_lfanew);
+	const IMAGE_SECTION_HEADER* section = IMAGE_FIRST_SECTION(nt);
+	for (WORD i = 0; i < nt->FileHeader.NumberOfSections; i++, section++)
+		if (memcmp(section->Name, ".fakesit", 8) == 0)
+		{
+			DWORD old = 0;
+			VirtualProtect(base + section->VirtualAddress, section->Misc.VirtualSize, PAGE_EXECUTE_READ, &old);
+		}
+}
+
+// The protection every site had before TweaksV loaded (read+execute); TweaksV must put every page
+// it changes back to it.
 static DWORD g_siteProtect = 0;
 static int g_notRestored = 0;
 static DWORD ProtectionOf(const volatile void* p)
@@ -385,6 +401,18 @@ static void CheckSite(const Site& site)
 		g_notRestored++;
 	if (ProtectionOf(site.bytes + site.size - 1) != g_siteProtect)
 		g_notRestored++;
+}
+
+// TweaksV's call stubs: every call it redirected leads to one, and none may be writable.
+static int g_stubs = 0, g_writableStubs = 0;
+static void CheckStub(const unsigned char* callTarget)
+{
+	MEMORY_BASIC_INFORMATION info{};
+	if (InImage(callTarget) || VirtualQuery(callTarget, &info, sizeof(info)) != sizeof(info) || info.State != MEM_COMMIT)
+		return;	// not redirected, or "another mod's" address, where nothing is
+	g_stubs++;
+	if (info.Protect != PAGE_EXECUTE_READ)
+		g_writableStubs++;
 }
 
 // DirectStorage (TweaksV's UNLOCK_FILES and LOG_CALLS): the calls the game makes into dstorage.dll,
@@ -543,10 +571,18 @@ int wmain(int argc, wchar_t** argv)
 	RovSetup(argc, argv);
 	ForEachSite(TouchSite);
 	RovForEachDataSite(TouchData);
+	MakeSitesReadExecute();
 	g_siteProtect = ProtectionOf(g_heapSite);
 
 	// the stand-in dstorage.dll, loaded before TweaksV as the game's import is
 	const HMODULE dstorage = HasOption(argc, argv, L"dstorage") ? LoadLibraryW(L"dstorage.dll") : nullptr;
+	if (HasOption(argc, argv, L"nodyncode"))	// from here on no code may be changed or made (Windows' dynamic code policy)
+	{
+		PROCESS_MITIGATION_DYNAMIC_CODE_POLICY policy{};
+		policy.ProhibitDynamicCode = 1;
+		if (!SetProcessMitigationPolicy(ProcessDynamicCodePolicy, &policy, sizeof(policy)))
+			wprintf(L"dynamic code policy not set: %lu | ", GetLastError());
+	}
 	HMODULE module = LoadLibraryW(asi);
 	if (!module)
 	{
@@ -576,6 +612,10 @@ int wmain(int argc, wchar_t** argv)
 	PrintPackfile(argc, argv);
 	RovReport();
 	wprintf(L"%ls%ls", g_dstorageResult, g_fileOpensResult);
-	wprintf(L"protect: %ls\n", g_notRestored == 0 ? L"all restored" : L"NOT restored");
+	CheckStub(Rel32Target(g_packCallSite));
+	RovForEachCallTarget(CheckStub);
+	wprintf(L"stubs: %d, %ls | ", g_stubs, g_writableStubs == 0 ? L"all RX" : L"NOT all RX");
+	wprintf(L"protect: %ls %ls\n", g_notRestored == 0 ? L"all restored" : L"NOT restored",
+		g_siteProtect == PAGE_EXECUTE_READ ? L"(RX)" : L"(not RX)");
 	return 0;
 }

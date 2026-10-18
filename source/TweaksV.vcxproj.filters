@@ -70,9 +70,6 @@
     <ClCompile Include="ModkitLimitAdjusterEnhanced_Logging.cpp">
       <Filter>ModkitLimitAdjusterEnhanced</Filter>
     </ClCompile>
-    <ClCompile Include="Hooking.cpp">
-      <Filter>PackfileLimitAdjusterEnhanced</Filter>
-    </ClCompile>
     <ClCompile Include="PackfileLimitAdjusterEnhanced_Game.cpp">
       <Filter>PackfileLimitAdjusterEnhanced</Filter>
     </ClCompile>
@@ -164,9 +161,6 @@
     </ClInclude>
     <ClInclude Include="ModkitLimitAdjusterEnhanced_Logging.h">
       <Filter>ModkitLimitAdjusterEnhanced</Filter>
-    </ClInclude>
-    <ClInclude Include="Hooking.h">
-      <Filter>PackfileLimitAdjusterEnhanced</Filter>
     </ClInclude>
     <ClInclude Include="PackfileLimitAdjusterEnhanced_Game.h">
       <Filter>PackfileLimitAdjusterEnhanced</Filter>

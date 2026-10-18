@@ -13,7 +13,7 @@
 #include "ModkitLimitAdjusterEnhanced_Logging.h"
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
 #include "TweaksVSettings.h"	// TweaksV: MODKITARRAY_SIZE, DRY_RUN, DIAGNOSTIC_MODE
-#include "TweaksVPatch.h"	// TweaksV: DescribeAddress, MakeWritable, RestoreProtection
+#include "TweaksVPatch.h"	// TweaksV: DescribeAddress, WriteCode
 #include "TweaksVSummary.h"	// TweaksV: start-up summary
 
 namespace ModkitLimitAdjusterEnhanced // TweaksV: one namespace per original plugin
@@ -33,10 +33,9 @@ static_assert(static_cast<int>(MaxModkitArray_Size) == TweaksV::kModkitArraySize
 
 static const char* const kTag = "ModkitLimitAdjusterEnhanced"; // TweaksV: for the shared helpers' log lines
 
-// TweaksV: the sites are made writable and restored with TweaksV::MakeWritable/RestoreProtection
-// (TweaksVPatch.h): everything is made writable before anything is written, so a change
-// is made everywhere or nowhere, and the real old protections are restored newest first, because
-// two sites can share a page (plan 5.9 R1/R3)
+// TweaksV: every write goes through TweaksV::WriteCode (TweaksVPatch.h): everything is made writable
+// before anything is written, so a change is made everywhere or nowhere, and every page gets its own
+// protection back
 
 void initializeGame()
 {
@@ -125,18 +124,16 @@ void OverrideModkitArraySize(uint32_t newSize, const std::vector<PatternPairExte
 		return;
 	}
 
-	// TweaksV: pass 2 - the original write, for every address found above
-	std::vector<DWORD> oldProtects;
-	if (!TweaksV::MakeWritable(addresses, sizeof(uint32_t), oldProtects, kTag)) {
-		FatalErrorExit();
-		return;
-	}
+	// TweaksV: pass 2 - the original write, for every address found above, through TweaksV's one code
+	// writer: all limits change or none
+	std::vector<TweaksV::CodeWrite> writes;
 	for (size_t i = 0; i < addresses.size(); i++) {
 		auto address = addresses[i];
 		auto& entry = list[i];
-		*(uint32_t*)address = (uint32_t)((newSize * entry.mulModifier) + entry.addModifier);
+		writes.push_back({ address, TweaksV::BytesOf((uint32_t)((newSize * entry.mulModifier) + entry.addModifier)), "modkit limit" });
 	}
-	TweaksV::RestoreProtection(addresses, sizeof(uint32_t), oldProtects);
+	if (!TweaksV::WriteCode(writes, kTag))
+		FatalErrorExit();
 }
 
 // TweaksV: the absolute-address relocation function is removed - only the other game edition used it (F-MOD-4)
@@ -183,19 +180,16 @@ void RelocateRelativeModkitArray(void* newModkitArray, const std::vector<Pattern
 		return;
 	}
 
-	// TweaksV: pass 2 - the original write, for every address found above; every site is made
-	// writable first, so the array moves everywhere or nowhere
-	std::vector<DWORD> oldProtects;
-	if (!TweaksV::MakeWritable(addresses, sizeof(uint32_t), oldProtects, kTag))
-	{
-		FatalErrorExit();
-		return;
-	}
+	// TweaksV: pass 2 - the original write, for every address found above, through TweaksV's one code
+	// writer: the array moves everywhere or nowhere
+	std::vector<TweaksV::CodeWrite> writes;
 	for (auto address : addresses)
 	{
-		*(int32_t*)address = static_cast<int32_t>((intptr_t)newModkitArray - (intptr_t)address - 4);
+		writes.push_back({ address, TweaksV::BytesOf(static_cast<int32_t>((intptr_t)newModkitArray - (intptr_t)address - 4)),
+			"modkit array reference" });
 	}
-	TweaksV::RestoreProtection(addresses, sizeof(uint32_t), oldProtects);
+	if (!TweaksV::WriteCode(writes, kTag))
+		FatalErrorExit();
 }
 
 void AdjustModkitArrayLimit()
@@ -245,7 +239,7 @@ void patchHardcodedArrayLimits() {
 void FatalErrorExit() {
 	Logging("FATAL ERROR - ModkitLimitAdjusterEnhanced is skipped for this session");
 	TweaksV::ReportFailure("ModkitLimitAdjusterEnhanced", "The modkit limit is not changed this session: a required "
-		"check failed (details in TweaksV.log).");
+		"step failed (details in TweaksV.log).");
 	fatalError = true;
 }
 

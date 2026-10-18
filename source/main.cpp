@@ -7,7 +7,7 @@
 #include "TweaksVIni.h"			// TweaksV: the game folder
 #include "TweaksVSettings.h"	// TweaksV: SKIP_RPF_CACHE_CHECK, DRY_RUN
 #include "TweaksVLog.h"			// TweaksV
-#include "TweaksVPatch.h"		// TweaksV: DescribeAddress, CallTarget
+#include "TweaksVPatch.h"		// TweaksV: DescribeAddress, CallTarget, WriteCode
 #include "TweaksVSummary.h"		// TweaksV: start-up summary
 
 namespace RageOpenV // TweaksV: one namespace per original plugin
@@ -53,14 +53,16 @@ void HookGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
 				auto addr = memory::scan("ff 15 ? ? ? ? 48 85 c0 74 ? 48 89 c1 31 d2", true);
 				if (addr.address != 0) {
 					// TweaksV: the 6 bytes must be the "call [rip+x]" (FF 15) that hides the console
-					const uint8_t* call = addr.add(16).as<const uint8_t*>();
+					uint8_t* call = addr.add(16).as<uint8_t*>();
 					if (call[0] != 0xFF || call[1] != 0x15)
 						TweaksV::WriteLog("RageOpenV", "Console: unexpected bytes at " + TweaksV::DescribeAddress(call) +
 							" - left as they are, so the game may hide the console.");
 					else if (TweaksV::IsDryRun())
 						TweaksV::WriteLog("RageOpenV", "DRY_RUN: would keep the console visible (" + TweaksV::DescribeAddress(call) + ").");
-					else
-						addr.add(16).nop(6);
+					// TweaksV: was addr.add(16).nop(6) - the 6 NOPs now go through TweaksV's one code writer
+					else if (!TweaksV::WriteCode({ { call, std::vector<uint8_t>(6, 0x90), "console hide call" } }, "RageOpenV"))
+						TweaksV::WriteLog("RageOpenV", "Console: the game code could not be made writable - the game may hide "
+							"the console.");
 				}
 			}
 
@@ -81,7 +83,9 @@ void HookGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
 					TweaksV::WriteLog("RageOpenV", "The RPF cache check is already skipped (another mod did it) - left as it is.");
 				else if (TweaksV::IsDryRun())
 					TweaksV::WriteLog("RageOpenV", "DRY_RUN: would skip the RPF cache check (" + TweaksV::DescribeAddress(callee) + ").");
-				else if (addr.add(1).rip().put<uint16_t>(0x90c3))
+				// TweaksV: was addr.add(1).rip().put<uint16_t>(0x90c3) - "ret; nop" at the start of the check,
+				// now through TweaksV's one code writer
+				else if (TweaksV::WriteCode({ { const_cast<uint8_t*>(callee), { 0xC3, 0x90 }, "RPF cache check" } }, "RageOpenV"))
 					TweaksV::WriteLog("RageOpenV", "The RPF cache check is skipped (" + TweaksV::DescribeAddress(callee) + ").");
 				else
 					TweaksV::ReportFailure("RageOpenV", "The RPF cache check is not skipped this session: the game code "
