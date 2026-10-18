@@ -1,7 +1,7 @@
 // TweaksV: carried over from RageOpenV (src/gtav/rage/fiDevice.h) by Chiheb-Bacha, based on
 // ClosedIV by martonp96 - https://github.com/Chiheb-Bacha/RageOpenV (GPL-3.0).
 // Modified for TweaksV; every change is marked "TweaksV:". The virtual functions
-// below are the game's vtable layout: never reorder, add or remove any (plan A.6).
+// below are the game's vtable layout: never reorder, add or remove any.
 #pragma once
 #include <cstddef>	// TweaksV: offsetof
 
@@ -74,12 +74,12 @@ namespace rage
 		void SetPath(const char* path, bool allowRoot, rage::fiDevice* parent);
 
 		// TweaksV: finds the game's Mount and SetPath, which the two functions above call - once,
-		// before the newmods hooks are installed (they were searched for lazily inside the game's
-		// calls - B-ROV-01/20). Returns false if either is missing. Static, so the vtable is unchanged.
+		// before the newmods hooks are installed (they were searched for lazily, inside the game's
+		// calls, and never checked). Returns false if either is missing. Static, so the vtable is unchanged.
 		static bool FindGameFunctions();
 	};
 
-	// TweaksV: class fiDeviceRelative removed - declared and defined, but never used (B-ROV-20)
+	// TweaksV: class fiDeviceRelative removed - declared and defined, but never used
 
 	class fiDeviceLocal : public fiDevice
 	{
@@ -139,9 +139,9 @@ namespace rage
 		static std::string ToFullPath(const char* fileName)
 		{
 			// TweaksV: must never throw - it runs inside the game's file calls; any error gives an
-			// empty path, which matches no file (B-ROV-21). The newmods folder (in the current
+			// empty path, which matches no file. The newmods folder (in the current
 			// directory, as upstream) is worked out once. The mapping is upstream's: "X:/path" ->
-			// newmods\X\path, whatever SetPath was given (plan A.4).
+			// newmods\X\path, whatever SetPath was given.
 			try
 			{
 				static const std::filesystem::path newmods = [] {
@@ -173,7 +173,7 @@ namespace rage
 		}
 	};
 
-	// TweaksV: the sizes and offsets the game relies on (plan A.6, verified with MSVC 19.51)
+	// TweaksV: the sizes and offsets the game relies on (verified with MSVC 19.51)
 	static_assert(offsetof(fiFindData, fileSize) == 0x100 && offsetof(fiFindData, lastWriteTime) == 0x108 &&
 		offsetof(fiFindData, fileAttributes) == 0x110 && sizeof(fiFindData) == 0x118, "rage::fiFindData layout changed");
 	static_assert(sizeof(fiDeviceLocal) == 0x128, "rage::fiDeviceLocal size changed");

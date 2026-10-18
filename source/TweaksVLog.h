@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - the one log file, TweaksV.log, shared by every part of TweaksV (plan 5.7).
+// TweaksV - the one log file, TweaksV.log, shared by every part of TweaksV.
 #pragma once
 
 #include <windows.h>
@@ -15,10 +15,10 @@ namespace TweaksV
 	void WriteLog(std::string_view tag, std::string_view text);
 
 	// Truncates TweaksV.log in the game folder - or, if that folder is not writable,
-	// %LOCALAPPDATA%\TweaksV\TweaksV.log (plan 4.7). Called by the shared ClearLog().
+	// %LOCALAPPDATA%\TweaksV\TweaksV.log. Called by the shared ClearLog().
 	void ClearLogFile();
 
-	// The first lines of TweaksV.log: versions, paths and switches (plan 5.7). Then
+	// The first lines of TweaksV.log: versions, paths and switches. Then
 	// writes any lines that were logged before the log was started.
 	void WriteLogHeader();
 

@@ -11,7 +11,7 @@ namespace logger
 {
 	// TweaksV: "void init();" removed - the shared ClearLog() clears TweaksV.log once per start
 	// TweaksV: the type "error" is always written; "info", "mods" and "device" follow the LOG_INFO,
-	// LOG_MODS and LOG_DEVICE switches in TweaksV.ini (plan 5.7)
+	// LOG_MODS and LOG_DEVICE switches in TweaksV.ini
 	void write(const char* type, const char* msg, ...);
 	void log(const char* type, const char* msg, ...);
 	void vwrite(const char* type, const char* msg, va_list args);

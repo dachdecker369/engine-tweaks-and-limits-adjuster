@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - the one log file, TweaksV.log (plan 5.7 and 4.7).
+// TweaksV - the one log file, TweaksV.log.
 
 #include "TweaksVLog.h"
 
@@ -22,7 +22,7 @@ namespace TweaksV
 {
 	namespace
 	{
-		constexpr size_t kMaxLine = 2048;		// plan 5.7: 2 KB lines
+		constexpr size_t kMaxLine = 2048;		// the longest line written: 2 KB
 		constexpr size_t kMaxPending = 1024;	// lines kept until the log is started
 
 		SRWLOCK g_lock = SRWLOCK_INIT;
@@ -183,7 +183,7 @@ namespace TweaksV
 			}
 			else
 			{
-				// Game folder read-only (plan 4.7): use %LOCALAPPDATA%\TweaksV instead.
+				// Game folder read-only: use %LOCALAPPDATA%\TweaksV instead.
 				primaryError = GetLastError();
 				const std::wstring folder = GetFallbackFolder();
 				if (!folder.empty())
@@ -256,7 +256,7 @@ namespace TweaksV
 
 	void OpenConsole()
 	{
-		// RageOpenV's code (main.cpp:56-64), moved here (plan 5.5 step 5).
+		// RageOpenV's code (main.cpp:56-64), moved here.
 		if (!AllocConsole() && GetConsoleWindow() == nullptr)
 		{
 			const DWORD error = GetLastError();

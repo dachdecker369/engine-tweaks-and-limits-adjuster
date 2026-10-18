@@ -4,8 +4,8 @@
 #pragma once
 
 #include <windows.h>		// TweaksV
-#include <string>
 #include <vector>
+#include "TweaksVPatterns.h"	// TweaksV: the patterns; <string> removed - unused now
 #include "StubMemory.h"		// TweaksV: FindPrevFreeRegion and AllocateStubMemory are shared now
 
 namespace PackfileLimitAdjusterEnhanced // TweaksV: one namespace per original plugin
@@ -13,18 +13,18 @@ namespace PackfileLimitAdjusterEnhanced // TweaksV: one namespace per original p
 
 struct PatternPair
 {
-	std::string pattern;
+	const TweaksV::GamePattern* pattern;	// TweaksV: an entry of TweaksVPatterns.h - was std::string
 	int offset;
 };
 
 void initializeGame();
-// TweaksV: the other game edition's patch function removed (F-PACK-4)
+// TweaksV: the other game edition's patch function removed
 // TweaksV: "static void EnhancedPatch();" and "static void SetStreamingInterface(char* si);" moved
-// into Game.cpp - a header must not declare static functions (B-PACK-08)
-// TweaksV: the absolute-address relocation function is removed - only the other game edition used it (F-PACK-5)
+// into Game.cpp - a header must not declare static functions
+// TweaksV: the absolute-address relocation function is removed - only the other game edition used it
 void RelocateRelativePackFileArray(void* newPackFileArray, const std::vector<PatternPair>& list);
 void AdjustPackFileArrayLimit();
-// TweaksV: FindPrevFreeRegion and AllocateStubMemory removed - shared now, see StubMemory.h (plan 4.1)
+// TweaksV: FindPrevFreeRegion and AllocateStubMemory removed - shared now, see StubMemory.h
 void FatalErrorExit();
 
 } // namespace PackfileLimitAdjusterEnhanced

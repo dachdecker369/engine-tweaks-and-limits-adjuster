@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - old stand-alone plugins still installed next to TweaksV (plan 4.4).
+// TweaksV - old stand-alone plugins still installed next to TweaksV.
 
 #include "TweaksVConflicts.h"
 
@@ -9,6 +9,7 @@
 #include <string>
 #include <utility>
 
+#include "TweaksVFeatures.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
 #include "TweaksVSettings.h"
@@ -18,27 +19,6 @@ namespace TweaksV
 {
 	namespace
 	{
-		struct OldPlugin
-		{
-			const wchar_t* file;
-			const SettingsSection* part;	// the part of TweaksV it duplicates
-		};
-
-		// The plugins TweaksV replaces. ZHeapAdjuster.asi is the rename the HeapAdjuster
-		// author recommends; OpenRPF.asi and OpenIV.asi do RageOpenV's job, and alloc8or's
-		// DirectStorageFix.asi does the job of TweaksV's own DirectStorage part.
-		constexpr OldPlugin kOldPlugins[] = {
-			{ L"HeapAdjuster.asi", &kHeapSection },
-			{ L"ZHeapAdjuster.asi", &kHeapSection },
-			{ L"ModkitLimitAdjusterEnhanced.asi", &kModkitSection },
-			{ L"PackfileLimitAdjusterEnhanced.asi", &kPackfileSection },
-			{ L"RageOpenV.asi", &kRageOpenVSection },
-			{ L"OpenRPF.asi", &kRageOpenVSection },
-			{ L"OpenIV.asi", &kRageOpenVSection },
-			{ L"StraightToStoryMode.asi", &kStoryModeSection },
-			{ L"DirectStorageFix.asi", &kDirectStorageSection },
-		};
-
 		// ASI loaders load .asi files from the game folder and these subfolders.
 		constexpr const wchar_t* kFolders[] = { L"", L"\\scripts", L"\\plugins" };
 
@@ -54,17 +34,22 @@ namespace TweaksV
 		int found = 0;
 		for (const wchar_t* folder : kFolders)
 		{
-			for (const OldPlugin& plugin : kOldPlugins)
+			for (const Feature& feature : Features())
 			{
-				const std::wstring path = GetGameFolder() + folder + L"\\" + plugin.file;
-				if (!FileExists(path))
-					continue;
+				for (const wchar_t* file : feature.oldPlugins)
+				{
+					if (!file)
+						continue;
+					const std::wstring path = GetGameFolder() + folder + L"\\" + file;
+					if (!FileExists(path))
+						continue;
 
-				++found;
-				DisableFeatureForSession(*plugin.part);
-				ReportFailure("TweaksV", "Old plugin found: " + ToUtf8(path) + ". TweaksV's " + plugin.part->feature +
-					" part is switched off for this session so nothing is patched twice. "
-					"Delete the old file - TweaksV replaces it.");
+					++found;
+					DisableFeatureForSession(*feature.section);
+					ReportFailure("TweaksV", "Old plugin found: " + ToUtf8(path) + ". TweaksV's " + feature.section->feature +
+						" part is switched off for this session so nothing is patched twice. "
+						"Delete the old file - TweaksV replaces it.");
+				}
 			}
 		}
 

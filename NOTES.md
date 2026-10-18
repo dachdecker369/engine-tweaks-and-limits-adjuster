@@ -23,6 +23,13 @@
   - A redirected call goes through a 16-byte jump near the game, which is written once and then only read and executed - never writable and executable at once (the originals' trampolines were both);
   - DRY_RUN and DIAGNOSTIC_MODE work the same for every part.
 
+- **One pattern table:** every byte pattern TweaksV looks for is defined once, in `TweaksVPatterns.h`, under the label `PATTERNS.md` gives it:
+  - A label the table does not have, or a malformed pattern, stops the build;
+  - The tests check that `PATTERNS.md` lists exactly the table's patterns, and that the code uses each one once;
+  - `TweaksV.log` names each pattern by its label, and `TEST_BREAK_PATTERN` (test builds only) takes a label.
+
+- **One feature table:** `TweaksVFeatures.cpp` lists each feature once: its section of `TweaksV.ini`, the old stand-alone plugins that do its job and the function that starts it. DllMain starts the features from it and the conflict check takes their old plugins from it, so a new feature is one entry there, plus its settings.
+
 - **HeapAdjusterEnhanced merged:** `[HEAP_SETTINGS] HEAP_SIZE` (default 2000 MB) is read from `TweaksV.ini`, and its original code is kept in its own namespace. Fixes:
   - A missing pattern no longer crashes the game;
   - The target instruction is checked before writing;
@@ -86,7 +93,9 @@
 
 - **Hook:** `TweaksV.asi` stays loaded once enabled until the game exits.
 
-- **Tests:** `test\` holds fake-game test suites (275 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. `bash test/run_all.sh` builds and runs them (see README).
+- **Build:** all of TweaksV's code, its own and the merged plugins', builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
+
+- **Tests:** `test\` holds fake-game test suites (277 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 
@@ -100,11 +109,13 @@ Known bugs and open issues in TweaksV.
 - **Tested:** one boot on 1.0.1158.16 with `NEWMODS=1`, `LOG_DEVICE=1` and an empty `newmods` folder. The newmods devices were mounted without a problem, but the game opened no file through them, so this code never ran. Confirming the sign needs a boot in which the game loads a file from the `newmods` folder.
 - **Workaround:** `NEWMODS=0` (the default) under `[RAGEOPENV_SETTINGS]` in `TweaksV.ini` turns newmods off.
 
-### T-DEBT: shared code still written more than once
+### T-HARDEN: hardening still to do
 
-- **What:**
-  - The patterns are text in nine files.
-  - About 240 comments in the source, and some in the tests, still cite the sections and bug IDs of the original merge plan, which is not part of the repository.
-  - Every test suite has its own copy of the test helpers.
-  - The scanner keeps the original's name, `FindPatternBmh`.
-- **When it goes:** in the next refactoring steps (one pattern table, the comments), before the next release. The settings and the patch code are done: one table and one module now.
+- **What:** low-severity items from the code review:
+  - MinHook, the hook library, keeps its trampolines in memory that is writable and executable;
+  - `TweaksV.log` and `TweaksV.ini` are written without checking for links;
+  - newmods (off by default) uses fixed 256-character path buffers and does not check that a path stays inside the `newmods` folder;
+  - `TweaksV.log` shows the Windows user name in its paths;
+  - the log switches for testing (`LOG_CALLS`, `LOG_FILE_OPENS`) and RageOpenV's (`LOG_INFO`, `LOG_MODS`, `LOG_DEVICE`) let `TweaksV.log` grow without a limit;
+  - a part that stops working after the start-up summary, such as the DirectStorage `OpenFile` hook, is reported only in the log.
+- **When it goes:** in the next refactoring step, security hardening, before the next release.

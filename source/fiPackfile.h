@@ -49,7 +49,7 @@ namespace rage
 
 	// TweaksV: the code works with the COMPILED offsets of the three fields it uses (some field
 	// names above do not match them, because memoryPtr is 8-byte aligned) - pinned so no change
-	// can move them (plan A.6, verified with MSVC 19.51)
+	// can move them (verified with MSVC 19.51)
 	static_assert(offsetof(fiPackfile, entryTable) == 0x20, "fiPackfile::entryTable moved");
 	static_assert(offsetof(fiPackfile, filesCount) == 0x28, "fiPackfile::filesCount moved");
 	static_assert(offsetof(fiPackfile, currentFileOffset) == 0xB4, "fiPackfile::currentFileOffset moved");

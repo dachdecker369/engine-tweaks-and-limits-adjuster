@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - failure collection and the one start-up summary message box (plan 5.8).
+// TweaksV - failure collection and the one start-up summary message box.
 
 #include "TweaksVSummary.h"
 

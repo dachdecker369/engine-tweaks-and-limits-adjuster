@@ -3,14 +3,12 @@
 // screen patches were adapted from ChaosModV (GPL-3.0); the landing page patch is by
 // "Unknown Modder" (alloc8or).
 // Modified for TweaksV: GTA V Enhanced only, namespace, one TweaksV.ini switch
-// per screen, safety fixes (B-STORY-01..04). Every change is marked "TweaksV:".
+// per screen, safety fixes. Every change is marked "TweaksV:".
 #include <windows.h>				// TweaksV: was #include "pch.h"
 #include "MemScanner.h"				// TweaksV: the shared scanner
 #include <cstdint>
-#include <string_view>
-#include <cassert>
+// TweaksV: <string_view>, <cassert> and <fstream> removed - unused
 #include "StraightToStoryMode_Game.h"
-#include <fstream>
 #include "StraightToStoryMode_Logging.h"
 #include <cstring>					// TweaksV: memcpy
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
@@ -26,11 +24,11 @@ BYTE* legal;
 BYTE* landingPage;
 
 // TweaksV: the TODO "add null checks for patterns and tolerate missing patterns by skipping
-// the patch" is done: a missing pattern skips only that screen (B-STORY-01)
+// the patch" is done: a missing pattern skips only that screen
 
 // TweaksV: one patch write, through TweaksV's one code writer (TweaksVPatch.h), which checks the
 // protection and puts it back, flushes the instruction cache and handles DRY_RUN and
-// DIAGNOSTIC_MODE (plan 5.9 R3); a failure goes to the start-up summary. Returns false if nothing
+// DIAGNOSTIC_MODE; a failure goes to the start-up summary. Returns false if nothing
 // could be written.
 static bool WritePatch(BYTE* address, const BYTE* bytes, size_t size, const char* what)
 {
@@ -43,12 +41,12 @@ static bool WritePatch(BYTE* address, const BYTE* bytes, size_t size, const char
 
 void initializeGame()
 {
-	// TweaksV: ClearLog() removed - TweaksV.log is cleared once per start (plan 5.7)
+	// TweaksV: ClearLog() removed - TweaksV.log is cleared once per start
 
 	// TweaksV: the game edition check and the other edition's patches are removed -
-	// TweaksV only runs in GTA5_Enhanced.exe (F-STORY-1..4)
+	// TweaksV only runs in GTA5_Enhanced.exe
 
-	// TweaksV: one TweaksV.ini switch per screen (B-STORY-04)
+	// TweaksV: one TweaksV.ini switch per screen
 	const bool skipSplashScreen = TweaksV::IsOn(TweaksV::kSkipSplashScreen);
 	const bool skipLegalScreen = TweaksV::IsOn(TweaksV::kSkipLegalScreen);
 	const bool skipLandingPage = TweaksV::IsOn(TweaksV::kSkipLandingPage);
@@ -58,8 +56,8 @@ void initializeGame()
 	// https://github.com/gta-chaos-mod/ChaosModV/blob/9301f701dcd29e558a7955f260a3fcb327e66a21/ChaosMod/Memory/Memory.cpp
 	if (skipSplashScreen) // TweaksV
 	{
-		splash = MemScanner::FindPatternBmh("0F 85 A9 00 00 00 48 8D 54");
-		if (!splash) // TweaksV: null check - skip only this screen (B-STORY-01)
+		splash = MemScanner::Find(TweaksV::Pattern("S-E1"));
+		if (!splash) // TweaksV: null check - skip only this screen
 		{
 			TweaksV::ReportFailure("StraightToStoryMode", "The splash screen cannot be skipped: its game code was not "
 				"found (a game update may have moved it).");
@@ -69,11 +67,11 @@ void initializeGame()
 		{
 			splash -= 0x0D;
 
-			if (splash[0] == 0xE9 && splash[5] == 0x90) // TweaksV: already patched (an old StraightToStoryMode.asi?) - skip quietly (B-STORY-03)
+			if (splash[0] == 0xE9 && splash[5] == 0x90) // TweaksV: already patched (an old StraightToStoryMode.asi?) - skip quietly
 			{
 				Logging("Splash screen: already patched - skipped.");
 			}
-			else if (splash[0] != 0x0F || splash[1] != 0x84) // TweaksV: must be "jz rel32" (B-STORY-02)
+			else if (splash[0] != 0x0F || splash[1] != 0x84) // TweaksV: must be "jz rel32"
 			{
 				TweaksV::ReportFailure("StraightToStoryMode", "The splash screen cannot be skipped: the game code found is "
 					"not the expected instruction (" + TweaksV::HexBytes(splash, 6) + ").");
@@ -82,7 +80,7 @@ void initializeGame()
 			else
 			{
 				// TweaksV: "jz rel32" becomes "jmp rel32+1" + nop - the same target, now taken
-				// always. Upstream hard-coded E9 86 01 00 00 90 (B-STORY-02).
+				// always. Upstream hard-coded E9 86 01 00 00 90.
 				const int32_t jumpDisplacement = *(int32_t*)(splash + 2) + 1;
 				BYTE patch[6] = { 0xE9, 0x00, 0x00, 0x00, 0x00, 0x90 };
 				memcpy(patch + 1, &jumpDisplacement, 4);
@@ -98,8 +96,8 @@ void initializeGame()
 
 	if (skipLegalScreen) // TweaksV
 	{
-		legal = MemScanner::FindPatternBmh("00 E9 ? 05 00 00 E8 ? 07");
-		if (!legal) // TweaksV: null check - skip only this screen (B-STORY-01)
+		legal = MemScanner::Find(TweaksV::Pattern("S-E2"));
+		if (!legal) // TweaksV: null check - skip only this screen
 		{
 			TweaksV::ReportFailure("StraightToStoryMode", "The legal screen cannot be skipped: its game code was not "
 				"found (a game update may have moved it).");
@@ -110,11 +108,11 @@ void initializeGame()
 			legal -= 0x0F;
 
 			static const BYTE nops[6] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-			if (memcmp(legal, nops, 6) == 0) // TweaksV: already patched - skip quietly (B-STORY-03)
+			if (memcmp(legal, nops, 6) == 0) // TweaksV: already patched - skip quietly
 			{
 				Logging("Legal screen: already patched - skipped.");
 			}
-			else if (legal[0] != 0x0F || legal[1] != 0x84) // TweaksV: must be "jz rel32", as in the game (0F 84 07 05 00 00 on 1.0.1158.16); the jump distance is not checked, as game updates change it (S-E2, T3)
+			else if (legal[0] != 0x0F || legal[1] != 0x84) // TweaksV: must be "jz rel32", as in the game (0F 84 07 05 00 00 on 1.0.1158.16); the jump distance is not checked, as game updates change it
 			{
 				TweaksV::ReportFailure("StraightToStoryMode", "The legal screen cannot be skipped: the game code found is "
 					"not the expected instruction (" + TweaksV::HexBytes(legal, 6) + ").");
@@ -135,8 +133,8 @@ void initializeGame()
 	// Thanks to "Unknown Modder" (alloc8or) for the landing page patch on Enhanced
 	if (skipLandingPage) // TweaksV
 	{
-		landingPage = MemScanner::FindPatternBmh("E8 ? ? ? ? 8B 0D ? ? ? ? 83 C1 ? 84 C0");
-		if (!landingPage) // TweaksV: null check - skip only this screen (B-STORY-01)
+		landingPage = MemScanner::Find(TweaksV::Pattern("S-E3"));
+		if (!landingPage) // TweaksV: null check - skip only this screen
 		{
 			TweaksV::ReportFailure("StraightToStoryMode", "The landing page cannot be skipped: its game code was not "
 				"found (a game update may have moved it).");
@@ -148,17 +146,17 @@ void initializeGame()
 			BYTE* patchedFuncAddr = (BYTE*)(*(int32_t*)landingPage + landingPage + 4);
 
 			static const BYTE returnZero[3] = { 0x31, 0xC0, 0xC3 }; // xor eax, eax; ret
-			if (!TweaksV::IsInsideGameImage(patchedFuncAddr)) // TweaksV: the call must lead into the game (plan 5.9 R2)
+			if (!TweaksV::IsInsideGameImage(patchedFuncAddr)) // TweaksV: the call must lead into the game
 			{
 				TweaksV::ReportFailure("StraightToStoryMode", "The landing page cannot be skipped: the call found does not "
 					"lead into the game code.");
 				allApplied = false;
 			}
-			else if (memcmp(patchedFuncAddr, returnZero, 3) == 0) // TweaksV: already patched - skip quietly (B-STORY-03)
+			else if (memcmp(patchedFuncAddr, returnZero, 3) == 0) // TweaksV: already patched - skip quietly
 			{
 				Logging("Landing page: already patched - skipped.");
 			}
-			else if (patchedFuncAddr[0] == 0xE9 || (patchedFuncAddr[0] == 0xFF && patchedFuncAddr[1] == 0x25)) // TweaksV: plan 4.4
+			else if (patchedFuncAddr[0] == 0xE9 || (patchedFuncAddr[0] == 0xFF && patchedFuncAddr[1] == 0x25)) // TweaksV: a jump at its start is another mod's hook
 			{
 				TweaksV::ReportFailure("StraightToStoryMode", "The landing page is not skipped: another mod has already "
 					"hooked the function it patches.");
@@ -182,11 +180,7 @@ void initializeGame()
 	}
 }
 
-// TweaksV: kept under its original name, but it no longer shows a MessageBox or calls
-// exit(1) inside DllMain (plan 5.8). StraightToStoryMode now skips single screens instead.
-void FatalErrorExit() {
-	Logging("FATAL ERROR - StraightToStoryMode is skipped for this session");
-	TweaksV::ReportFailure("StraightToStoryMode", "A fatal error occurred - StraightToStoryMode is skipped for this session.");
-}
+// TweaksV: FatalErrorExit() removed - it showed a MessageBox and called exit(1) inside DllMain;
+// StraightToStoryMode now skips single screens instead, so nothing calls it
 
 } // namespace StraightToStoryMode

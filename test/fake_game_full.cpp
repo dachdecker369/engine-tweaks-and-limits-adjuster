@@ -1,6 +1,7 @@
 // Test harness for TweaksV: pretends to be GTA5_Enhanced.exe and contains copies of the game
-// code TweaksV patches (HeapAdjusterEnhanced, StraightToStoryMode, ModkitLimitAdjusterEnhanced
-// and PackfileLimitAdjusterEnhanced so far). Prints every patch site after TweaksV.asi has loaded.
+// code TweaksV patches: HeapAdjusterEnhanced's, StraightToStoryMode's, ModkitLimitAdjusterEnhanced's
+// and PackfileLimitAdjusterEnhanced's here, RageOpenV's in fake_game_rov.cpp. Prints every patch site
+// after TweaksV.asi has loaded.
 // Link it with a version resource (fake_game_version.rc) for the game build to pretend to be.
 // Usage: GTA5_Enhanced.exe [TweaksV.asi] [options...]
 //   prepatched     StraightToStoryMode's patches are already applied (an old .asi ran first)
@@ -26,7 +27,7 @@
 
 // RageOpenV's part of the fake game (fake_game_rov.cpp; its options are listed there).
 void RovSetup(int argc, wchar_t** argv);
-void RovPhase1();
+void RovFirstTimeRequest();
 void RovReport();
 void RovForEachDataSite(void (*fn)(const volatile unsigned char*, size_t));
 void RovForEachCallTarget(void (*fn)(const unsigned char*));
@@ -589,7 +590,7 @@ int wmain(int argc, wchar_t** argv)
 		wprintf(L"LoadLibrary(%ls) failed: %lu\n", asi, GetLastError());
 		return 1;
 	}
-	RovPhase1();	// the game asks for the time: RageOpenV's hook runs its one-time start-up
+	RovFirstTimeRequest();	// the game asks for the time: RageOpenV's hook runs its one-time start-up
 	Sleep(1500); // the start-up summary thread runs
 	if (dstorage)
 		CallDStorage(dstorage);

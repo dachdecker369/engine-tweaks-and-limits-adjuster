@@ -3,7 +3,7 @@
 // Modified for TweaksV; every change is marked "TweaksV:".
 #pragma once
 #include <cstring>					// TweaksV: strcmp
-#include "TweaksVSettings.h"	// TweaksV: TweaksV.ini's settings - was #include "inicpp.h" (D9, B-ROV-07)
+#include "TweaksVSettings.h"	// TweaksV: TweaksV.ini's settings - was #include "inicpp.h"
 
 namespace RageOpenV // TweaksV: one namespace per original plugin
 {
@@ -12,13 +12,13 @@ class config
 {
 public:
 	// TweaksV: get_ini() removed - the inicpp object. TweaksV.ini is read with the Win32 INI API,
-	// which does not throw on ";" comment lines the way inicpp did (D9, B-ROV-07).
+	// which does not throw on ";" comment lines the way inicpp did.
 
 	static void load()
 	{
 		// TweaksV: TweaksV's DllMain has already created TweaksV.ini, so nothing is written here
 		// (was: load RageOpenV.ini, or write one with the defaults). The log switches are read
-		// once now, so later log calls never touch the INI (B-ROV-11).
+		// once now, so later log calls never touch the INI.
 		get_log("info");
 	}
 

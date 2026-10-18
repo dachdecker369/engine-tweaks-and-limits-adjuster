@@ -13,6 +13,6 @@ void Logging(std::string msg) {
 }
 
 // TweaksV: ClearLog() removed - the one shared ClearLog() clears TweaksV.log once per
-// start (plan 5.7); clearing it here would erase the other plugins' lines
+// start; clearing it here would erase the other plugins' lines
 
 } // namespace ModkitLimitAdjusterEnhanced

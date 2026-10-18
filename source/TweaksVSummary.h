@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - failure collection and the one start-up summary message box (plan 5.8).
+// TweaksV - failure collection and the one start-up summary message box.
 #pragma once
 
 #include <string>
@@ -13,6 +13,6 @@ namespace TweaksV
 	// and there is something to report. Shown at most once. Never call it from DllMain.
 	void ShowStartupSummary();
 
-	// The same, from a worker thread - safe to start from DllMain (plan 5.5 step 8).
+	// The same, from a worker thread - safe to start from DllMain.
 	void ShowStartupSummaryLater();
 }

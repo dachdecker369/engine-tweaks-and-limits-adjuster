@@ -4,10 +4,8 @@
 #pragma once
 
 #include <Windows.h>
-#include <algorithm>
-#include <iostream>
+// TweaksV: <algorithm>, <iostream> and <thread> removed - nothing uses them
 #include <string>
-#include <thread>
 #include <filesystem>
 #include <vector>
 
@@ -20,11 +18,12 @@
 #include "fiPackfile.h"
 
 // TweaksV: IsEnhanced() moved to IsEnhanced.h - TweaksV's DllMain checks it once for
-// everything, so RageOpenV no longer calls it (F-ROV-4)
+// everything, so RageOpenV no longer calls it
 
 namespace RageOpenV // TweaksV: one namespace per original plugin
 {
-// TweaksV: no longer the DLL's entry point - TweaksV's DllMain calls it (plan 5.5 step 7). Returns
-// TRUE when the GetSystemTimeAsFileTime hook is installed; that hook then shows the start-up summary.
+// TweaksV: no longer the DLL's entry point - TweaksV's DllMain starts it from the feature table
+// (TweaksVFeatures.cpp). Returns TRUE when the GetSystemTimeAsFileTime hook is installed; that hook
+// then shows the start-up summary.
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved);
 } // namespace RageOpenV

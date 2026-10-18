@@ -60,7 +60,7 @@ Developer checks - not for release:
 Add these switches to the `msbuild` line above:
 
 - **Code Analysis:** `-p:TweaksVAnalyze=true` runs the MSVC code analysis (`/analyze`). Builds into `object\Analyze`.
-- **Test Builds:** `-p:TweaksVTestBuild=true` gives `object\Test\Release\TweaksV.asi`. Add `TEST_BREAK_PATTERN=<pattern>` under `[TWEAKSV]` in `TweaksV.ini`, with the pattern written exactly as in [PATTERNS.md](PATTERNS.md). Pattern then counts as missing, and then you can watch its part be skipped cleanly. The log header will list `TEST BUILD`.
+- **Test Builds:** `-p:TweaksVTestBuild=true` gives `object\Test\Release\TweaksV.asi`. Add `TEST_BREAK_PATTERN=<label>` under `[TWEAKSV]` in `TweaksV.ini`, with the label of a pattern in [PATTERNS.md](PATTERNS.md), such as `S-E2`. That pattern then counts as missing, and you can watch its part be skipped cleanly. The log header will list `TEST BUILD`.
 
 ## Testing
 

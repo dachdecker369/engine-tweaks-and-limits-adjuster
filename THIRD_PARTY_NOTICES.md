@@ -16,7 +16,7 @@ This file reproduces the copyright notices and license texts that those projects
 | [StraightToStoryMode](https://github.com/Chiheb-Bacha/StraightToStoryMode) | Chiheb-Bacha | GPL-3.0 | `StraightToStoryMode_*` |
 | [ChaosModV](https://github.com/gta-chaos-mod/ChaosModV) | The ChaosModV team | GPL-3.0 | The splash and legal screen patches in `StraightToStoryMode_Game.cpp` |
 | [GTA5-VehicleModKitLimit-Fix](https://github.com/0x-FADED/GTA5-VehicleModKitLimit-Fix) | 0x-FADED | MIT (see the notes) | The basis of ModkitLimitAdjusterEnhanced |
-| [PauseMenuHelper](https://github.com/CamxxCore/PauseMenuHelper) | Cameron Berry (CamxxCore) | MIT | `pattern.h` |
+| [PauseMenuHelper](https://github.com/CamxxCore/PauseMenuHelper) | Cameron Berry (CamxxCore) | MIT | No longer in TweaksV's code. Its `pattern.h` and `Hooking.h` are in the original projects archived in `upstream\` (HeapAdjusterEnhanced, PackfileLimitAdjusterEnhanced) |
 | Stub allocator | Bas Timmer / NTAuthority et al. | MIT | The search for free memory near the game in `StubMemory.cpp`, the same as in the stub allocator that PackfileLimitAdjusterEnhanced's `Hooking.cpp` carried |
 | [ScriptHookVDotNet](https://github.com/scripthookvdotnet/scripthookvdotnet) memory scanner | crosire, kagikn and contributors; C++ port by Chiheb-Bacha | zlib | `MemScanner.cpp`, `MemScanner.h` |
 

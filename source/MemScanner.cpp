@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>		// TweaksV: snprintf for the DIAGNOSTIC_MODE output
+#include <cstring>		// TweaksV: _stricmp (test builds)
 #include <sstream>
 #include <string>
 #include <vector>
@@ -35,7 +36,7 @@
 
 namespace MemScanner
 {
-    namespace // TweaksV: everything below except FindPatternBmh is internal
+    namespace // TweaksV: everything below except Find is internal
     {
         struct Range
         {
@@ -278,7 +279,8 @@ namespace MemScanner
         // (a pattern that matches more than once should be made unique). A pattern that matches more
         // than once also gets one line per match with the bytes around it, so that a longer pattern
         // can be chosen that matches only the place it is meant for.
-        void LogPatternDiagnostics(const std::string& patternStr, const Pattern& pattern, const std::vector<Range>& code, uint8_t* address)
+        void LogPatternDiagnostics(const TweaksV::GamePattern& gamePattern, const Pattern& pattern, const std::vector<Range>& code,
+            uint8_t* address)
         {
             const int maxCount = 100;
             std::vector<uint8_t*> found; // every match, for the lines per match below
@@ -295,7 +297,7 @@ namespace MemScanner
             snprintf(text, sizeof(text), " -> RVA 0x%llX, %d%s match%s, bytes:",
                 rva(address), matches, matches >= maxCount ? "+" : "", matches == 1 ? "" : "es");
 
-            std::string line = "Pattern found: " + patternStr + text;
+            std::string line = std::string("Pattern ") + gamePattern.label + " found: " + gamePattern.text + text;
             for (size_t i = 0; i < pattern.bytes.size() && i < 32; i++)
             {
                 char byteText[4];
@@ -334,42 +336,28 @@ namespace MemScanner
 
 #ifdef TWEAKSV_TEST_BUILD
         // TweaksV test builds only (-p:TweaksVTestBuild=true): TweaksV.ini [TWEAKSV] TEST_BREAK_PATTERN
-        // names one pattern, as written in PATTERNS.md, that is then treated as not found - to see that
-        // its part is skipped cleanly and the rest still works.
-        std::string NormalizePattern(const std::string& text)
+        // names one pattern by its label in PATTERNS.md (e.g. S-E2), which is then treated as not
+        // found - to see that its part is skipped cleanly and the rest still works.
+        bool IsBrokenForTest(const TweaksV::GamePattern& pattern)
         {
-            std::istringstream tokens(text);
-            std::string out, token;
-            while (tokens >> token)
-            {
-                if (token == "??")
-                    token = "?";
-                for (auto& c : token)
-                    c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
-                out += (out.empty() ? "" : " ") + token;
-            }
-            return out;
-        }
-
-        bool IsBrokenForTest(const std::string& patternStr)
-        {
-            static const std::string broken = NormalizePattern(TweaksV::GetText(TweaksV::kTestBreakPattern));
-            return !broken.empty() && NormalizePattern(patternStr) == broken;
+            const std::string& broken = TweaksV::GetText(TweaksV::kTestBreakPattern);
+            return !broken.empty() && _stricmp(broken.c_str(), pattern.label) == 0;
         }
 #endif
     }
 
-    uint8_t* FindPatternBmh(const std::string& patternStr)
+    uint8_t* Find(const TweaksV::GamePattern& gamePattern)
     {
+        const std::string label = gamePattern.label;
 #ifdef TWEAKSV_TEST_BUILD
-        if (IsBrokenForTest(patternStr)) {
-            TweaksV::WriteLog("MemScanner", "TEST BUILD: treated as not found (TEST_BREAK_PATTERN): " + patternStr);
+        if (IsBrokenForTest(gamePattern)) {
+            TweaksV::WriteLog("MemScanner", "TEST BUILD: pattern " + label + " is treated as not found (TEST_BREAK_PATTERN).");
             return nullptr;
         }
 #endif
         Pattern pattern;
-        if (!Compile(patternStr, pattern)) { // TweaksV: malformed pattern
-            TweaksV::WriteLog("MemScanner", "Invalid pattern (treated as not found): " + patternStr);
+        if (!Compile(gamePattern.text, pattern)) { // TweaksV: not for a pattern of kPatterns, which are checked when TweaksV is compiled
+            TweaksV::WriteLog("MemScanner", "Pattern " + label + " is not valid (treated as not found): " + gamePattern.text);
             return nullptr;
         }
 
@@ -377,12 +365,12 @@ namespace MemScanner
         uint8_t* address = FindInCode(pattern, code, nullptr);
         if (!address) {
             // TweaksV: was Logging(...) + FatalErrorExit(); the calling plugin now decides
-            TweaksV::WriteLog("MemScanner", "Pattern not found: " + patternStr);
+            TweaksV::WriteLog("MemScanner", "Pattern " + label + " not found: " + gamePattern.text);
             return nullptr;
         }
 
         if (TweaksV::IsDiagnosticMode()) // TweaksV
-            LogPatternDiagnostics(patternStr, pattern, code, address);
+            LogPatternDiagnostics(gamePattern, pattern, code, address);
 
         return address;
     }

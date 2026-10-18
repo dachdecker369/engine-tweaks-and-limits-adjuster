@@ -44,10 +44,10 @@ void InitialMountHook()
 {
 	InitialMountOrig();
 
-	// TweaksV: nothing may throw back into the game (B-ROV-21)
+	// TweaksV: nothing may throw back into the game
 	try
 	{
-	std::error_code error; // TweaksV: the current_path() that does not throw (B-ROV-21)
+	std::error_code error; // TweaksV: the current_path() that does not throw
 	std::filesystem::path cwd = std::filesystem::current_path(error) / "newmods/";
 	if (error)
 	{
@@ -91,8 +91,8 @@ void InitialMountHook()
 	}
 }
 
-// TweaksV: only the GTA V Enhanced pattern is kept (F-ROV-5)
-static memory::func<rage::fiDevice*, const char*, bool> GetDeviceHook("41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec ? ? ? ? 89 d6 49 89 ce");
+// TweaksV: only the GTA V Enhanced pattern is kept
+static memory::func<rage::fiDevice*, const char*, bool> GetDeviceHook(TweaksV::Pattern("R-E-M0"));
 
 char (*OpenArchiveOrig)(rage::fiPackfile* a1, const char* path, char smth, int32_t type, __int64 a5);
 char OpenArchiveHook(rage::fiPackfile* a1, const char* path, char smth, int32_t type, __int64 a5)
@@ -123,7 +123,7 @@ char OpenArchiveHook(rage::fiPackfile* a1, const char* path, char smth, int32_t 
 }
 
 static memory::InitFuncs CustomDevice([] {
-	// TweaksV: the NEWMODS switch (off by default); only the GTA V Enhanced patterns are kept (F-ROV-5)
+	// TweaksV: the NEWMODS switch (off by default); only the GTA V Enhanced patterns are kept
 	if (!TweaksV::IsOn(TweaksV::kNewMods)) {
 		TweaksV::WriteLog("RageOpenV", "NEWMODS=0 - the newmods folder is not mounted.");
 		return;
@@ -131,7 +131,7 @@ static memory::InitFuncs CustomDevice([] {
 
 	// TweaksV: without a newmods folder there is nothing to mount - and no reason for hooks that
 	// would look for every archive and file in it (the devices are mounted from the current
-	// directory, as upstream). DIAGNOSTIC_MODE still checks the patterns (plan Phase E2).
+	// directory, as upstream). DIAGNOSTIC_MODE still checks the patterns.
 	std::error_code error;
 	const std::filesystem::path folder = std::filesystem::current_path(error) / "newmods";
 	const bool haveFolder = !error && std::filesystem::is_directory(folder, error);
@@ -141,9 +141,9 @@ static memory::InitFuncs CustomDevice([] {
 	}
 
 	// TweaksV: pass 1 - the mount call, the archive function and the three game functions the
-	// devices use are found and checked before anything is written (B-ROV-01, plan 5.9 R1/R2)
-	memory mountCall = memory::scan("e8 ? ? ? ? 48 8d 05 ? ? ? ? 66 c7 44 58 02 00 00 66 89 3d").add(26);
-	memory openArchive = memory::scan("41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec ? ? ? ? 45 89 cd 45 89 c6 49 89 d7 48 89 ce 8b 05");
+	// devices use are found and checked before anything is written
+	memory mountCall = memory::scan(TweaksV::Pattern("R-E-M1")).add(26);
+	memory openArchive = memory::scan(TweaksV::Pattern("R-E-M2"));
 	const uint8_t* mountCallee = TweaksV::CallTarget((void*)mountCall.address);
 
 	std::string problem;
@@ -151,7 +151,7 @@ static memory::InitFuncs CustomDevice([] {
 		problem = "the initial mount call was not found in the game code";
 	else if (!mountCallee)
 		problem = "the initial mount call at " + TweaksV::DescribeAddress((void*)mountCall.address) + " is not a call";
-	// TweaksV: a call that leads out of the game has been redirected by another mod (plan 4.4)
+	// TweaksV: a call that leads out of the game has been redirected by another mod
 	else if (!TweaksV::IsInsideGameImage(mountCallee))
 		problem = "the initial mount call at " + TweaksV::DescribeAddress((void*)mountCall.address) +
 			" leads outside the game (another mod has redirected it)";
@@ -166,7 +166,7 @@ static memory::InitFuncs CustomDevice([] {
 		return;
 	}
 	// TweaksV: a function that already starts with a jump has probably been hooked by another mod -
-	// said in the log, and hooked on top, which chains to it (plan 4.4)
+	// said in the log, and hooked on top, which chains to it
 	if (TweaksV::StartsWithJump((void*)openArchive.address))
 		TweaksV::WriteLog("RageOpenV", "The archive function at " + TweaksV::DescribeAddress((void*)openArchive.address) +
 			" already starts with a jump - another mod may have hooked it; RageOpenV's hook goes on top.");

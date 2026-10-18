@@ -7,7 +7,7 @@ set -u
 T="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$T/.." && pwd)"
 export TWEAKSV_TEST_DIR="$R/object/TestRun"
-SUITES="ini_default story modkit packfile rageopenv directstorage phase_e"
+SUITES="patterns ini_default story modkit packfile rageopenv directstorage integration"
 
 build=1; keep=0
 for a in "$@"; do

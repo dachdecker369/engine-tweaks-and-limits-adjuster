@@ -1,19 +1,11 @@
 #!/usr/bin/env bash
-# M3 (ModkitLimitAdjusterEnhanced) scenarios: a fake GTA5_Enhanced.exe with copies of the
+# ModkitLimitAdjusterEnhanced scenarios: a fake GTA5_Enhanced.exe with copies of the
 # patched game code loads the real TweaksV.asi. Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" .
 mkdir -p appdata
 
-pass=0; fail=0
-check() { if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  $1"; fail=$((fail+1)); fi; }
-setkey() { sed -b -i "0,/^$1=.*\r\$/s//$1=$2\r/" TweaksV.ini; }
-setmodkitkey() { sed -b -i "/^\[MODKIT_SETTINGS\]/,/^\[/s/^$1=.*\r\$/$1=$2\r/" TweaksV.ini; }
-fresh_ini() { sed 's/$/\r/' "$T/base.ini" > TweaksV.ini; setkey SHOW_ERROR_POPUPS 0; }
-game() { cp "$1" GTA5_Enhanced.exe; shift; rm -f harness.out; LOCALAPPDATA="$AW" ./GTA5_Enhanced.exe TweaksV.asi "$@" > harness.out 2>&1; tr -d '\r' < harness.out; }
-log_has() { grep -q -- "$1" TweaksV.log; }
-count() { grep -c -- "$1" TweaksV.log; }
 GAME_LIMITS='limits: 1023 1027 1027 1027 1027 2048 1023 1023'
 MAX_LIMITS='limits: 65535 65539 65539 65539 65539 131072 65535 65535'
 NEW_ARRAY='modkit refs: new array (RW, 128 KB)'
@@ -27,22 +19,22 @@ check "heap and story mode still applied" "[[ \"\$out\" == *'heap: 1024 MB'* && 
 check "no problems" "! log_has 'PROBLEM'"
 
 echo "== K2 MODKITARRAY_SIZE=4096: limits for 4096, array still full size"
-fresh_ini; setmodkitkey MODKITARRAY_SIZE 4096; out=$(game full_game.exe); echo "      $out"
+fresh_ini; setkey MODKITARRAY_SIZE 4096 MODKIT_SETTINGS; out=$(game full_game.exe); echo "      $out"
 check "limits 4095/4099/8192" "[[ \"\$out\" == *'limits: 4095 4099 4099 4099 4099 8192 4095 4095'* ]]"
 check "array still 128 KB" "[[ \"\$out\" == *\"$NEW_ARRAY\"* ]]"
 
 echo "== K3 MODKITARRAY_SIZE=500 is raised to the game's own 1024"
-fresh_ini; setmodkitkey MODKITARRAY_SIZE 500; out=$(game full_game.exe); echo "      $out"
+fresh_ini; setkey MODKITARRAY_SIZE 500 MODKIT_SETTINGS; out=$(game full_game.exe); echo "      $out"
 check "limits stay at the game's values" "[[ \"\$out\" == *\"$GAME_LIMITS\"* ]]"
 check "clamp logged" "log_has 'MODKITARRAY_SIZE=500 is outside 1024..65536 - using 1024'"
 
 echo "== K4 MODKITARRAY_SIZE=70000 is clamped to 65536"
-fresh_ini; setmodkitkey MODKITARRAY_SIZE 70000; out=$(game full_game.exe)
+fresh_ini; setkey MODKITARRAY_SIZE 70000 MODKIT_SETTINGS; out=$(game full_game.exe)
 check "limits for 65536" "[[ \"\$out\" == *\"$MAX_LIMITS\"* ]]"
 check "clamp reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[MODKIT_SETTINGS\] MODKITARRAY_SIZE=70000 is outside 1..65536 - using 65536.'"
 
 echo "== K5 MODKITARRAY_SIZE=abc falls back to the default 65536"
-fresh_ini; setmodkitkey MODKITARRAY_SIZE abc; out=$(game full_game.exe)
+fresh_ini; setkey MODKITARRAY_SIZE abc MODKIT_SETTINGS; out=$(game full_game.exe)
 check "limits for 65536" "[[ \"\$out\" == *\"$MAX_LIMITS\"* ]]"
 check "invalid value reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[MODKIT_SETTINGS\] MODKITARRAY_SIZE=abc is not a number - using 65536.'"
 
@@ -54,12 +46,12 @@ check "both 'would' lines" "log_has 'DRY_RUN: would move the modkit array (6 ref
 
 echo "== K7 DIAGNOSTIC_MODE=1: every pattern, reference and limit logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
-check "the 14 modkit patterns each found exactly once" "[ \$(grep -c -E 'Pattern found: (31 c9 48 8d 05|89 c2 48 8d 0d|41 0f b7 c2 48 8d 0d|57 48 83 ec|48 8d 3d \? \? \? \? 0f b7|77 \? 48 8d 15|0f b7 c0 66 ba|48 83 c5|74 \? 48 83 c5|48 83 c7 \? 48 83 c2 \? 48 83 c5|48 83 c7 \? 48 83 c2 \? 48 83 c6|41 b8|0f b7 41|41 0f b7 ca).* 1 match,' TweaksV.log) -eq 14 ]"
+check "the 14 modkit patterns each found exactly once" "[ \$(grep -c -E 'Pattern M-E-(R[1-6]|L[1-8]) found: .* 1 match,' TweaksV.log) -eq 14 ]"
 check "6 references logged" "[ \$(count 'ModkitLimitAdjusterEnhanced\] DIAGNOSTIC: reference at RVA') -eq 6 ]"
 check "8 limits logged, all decoding to 1024" "[ \$(count 'DIAGNOSTIC: limit at RVA .* -> game size 1024') -eq 8 ]"
 
 echo "== K8 [MODKIT_SETTINGS] ENABLED=0"
-fresh_ini; setmodkitkey ENABLED 0; out=$(game full_game.exe)
+fresh_ini; setkey ENABLED 0 MODKIT_SETTINGS; out=$(game full_game.exe)
 check "nothing changed" "[[ \"\$out\" == *'modkit refs: game array'* && \"\$out\" == *\"$GAME_LIMITS\"* ]]"
 check "no modkit lines" "! log_has '\[ModkitLimitAdjusterEnhanced\]'"
 

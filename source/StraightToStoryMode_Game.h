@@ -3,11 +3,10 @@
 // Modified for TweaksV; every change is marked "TweaksV:".
 #pragma once
 
-#include <string>
-#include <vector>
+// TweaksV: <string> and <vector> removed - unused
 
 namespace StraightToStoryMode // TweaksV: one namespace per original plugin
 {
 void initializeGame();
-void FatalErrorExit();
+// TweaksV: FatalErrorExit() removed - see StraightToStoryMode_Game.cpp
 } // namespace StraightToStoryMode

@@ -14,13 +14,13 @@ namespace RageOpenV // TweaksV: one namespace per original plugin
 {
 
 // TweaksV: atomic, and claimed with exchange() BEFORE the init runs, because the init can end up
-// calling this function again (plan 4.2) - it was a plain bool (B-ROV-10)
+// calling this function again - it was a plain bool
 static std::atomic<bool> bInited{ false };
 void (*origGetSystemTimeAsFileTime)(LPFILETIME lpSystemTimeAsFileTime);
 static PVOID g_timeHookTarget = nullptr; // TweaksV: GetSystemTimeAsFileTime itself, to unhook it after the start-up
 
 // TweaksV: RageOpenV looks for mods\ and newmods\ in the current directory, as the original did;
-// says so in the log when that is not the game folder (B-ROV-21)
+// says so in the log when that is not the game folder
 static void LogCurrentDirectory()
 {
 	wchar_t current[MAX_PATH] = {};
@@ -42,15 +42,15 @@ void HookGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
 {
 	if (!bInited.load(std::memory_order_relaxed) && !bInited.exchange(true))
 	{
-		try // TweaksV: nothing may throw back into the game (plan 5.8)
+		try // TweaksV: nothing may throw back into the game
 		{
 			LogCurrentDirectory(); // TweaksV
 
 			// Don't hide the console
-			// TweaksV: only with CONSOLE=1 - upstream applied it without a console as well (B-ROV-04);
-			// the other edition's patterns are removed (F-ROV-1)
+			// TweaksV: only with CONSOLE=1 - upstream applied it without a console as well;
+			// the other edition's patterns are removed
 			if (config::get_config<bool>("console")) {
-				auto addr = memory::scan("ff 15 ? ? ? ? 48 85 c0 74 ? 48 89 c1 31 d2", true);
+				auto addr = memory::scan(TweaksV::Pattern("R-E-C1"), true);
 				if (addr.address != 0) {
 					// TweaksV: the 6 bytes must be the "call [rip+x]" (FF 15) that hides the console
 					uint8_t* call = addr.add(16).as<uint8_t*>();
@@ -67,11 +67,11 @@ void HookGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
 			}
 
 			// rpf cache check skip
-			// TweaksV: the SKIP_RPF_CACHE_CHECK switch - the block was "only on Enhanced" (F-ROV-2)
+			// TweaksV: the SKIP_RPF_CACHE_CHECK switch - the block was "only on Enhanced"
 			if (TweaksV::IsOn(TweaksV::kSkipRpfCacheCheck)) {
-				auto addr = memory::scan("e8 ? ? ? ? 48 8d 0d ? ? ? ? 48 8d 15 ? ? ? ? 48 8d 35");
+				auto addr = memory::scan(TweaksV::Pattern("R-E-K1"));
 				// TweaksV: the call must lead into the game, and a ret already there means another
-				// mod has done this (plan 5.9 R2, 4.4)
+				// mod has done this
 				const uint8_t* callee = TweaksV::CallTarget((void*)addr.address);
 				if (addr.address == 0)
 					TweaksV::ReportFailure("RageOpenV", "The RPF cache check is not skipped this session: its call was not "
@@ -104,8 +104,8 @@ void HookGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
 				"for this session.");
 		}
 
-		// TweaksV: one start-up summary for both moments (plan 5.5) - from a worker thread, because
-		// this hook runs on whichever thread first asks for the time and must not block it
+		// TweaksV: one start-up summary, for what DllMain and this start-up found - from a worker thread,
+		// because this hook runs on whichever thread first asks for the time and must not block it
 		TweaksV::ShowStartupSummaryLater();
 
 		// TweaksV: the hook's one job is done, so the game's later calls - it asks for the time
@@ -129,7 +129,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  dwReason, LPVOID lpReserved)
 
 		config::load(); // TweaksV: reads TweaksV.ini, which TweaksV's DllMain has created
 
-		// TweaksV: logger::init() removed - TweaksV's DllMain clears TweaksV.log once (plan 5.7)
+		// TweaksV: logger::init() removed - TweaksV's DllMain clears TweaksV.log once
 
 		if (!memory::init()) { // TweaksV: checked
 			TweaksV::ReportFailure("RageOpenV", "RageOpenV could not start: MinHook could not be initialised (details "
@@ -138,12 +138,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  dwReason, LPVOID lpReserved)
 		}
 
 		// TweaksV: the console is opened by TweaksV's DllMain (CONSOLE=1, TweaksV::OpenConsole) -
-		// this code moved there (plan 5.5 step 5)
+		// this code moved there
 
 		// NOTE: using a thread doesn't work consistently. Sometimes some hooks are executed before init is finished.
 		// Calling HookGetSystemTimeAsFileTime directly inside DllMain doesn't work (loader lock shenanigans)
 		// memory::IAT doesn't work on Enhanced since imports are obfuscated
-		// (TweaksV: the other edition's mention is dropped from the first line - F-ROV-3)
+		// (TweaksV: the other edition's mention is dropped from the first line)
 		if (!memory::HookApi(L"kernel32.dll", "GetSystemTimeAsFileTime", (PVOID)HookGetSystemTimeAsFileTime, (PVOID*)&origGetSystemTimeAsFileTime,
 			&g_timeHookTarget)) { // TweaksV: + the target, to unhook it after the start-up
 			logger::write("error", "Hooking failed error (%ld)", GetLastError()); // TweaksV: "error" - was "info"

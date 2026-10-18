@@ -1,6 +1,6 @@
 // TweaksV: carried over from RageOpenV (src/gtav/rage/fiDevice.cpp) by Chiheb-Bacha, based on
 // ClosedIV by martonp96 - https://github.com/Chiheb-Bacha/RageOpenV (GPL-3.0).
-// Modified for TweaksV: the newmods device fixes (B-ROV-12..20); every change is
+// Modified for TweaksV: the newmods device fixes; every change is
 // marked "TweaksV:".
 #include "main.h"
 #include <atomic>					// TweaksV
@@ -14,16 +14,16 @@ namespace RageOpenV // TweaksV: one namespace per original plugin
 {
 
 // TweaksV: the game's Mount and SetPath, found once by FindGameFunctions() - upstream searched for
-// them lazily, inside the game's own calls, and used the result unchecked (B-ROV-01/20)
+// them lazily, inside the game's own calls, and used the result unchecked
 static bool(*g_gameMount)(void*, const char*) = nullptr;
 static void(*g_gameSetPath)(void*, const char*, bool, rage::fiDevice*) = nullptr;
 
 bool rage::fiDevice::FindGameFunctions()
 {
-	// TweaksV: only the GTA V Enhanced patterns are kept (F-ROV-8)
-	g_gameMount = memory::scan("56 57 53 48 81 ec ? ? ? ? 48 83 79 ? ? 0f 84 ? ? ? ? 48 89 d7")
+	// TweaksV: only the GTA V Enhanced patterns are kept
+	g_gameMount = memory::scan(TweaksV::Pattern("R-E-D1"))
 		.as<bool(*)(void*, const char*)>();
-	g_gameSetPath = memory::scan("56 57 53 48 81 ec ? ? ? ? 4c 89 cf 44 89 c3")
+	g_gameSetPath = memory::scan(TweaksV::Pattern("R-E-D2"))
 		.as<void(*)(void*, const char*, bool, rage::fiDevice*)>();
 	return g_gameMount && g_gameSetPath;
 }
@@ -46,7 +46,7 @@ void rage::fiDevice::SetPath(const char* path, bool allowRoot, rage::fiDevice* p
 	g_gameSetPath(this, path, allowRoot, parent);
 }
 
-// TweaksV: rage::fiDeviceRelative's constructor, Mount and SetPath removed - never used (B-ROV-20)
+// TweaksV: rage::fiDeviceRelative's constructor, Mount and SetPath removed - never used
 
 rage::fiDeviceLocal::fiDeviceLocal() {
 	pad[0xF8] = 0;
@@ -54,11 +54,11 @@ rage::fiDeviceLocal::fiDeviceLocal() {
 rage::fiDeviceLocal::~fiDeviceLocal(){}
 
 // TweaksV: handle -> file name, only for LOG_DEVICE lines: filled only while that switch is on,
-// and locked, as the game calls these functions from several threads (B-ROV-14)
+// and locked, as the game calls these functions from several threads
 std::unordered_map<HANDLE, std::string> handleNames;
 static std::shared_mutex handleNamesMutex;
 
-// TweaksV: the file name for a log line - a lookup that never inserts (operator[] did, B-ROV-14)
+// TweaksV: the file name for a log line - a lookup that never inserts (operator[] did)
 static std::string HandleName(HANDLE handle)
 {
 	try
@@ -73,7 +73,8 @@ static std::string HandleName(HANDLE handle)
 	}
 }
 
-HANDLE rage::fiDeviceLocal::Open(const char* fileName, bool readOnly)
+// TweaksV: here and below, the names of parameters a function does not use are commented out
+HANDLE rage::fiDeviceLocal::Open(const char* fileName, bool /*readOnly*/)
 {
 	logger::write("device", "[%s] %s", __FUNCTION__, fileName);
 	// TweaksV: a file that cannot be opened gives INVALID_HANDLE_VALUE, as the game expects (the
@@ -87,7 +88,7 @@ HANDLE rage::fiDeviceLocal::Open(const char* fileName, bool readOnly)
 			return INVALID_HANDLE_VALUE;
 		}
 		HANDLE handle = file;
-		if (config::get_log("device")) // TweaksV: B-ROV-14
+		if (config::get_log("device")) // TweaksV: the name is kept only for LOG_DEVICE lines
 		{
 			std::unique_lock lock(handleNamesMutex);
 			handleNames[handle] = fileName ? fileName : "";
@@ -102,30 +103,30 @@ HANDLE rage::fiDeviceLocal::Open(const char* fileName, bool readOnly)
 
 uint32_t rage::fiDeviceLocal::ReadFile(HANDLE handle, void* buffer, uint32_t length)
 {
-	if (config::get_log("device")) // TweaksV: the name is only looked up for a line that is written (B-ROV-12)
+	if (config::get_log("device")) // TweaksV: the name is only looked up for a line that is written
 		logger::write("device", "[%s] %s %u", __FUNCTION__, HandleName(handle).c_str(), length);
 	auto file = (std::ifstream*)handle;
-	file->clear(); // TweaksV: a short read left failbit set and every later read failed (B-ROV-19)
+	file->clear(); // TweaksV: a short read left failbit set and every later read failed
 	file->read((char*)buffer, length);
-	return file->gcount();
+	return static_cast<uint32_t>(file->gcount()); // TweaksV: cast - at most length
 }
 
 uint32_t rage::fiDeviceLocal::ReadBulk(HANDLE handle, uint64_t offset, char* buffer, uint32_t length)
 {
-	if (config::get_log("device")) // TweaksV: B-ROV-12
+	if (config::get_log("device")) // TweaksV: the name is only looked up for a line that is written
 		logger::write("device", "[%s] %s %u", __FUNCTION__, HandleName(handle).c_str(), length);
 	auto file = (std::ifstream*)handle;
-	file->clear(); // TweaksV: after a short read, seekg did nothing (B-ROV-19)
+	file->clear(); // TweaksV: after a short read, seekg did nothing
 	file->seekg(offset);
 	return ReadFile(handle, buffer, length);
 }
 
 uint64_t rage::fiDeviceLocal::Seek64(HANDLE handle, int64_t distance, uint32_t method)
 {
-	if (config::get_log("device")) // TweaksV: B-ROV-12; %lld for the 64-bit distance (was %d)
+	if (config::get_log("device")) // TweaksV: only for a line that is written; %lld for the 64-bit distance (was %d)
 		logger::write("device", "[%s] %s %lld", __FUNCTION__, HandleName(handle).c_str(), distance);
 	auto file = (std::ifstream*)handle;
-	file->clear(); // TweaksV: B-ROV-19
+	file->clear(); // TweaksV: after a short read, seekg did nothing
 	if (method == SEEK_CUR)
 	{
 		file->seekg(distance, std::ios::cur);
@@ -156,13 +157,13 @@ uint32_t rage::fiDeviceLocal::Close(HANDLE handle)
 	if (!handle || handle == INVALID_HANDLE_VALUE) // TweaksV: not one of our streams
 		return false;
 	auto file = (std::ifstream*)handle;
-	if (config::get_log("device")) // TweaksV: B-ROV-12/14
+	if (config::get_log("device")) // TweaksV: only for LOG_DEVICE - the line, and the name, which is no longer needed
 	{
 		logger::write("device", "[%s] %s", __FUNCTION__, HandleName(handle).c_str());
 		std::unique_lock lock(handleNamesMutex);
 		handleNames.erase(handle);
 	}
-	delete file; // TweaksV: the stream, and its OS file handle, leaked on every close (B-ROV-13)
+	delete file; // TweaksV: the stream, and its OS file handle, leaked on every close
 	return true;
 }
 
@@ -171,7 +172,7 @@ uint64_t rage::fiDeviceLocal::Size64(HANDLE handle)
 	uint64_t fileCurrentPos = Seek64(handle, 0, SEEK_CUR);
 	uint64_t fileEndPos = Seek64(handle, 0, SEEK_END);
 	Seek64(handle, fileCurrentPos, SEEK_SET);
-	if (config::get_log("device")) // TweaksV: B-ROV-12; %llu for the 64-bit size (was %d)
+	if (config::get_log("device")) // TweaksV: only for a line that is written; %llu for the 64-bit size (was %d)
 		logger::write("device", "[%s] %s %llu", __FUNCTION__, HandleName(handle).c_str(), fileEndPos);
 	return fileEndPos;
 }
@@ -230,7 +231,7 @@ HANDLE rage::fiDeviceLocal::FindFileBegin(const char* path, rage::fiFindData* fi
 	MultiByteToWideChar(CP_ACP, 0, fullPath.c_str(), -1, wcPath, 256);
 
 	// TweaksV: swprintf_s formats INTO fileName; wprintf_s printed to stdout with fileName as the
-	// format, so FindFirstFileW always got an empty path and the search always failed (B-ROV-15)
+	// format, so FindFirstFileW always got an empty path and the search always failed
 	swprintf_s(fileName, MAX_PATH, slashFound ? L"%s*" : L"%s\\*", wcPath);
 	HANDLE firstFileHandle = FindFirstFileW(fileName, &foundData);
 	if (firstFileHandle == INVALID_HANDLE_VALUE)
@@ -253,17 +254,17 @@ bool rage::fiDeviceLocal::FindFileNext(HANDLE handle, rage::fiFindData* findData
 int rage::fiDeviceLocal::FindFileEnd(HANDLE handle)
 {
 	// TweaksV: a search handle is never in handleNames - operator[] added an empty entry for it on
-	// every call (B-ROV-14); the unused stream cast is gone
+	// every call; the unused stream cast is gone
 	logger::write("device", "[%s]", __FUNCTION__);
 	return (FindClose(handle) != 0) - 1;
 }
 
-HANDLE rage::fiDeviceLocal::OpenBulk(const char* fileName, uint64_t* ptr)
+HANDLE rage::fiDeviceLocal::OpenBulk(const char* fileName, uint64_t* /*ptr*/)
 {
 	return Open(fileName, true);
 }
 
-HANDLE rage::fiDeviceLocal::OpenBulkWrap(const char* fileName, uint64_t* ptr, void* unk)
+HANDLE rage::fiDeviceLocal::OpenBulkWrap(const char* fileName, uint64_t* ptr, void* /*unk*/)
 {
 	return OpenBulk(fileName, ptr);
 }
@@ -296,7 +297,7 @@ void* rage::fiDeviceLocal::FixRelativeName(char* dest, int length, const char* s
 	return dest;
 }
 
-bool rage::fiDeviceLocal::SetEndOfFile(HANDLE handle)
+bool rage::fiDeviceLocal::SetEndOfFile(HANDLE /*handle*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return false;
@@ -311,7 +312,7 @@ bool rage::fiDeviceLocal::SafeRead(HANDLE handle, void* buffer, uint32_t length)
 	for (;;)
 	{
 		uint32_t bytesRead = ReadFile(handle, (char*)buffer + offset, length - offset);
-		if (bytesRead == 0) // TweaksV: was "bytesRead < 0" - never true for an unsigned value, so this looped forever at the end of a file (B-ROV-17)
+		if (bytesRead == 0) // TweaksV: was "bytesRead < 0" - never true for an unsigned value, so this looped forever at the end of a file
 			break;
 		offset += bytesRead;
 		if (offset >= length)
@@ -320,61 +321,61 @@ bool rage::fiDeviceLocal::SafeRead(HANDLE handle, void* buffer, uint32_t length)
 	return false;
 }
 
-bool rage::fiDeviceLocal::SafeWrite(HANDLE handle, const void* buffer, uint32_t length)
+bool rage::fiDeviceLocal::SafeWrite(HANDLE /*handle*/, const void* /*buffer*/, uint32_t /*length*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return false;
 }
 
-HANDLE rage::fiDeviceLocal::CreateLocal(const char* fileName)
+HANDLE rage::fiDeviceLocal::CreateLocal(const char* /*fileName*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
 }
 
-HANDLE rage::fiDeviceLocal::Create(const char* fileName)
+HANDLE rage::fiDeviceLocal::Create(const char* /*fileName*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
 }
 
-uint32_t rage::fiDeviceLocal::WriteBulk(HANDLE handle, uint64_t offset, const void* buffer, uint32_t length)
+uint32_t rage::fiDeviceLocal::WriteBulk(HANDLE /*handle*/, uint64_t /*offset*/, const void* /*buffer*/, uint32_t /*length*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
 }
 
-uint32_t rage::fiDeviceLocal::Write(HANDLE hande, const void* buffer, uint32_t length)
+uint32_t rage::fiDeviceLocal::Write(HANDLE /*hande*/, const void* /*buffer*/, uint32_t /*length*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
 }
 
-uint32_t rage::fiDeviceLocal::Flush(HANDLE handle)
+uint32_t rage::fiDeviceLocal::Flush(HANDLE /*handle*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
 }
 
-bool rage::fiDeviceLocal::Delete(const char* fileName)
+bool rage::fiDeviceLocal::Delete(const char* /*fileName*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
 }
 
-bool rage::fiDeviceLocal::Rename(const char* from, const char* to)
+bool rage::fiDeviceLocal::Rename(const char* /*from*/, const char* /*to*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
 }
 
-bool rage::fiDeviceLocal::MakeDirectory(const char* dir)
+bool rage::fiDeviceLocal::MakeDirectory(const char* /*dir*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
 }
 
-bool rage::fiDeviceLocal::UnmakeDirectory(const char* dir)
+bool rage::fiDeviceLocal::UnmakeDirectory(const char* /*dir*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
@@ -385,7 +386,7 @@ void rage::fiDeviceLocal::Sanitize()
 	logger::write("device", "[%s]", __FUNCTION__);
 }
 
-bool rage::fiDeviceLocal::SetFileTime(const char* fileName, uint64_t fileTime)
+bool rage::fiDeviceLocal::SetFileTime(const char* /*fileName*/, uint64_t /*fileTime*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
@@ -397,7 +398,7 @@ uint64_t rage::fiDeviceLocal::GetRootDeviceId(const char*)
 	return 1;
 }
 
-bool rage::fiDeviceLocal::SetAttributes(const char* fileName, uint32_t attributes)
+bool rage::fiDeviceLocal::SetAttributes(const char* /*fileName*/, uint32_t /*attributes*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return false;
@@ -409,7 +410,7 @@ uint32_t rage::fiDeviceLocal::IsMemoryMappedDevice()
 	return 2;
 }
 
-uint32_t rage::fiDeviceLocal::GetResourceInfo(const char* fileName, rage::fiResourceInfo* flags)
+uint32_t rage::fiDeviceLocal::GetResourceInfo(const char* /*fileName*/, rage::fiResourceInfo* /*flags*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
@@ -421,7 +422,7 @@ int32_t rage::fiDeviceLocal::IsValidHandle()
 	return 0;
 }
 
-uint32_t rage::fiDeviceLocal::GetBulkOffset(HANDLE handle)
+uint32_t rage::fiDeviceLocal::GetBulkOffset(HANDLE /*handle*/)
 {
 	logger::write("device", "[%s]", __FUNCTION__);
 	return 0;
@@ -481,7 +482,7 @@ void rage::fiDeviceLocal::ConvertFoundData(LPWIN32_FIND_DATAW foundDataWin, rage
 	foundDataRage->lastWriteTime = foundDataWin->ftLastWriteTime;
 	foundDataRage->fileAttributes = foundDataWin->dwFileAttributes;
 	// TweaksV: nFileSizeHigh comes before nFileSizeLow in WIN32_FIND_DATAW, so reading both as one
-	// 64-bit value swapped the halves (B-ROV-16)
+	// 64-bit value swapped the halves
 	foundDataRage->fileSize = (static_cast<uint64_t>(foundDataWin->nFileSizeHigh) << 32) | foundDataWin->nFileSizeLow;
 }
 

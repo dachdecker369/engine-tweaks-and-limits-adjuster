@@ -13,11 +13,11 @@ namespace RageOpenV // TweaksV: one namespace per original plugin
 
 static const int OPEN = 0x4E45504F;
 
-// TweaksV: more entries than this in one archive means the header was not read right (B-ROV-06)
+// TweaksV: more entries than this in one archive means the header was not read right
 static const int32_t kMaxRpfEntries = 0x100000;
 
 // TweaksV: thread_local - FindEncryptionHook sets it and the hooks below read it on the thread
-// that opens the archive; one global mixed up archives opened on two threads at once (B-ROV-06)
+// that opens the archive; one global mixed up archives opened on two threads at once
 thread_local uint32_t currentEncryption;
 bool FindEncryptionHook(uint32_t encryption)
 {
@@ -57,14 +57,14 @@ bool ParseHeaderHook(rage::fiPackfile* a1, const char* name, bool readHeader, vo
 	if (ret && a1) // TweaksV: + null check
 	{
 		// fiPackfile on Enhanced is shifted by 0x08
-		// TweaksV: always - the edition check around the shift is removed (F-ROV-7)
+		// TweaksV: always - the edition check around the shift is removed
 		a1 = reinterpret_cast<rage::fiPackfile*>(reinterpret_cast<uintptr_t>(a1) + 0x8);
 		logger::log("mods", "[%s] fileCount /%d", __FUNCTION__, a1->filesCount);
 		// TweaksV: only an OPEN archive is changed, so the entry table of an encrypted one - every
 		// archive of the game - is no longer walked (upstream walked it and changed nothing)
 		if (currentEncryption != OPEN)
 			return ret;
-		// TweaksV: only a plausible entry table is walked (B-ROV-06)
+		// TweaksV: only a plausible entry table is walked
 		if (!a1->entryTable || a1->filesCount < 0 || a1->filesCount > kMaxRpfEntries)
 		{
 			logger::write("error", "[%s] %s: implausible entry table (%d entries) - left as it is", __FUNCTION__,
@@ -85,19 +85,19 @@ bool ParseHeaderHook(rage::fiPackfile* a1, const char* name, bool readHeader, vo
 
 static memory::InitFuncs PackfileEncryptionHooks([] {
 	// Allow unencrypted RPFs
-	// TweaksV: the OPEN_RPF switch; only the GTA V Enhanced patterns are kept (F-ROV-7)
+	// TweaksV: the OPEN_RPF switch; only the GTA V Enhanced patterns are kept
 	if (!TweaksV::IsOn(TweaksV::kOpenRpf)) {
 		TweaksV::WriteLog("RageOpenV", "OPEN_RPF=0 - unencrypted (OPEN) RPF archives are not enabled.");
 		return;
 	}
 
 	// TweaksV: pass 1 - the five call sites are found and checked before anything is written, so
-	// they are redirected together or not at all (B-ROV-01/05, plan 5.9 R1/R2)
-	memory findEncryption = memory::scan("e8 ? ? ? ? 80 7c 24 2e ? 74 ? 48 8b 56");
-	memory decryptHeader = memory::scan("e8 ? ? ? ? 8b 46 ? 85 c0 74 ? b9");
-	memory decryptHeader2 = memory::scan("e8 ? ? ? ? 48 8b 46 ? 66 c7 00 00 ? eb");
-	memory decryptHeader2b = memory::scan("e8 ? ? ? ? 48 8b 46 ? 8b 4c 24 ? 48 8d 14 08");
-	memory parseHeader = memory::scan("c6 86 ? ? ? ? ? 48 89 f1 4c 89 fa 45 89 f0 45 31 c9").add(19);
+	// they are redirected together or not at all
+	memory findEncryption = memory::scan(TweaksV::Pattern("R-E-E1"));
+	memory decryptHeader = memory::scan(TweaksV::Pattern("R-E-E2"));
+	memory decryptHeader2 = memory::scan(TweaksV::Pattern("R-E-E3"));
+	memory decryptHeader2b = memory::scan(TweaksV::Pattern("R-E-E4"));
+	memory parseHeader = memory::scan(TweaksV::Pattern("R-E-E5")).add(19);
 
 	// TweaksV: each call with the hook it gets and the variable that keeps the function it called
 	// (upstream read it with add(1).rip()); the second DecryptHeader2 call shares the first one's
@@ -118,7 +118,7 @@ static memory::InitFuncs PackfileEncryptionHooks([] {
 			problem = std::string("the ") + site.name + " was not found in the game code";
 		else if (!callee)
 			problem = std::string("the ") + site.name + " at " + TweaksV::DescribeAddress(address) + " is not a call";
-		// TweaksV: a call that leads out of the game has been redirected by another mod (plan 4.4)
+		// TweaksV: a call that leads out of the game has been redirected by another mod
 		else if (!TweaksV::IsInsideGameImage(callee))
 			problem = std::string("the ") + site.name + " at " + TweaksV::DescribeAddress(address) +
 				" leads outside the game (another mod has redirected it)";
@@ -129,7 +129,7 @@ static memory::InitFuncs PackfileEncryptionHooks([] {
 				" -> " + TweaksV::DescribeAddress(callee));
 	}
 	// TweaksV: the second DecryptHeader2 call is given the first one's original, so both must
-	// call the same function (B-ROV-05)
+	// call the same function
 	if (problem.empty() && TweaksV::CallTarget((void*)decryptHeader2.address) != TweaksV::CallTarget((void*)decryptHeader2b.address))
 		problem = "the two DecryptHeader2 calls lead to different functions (" +
 			TweaksV::DescribeAddress(TweaksV::CallTarget((void*)decryptHeader2.address)) + " and " +
@@ -146,7 +146,6 @@ static memory::InitFuncs PackfileEncryptionHooks([] {
 
 	// TweaksV: pass 2 - the original writes (set_call on each site), now through TweaksV's one call
 	// redirector: all five calls or none, each original set before its call can reach a hook
-	// (plan 5.9 R1/R3)
 	std::vector<TweaksV::CallRedirect> redirects;
 	for (const Site& site : sites)
 		redirects.push_back({ (uint8_t*)site.mem->address, site.hook, site.name, site.original });

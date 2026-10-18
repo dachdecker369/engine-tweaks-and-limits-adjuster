@@ -1,6 +1,6 @@
 # Patterns
 
-Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game build each one was last verified on. TweaksV searches only the game's code (its executable sections). The labels (`H-E1`, `P-E-R31a`, ...) are the ones the source comments use. Patterns are written exactly as in the source, where `?` matches any byte. RVA is where each pattern matched on 1.0.1158.16, counted from the start of `GTA5_Enhanced.exe` in memory.
+Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game build each one was last verified on. TweaksV searches only the game's code (its executable sections). Each pattern is defined once, in the table in `source\TweaksVPatterns.h`, under the label it has here (`H-E1`, `P-E-R31a`, ...), and is written here exactly as there; `?` matches any byte. The tests check that this file and the table list the same patterns, and `TweaksV.log` names each pattern by its label. RVA is where each pattern matched on 1.0.1158.16, counted from the start of `GTA5_Enhanced.exe` in memory.
 
 ## Status
 
@@ -19,9 +19,9 @@ The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstor
 
 ### When Game Updates
 
-1. Start the game with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1` - and `CONSOLE=1` and `NEWMODS=1`, so every pattern is looked for. Then game binary isn't patched. `TweaksV.log` lists every pattern not found.
+1. Start the game with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1` - and `CONSOLE=1` and `NEWMODS=1`, so every pattern is looked for. Then game binary isn't patched. `TweaksV.log` lists every pattern not found, by its label.
 2. Check whether the original plugin has been updated (`UPSTREAM.md`).
-3. Update the pattern, confirm that it matches exactly once, then update this file.
+3. Update the pattern in `source\TweaksVPatterns.h` and in this file - the tests check that both agree - and confirm that it matches exactly once.
 4. DirectStorage: if `UNLOCK_FILES=1` reports a problem (another interface, or an `OpenFile` outside DirectStorage's DLLs), look at the factory's functions with `LOG_CALLS=1` and `DIAGNOSTIC_MODE=1`.
 
 ## HeapAdjusterEnhanced

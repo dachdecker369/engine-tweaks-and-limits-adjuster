@@ -2,14 +2,12 @@
 // https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced (GPL-3.0) - based on the
 // ModkitLimit Extender by Tanuki / 0x-FADED (MIT; its LICENSE notes a part adapted from FiveM).
 // Modified for TweaksV: GTA V Enhanced only, namespace, TweaksV.ini/TweaksV.log,
-// two-pass patching and safety fixes (B-MOD-01..06). Every change is marked "TweaksV:".
+// two-pass patching and safety fixes. Every change is marked "TweaksV:".
 #include <windows.h>				// TweaksV: was #include "pch.h"
 #include "MemScanner.h"				// TweaksV: the shared scanner
 #include <cstdint>
-#include <string_view>
-#include <cassert>
+// TweaksV: <string_view>, <cassert> and <fstream> removed - unused
 #include "ModkitLimitAdjusterEnhanced_Game.h"
-#include <fstream>
 #include "ModkitLimitAdjusterEnhanced_Logging.h"
 #include "TweaksVConflicts.h"	// TweaksV: IsInsideGameImage
 #include "TweaksVSettings.h"	// TweaksV: MODKITARRAY_SIZE, DRY_RUN, DIAGNOSTIC_MODE
@@ -23,11 +21,11 @@ uint32_t VanillaModkitArray_Size;
 uint32_t ModkitArray_Size;
 void* newArray;
 
-// TweaksV: set by FatalErrorExit(); initializeGame() stops at its next check (plan 5.8)
+// TweaksV: set by FatalErrorExit(); initializeGame() stops at its next check
 static bool fatalError = false;
 
 // TweaksV: the new array always has the maximum size, whatever MODKITARRAY_SIZE says, so it
-// can never be smaller than the game's own array (B-MOD-04). Modkit IDs are 16-bit.
+// can never be smaller than the game's own array. Modkit IDs are 16-bit.
 static const uint32_t MaxModkitArray_Size = 65536;
 static_assert(static_cast<int>(MaxModkitArray_Size) == TweaksV::kModkitArraySize.maxValue, "MODKITARRAY_SIZE's maximum must be the array's size"); // TweaksV
 
@@ -39,22 +37,22 @@ static const char* const kTag = "ModkitLimitAdjusterEnhanced"; // TweaksV: for t
 
 void initializeGame()
 {
-	// TweaksV: ClearLog() removed - TweaksV.log is cleared once per start (plan 5.7)
+	// TweaksV: ClearLog() removed - TweaksV.log is cleared once per start
 
 	ModkitArray_Size = (uint32_t)TweaksV::GetNumber(TweaksV::kModkitArraySize); // TweaksV: from TweaksV's settings table, which checks it (was .\ModkitLimitAdjusterEnhanced.ini)
-	// TweaksV: the game edition check is removed - TweaksV only runs in GTA5_Enhanced.exe (F-MOD-1/2)
+	// TweaksV: the game edition check is removed - TweaksV only runs in GTA5_Enhanced.exe
 
-	newArray = (void*)AllocateStubMemory(sizeof(uint16_t) * MaxModkitArray_Size, PAGE_READWRITE); // TweaksV: always the full array, read/write data - was the configured size, RWX (B-MOD-03/04)
-	if (!newArray) { // TweaksV: was not checked (B-MOD-02)
+	newArray = (void*)AllocateStubMemory(sizeof(uint16_t) * MaxModkitArray_Size, PAGE_READWRITE); // TweaksV: always the full array, read/write data - was the configured size, RWX
+	if (!newArray) { // TweaksV: was not checked
 		Logging("The new modkit array could not be allocated near the game.");
 		FatalErrorExit();
 		return;
 	}
 
-	// TweaksV: the other game edition's absolute-address relocation call is removed (F-MOD-3)
+	// TweaksV: the other game edition's absolute-address relocation call is removed
 
 	AdjustModkitArrayLimit();
-	if (fatalError) { // TweaksV: stop at the first failed step (B-MOD-05) - nothing points at the new array yet
+	if (fatalError) { // TweaksV: stop at the first failed step - nothing points at the new array yet
 		VirtualFree(newArray, 0, MEM_RELEASE);
 		newArray = nullptr;
 		return;
@@ -76,12 +74,12 @@ void initializeGame()
 void OverrideModkitArraySize(uint32_t newSize, const std::vector<PatternPairExtended>& list) {
 
 	// TweaksV: pass 1 - find every limit and decode the game's own size from each; nothing is
-	// written unless all were found and all agree (plan 5.9 R1/R2)
+	// written unless all were found and all agree
 	std::vector<BYTE*> addresses;
 	for (auto& entry : list) {
-		auto address = MemScanner::FindPatternBmh(entry.pattern);
-		if (!address) { // TweaksV: a miss used to exit(1) inside MemScanner (B-MOD-05)
-			Logging("A modkit limit was not found in the game code: " + entry.pattern);
+		auto address = MemScanner::Find(*entry.pattern);
+		if (!address) { // TweaksV: a miss used to exit(1) inside MemScanner
+			Logging(std::string("A modkit limit was not found in the game code: ") + entry.pattern->label);
 			FatalErrorExit();
 			return;
 		}
@@ -93,21 +91,21 @@ void OverrideModkitArraySize(uint32_t newSize, const std::vector<PatternPairExte
 		if (VanillaModkitArray_Size == 0) {
 			VanillaModkitArray_Size = vanillaSize;
 		}
-		else if (vanillaSize != VanillaModkitArray_Size) { // TweaksV: every limit must agree (plan 5.9 R2)
+		else if (vanillaSize != VanillaModkitArray_Size) { // TweaksV: every limit must agree
 			Logging("The modkit limits disagree about the game's own size: " + std::to_string(VanillaModkitArray_Size) +
-				" and " + std::to_string(vanillaSize) + " (" + entry.pattern + ").");
+				" and " + std::to_string(vanillaSize) + " (" + entry.pattern->label + ").");
 			FatalErrorExit();
 			return;
 		}
 		addresses.push_back(address);
 	}
-	if (VanillaModkitArray_Size == 0 || VanillaModkitArray_Size > MaxModkitArray_Size) { // TweaksV: plausible (plan 5.9 R2)
+	if (VanillaModkitArray_Size == 0 || VanillaModkitArray_Size > MaxModkitArray_Size) { // TweaksV: the game's own size must be plausible
 		Logging("The game's own modkit list size, " + std::to_string(VanillaModkitArray_Size) + ", is not plausible.");
 		FatalErrorExit();
 		return;
 	}
 
-	// TweaksV: clamp to [the game's own size, 65536] - smaller would shrink the game's limits (B-MOD-04)
+	// TweaksV: clamp to [the game's own size, 65536] - smaller would shrink the game's limits
 	const uint32_t requestedSize = newSize;
 	if (newSize < VanillaModkitArray_Size)
 		newSize = VanillaModkitArray_Size;
@@ -136,19 +134,19 @@ void OverrideModkitArraySize(uint32_t newSize, const std::vector<PatternPairExte
 		FatalErrorExit();
 }
 
-// TweaksV: the absolute-address relocation function is removed - only the other game edition used it (F-MOD-4)
+// TweaksV: the absolute-address relocation function is removed - only the other game edition used it
 
 void RelocateRelativeModkitArray(void* newModkitArray, const std::vector<PatternPair>& list)
 {
-	// TweaksV: pass 1 - find and check every address before writing anything (plan 5.9 R1)
+	// TweaksV: pass 1 - find and check every address before writing anything
 	std::vector<BYTE*> addresses;
 	void* oldAddress = nullptr;
 
 	for (auto& entry : list)
 	{
-		auto address = MemScanner::FindPatternBmh(entry.pattern);
-		if (!address) { // TweaksV: a miss used to exit(1) inside MemScanner (B-MOD-05)
-			Logging("A reference to the modkit array was not found in the game code: " + entry.pattern);
+		auto address = MemScanner::Find(*entry.pattern);
+		if (!address) { // TweaksV: a miss used to exit(1) inside MemScanner
+			Logging(std::string("A reference to the modkit array was not found in the game code: ") + entry.pattern->label);
 			FatalErrorExit();
 			return;
 		}
@@ -163,7 +161,7 @@ void RelocateRelativeModkitArray(void* newModkitArray, const std::vector<Pattern
 			Logging("DIAGNOSTIC: reference at " + TweaksV::DescribeAddress(address) + " -> " + TweaksV::DescribeAddress(curTarget));
 		// TweaksV: was assert(curTarget == oldAddress), which Release builds leave out - now a real
 		// check, and the array must still be inside the game; otherwise another mod has already
-		// moved it (B-MOD-01, plan 5.9 R6)
+		// moved it
 		if (curTarget != oldAddress || !TweaksV::IsInsideGameImage(curTarget))
 		{
 			Logging("The references to the modkit array do not all point to the game's own array: " +
@@ -196,15 +194,15 @@ void AdjustModkitArrayLimit()
 {
 	std::vector<PatternPair> patternPairs;
 
-	// TweaksV: only the GTA V Enhanced list is kept (F-MOD-5)
+	// TweaksV: only the GTA V Enhanced list is kept
 	patternPairs = {
 		// Data
-		{ "31 c9 48 8d 05 ? ? ? ? eb", 5 },
-		{ "89 c2 48 8d 0d ? ? ? ? eb", 5 },
-		{ "41 0f b7 c2 48 8d 0d ? ? ? ? 0f b7 04 41", 7 },
-		{ "57 48 83 ec ? 48 8d 0d ? ? ? ? 41 b8", 8 },
-		{ "48 8d 3d ? ? ? ? 0f b7 3c 47", 3 },
-		{ "77 ? 48 8d 15 ? ? ? ? 0f b7 14 42", 5 }
+		{ &TweaksV::Pattern("M-E-R1"), 5 },
+		{ &TweaksV::Pattern("M-E-R2"), 5 },
+		{ &TweaksV::Pattern("M-E-R3"), 7 },
+		{ &TweaksV::Pattern("M-E-R4"), 8 },
+		{ &TweaksV::Pattern("M-E-R5"), 3 },
+		{ &TweaksV::Pattern("M-E-R6"), 5 }
 	};
 
 	RelocateRelativeModkitArray(newArray, patternPairs);
@@ -214,17 +212,17 @@ void patchHardcodedArrayLimits() {
 
 	std::vector<PatternPairExtended> patternPairs;
 
-	// TweaksV: only the GTA V Enhanced list is kept (F-MOD-6)
+	// TweaksV: only the GTA V Enhanced list is kept
 	patternPairs = {
 		// Data
-		{ "0f b7 c0 66 ba ? ? 3d ? ? ? ? 77", 8, 1, -1 },
-		{ "48 83 c5 ? 48 83 c0 ? 48 83 c7", 15, 1, 3 },
-		{ "74 ? 48 83 c5 ? 48 83 c3 ? 48 83 c0 ? 48 3d", 16, 1, 3 },
-		{ "48 83 c7 ? 48 83 c2 ? 48 83 c5 ? 48 81 fd", 15, 1, 3 },
-		{ "48 83 c7 ? 48 83 c2 ? 48 83 c6 ? 48 81 fe", 15, 1, 3 },
-		{ "41 b8 ? ? ? ? b2 ? e8 ? ? ? ? 66 0f 76 c0", 2, 2, 0 },
-		{ "0f b7 41 ? 66 bf ? ? 48 3d", 10, 1, -1 },
-		{ "41 0f b7 ca 66 b8 ? ? 81 f9", 10, 1, -1 }
+		{ &TweaksV::Pattern("M-E-L1"), 8, 1, -1 },
+		{ &TweaksV::Pattern("M-E-L2"), 15, 1, 3 },
+		{ &TweaksV::Pattern("M-E-L3"), 16, 1, 3 },
+		{ &TweaksV::Pattern("M-E-L4"), 15, 1, 3 },
+		{ &TweaksV::Pattern("M-E-L5"), 15, 1, 3 },
+		{ &TweaksV::Pattern("M-E-L6"), 2, 2, 0 },
+		{ &TweaksV::Pattern("M-E-L7"), 10, 1, -1 },
+		{ &TweaksV::Pattern("M-E-L8"), 10, 1, -1 }
 	};
 
 	OverrideModkitArraySize(ModkitArray_Size, patternPairs);
@@ -234,7 +232,7 @@ void patchHardcodedArrayLimits() {
 // for every plugin); AllocateStubMemory gained the protect parameter used above
 
 // TweaksV: kept under its original name, but it no longer shows a MessageBox or calls exit(1)
-// inside DllMain (plan 5.8): it logs, reports for the start-up summary and makes initializeGame()
+// inside DllMain: it logs, reports for the start-up summary and makes initializeGame()
 // stop at its next check
 void FatalErrorExit() {
 	Logging("FATAL ERROR - ModkitLimitAdjusterEnhanced is skipped for this session");

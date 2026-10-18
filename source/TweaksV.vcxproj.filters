@@ -37,6 +37,9 @@
     <ClCompile Include="TweaksVDirectStorage.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVFeatures.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVIni.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -120,6 +123,9 @@
     <ClInclude Include="TweaksVDirectStorage.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <ClInclude Include="TweaksVFeatures.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVIni.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
@@ -127,6 +133,9 @@
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVPatch.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVPatterns.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVSettings.h">
@@ -151,9 +160,6 @@
       <Filter>Shared</Filter>
     </ClInclude>
     <ClInclude Include="HeapAdjusterEnhanced_Game.h">
-      <Filter>HeapAdjusterEnhanced</Filter>
-    </ClInclude>
-    <ClInclude Include="pattern.h">
       <Filter>HeapAdjusterEnhanced</Filter>
     </ClInclude>
     <ClInclude Include="ModkitLimitAdjusterEnhanced_Game.h">

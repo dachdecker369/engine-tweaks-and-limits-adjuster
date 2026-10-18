@@ -5,12 +5,13 @@
 // Altered version - modified for TweaksV (see MemScanner.cpp).
 #pragma once
 #include <cstdint>
-#include <string>
+#include "TweaksVPatterns.h"	// TweaksV: the patterns
 
 namespace MemScanner
 {
-    // TweaksV: the first match of a pattern such as "48 8D 0D ? ? ? ?" in GTA5_Enhanced.exe's code, or
-    // nullptr. The name is the original's; the search is TweaksV's (see MemScanner.cpp). The overloads
-    // with a start address or a size, and the byte+mask one, are removed: nothing used them.
-    uint8_t* FindPatternBmh(const std::string& pattern);
+    // TweaksV: the first match of one of TweaksV's patterns (TweaksVPatterns.h) in GTA5_Enhanced.exe's
+    // code, or nullptr; a miss is logged with the pattern's label. Was FindPatternBmh(text), named after
+    // the original's Boyer-Moore-Horspool search, which TweaksV replaced (see MemScanner.cpp). The
+    // overloads with a start address or a size, and the byte+mask one, are removed: nothing used them.
+    uint8_t* Find(const TweaksV::GamePattern& pattern);
 }

@@ -4,34 +4,19 @@
 // Chiheb-Bacha) into one ASI plugin for GTA V Enhanced.
 // License: GPL-3.0-only (see LICENSE).
 //
-// The one real DllMain. The five plugins' start functions are called at step 8 below,
-// TweaksV's own DirectStorage part right after them.
+// The one real DllMain. The features - the five plugins and TweaksV's own DirectStorage part, in
+// TweaksVFeatures.cpp - are started at step 8 below.
 
 #include <windows.h>
 
 #include "ClearLog.h"		// Shared: ClearLog()
 #include "IsEnhanced.h"		// Shared: IsEnhanced()
 #include "TweaksVConflicts.h"
-#include "TweaksVDirectStorage.h"
+#include "TweaksVFeatures.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
-#include "HeapAdjusterEnhanced_Game.h"
-#include "ModkitLimitAdjusterEnhanced_Game.h"
-#include "PackfileLimitAdjusterEnhanced_Game.h"
-#include "main.h"
-#include "StraightToStoryMode_Game.h"
-
-// Starts one part of TweaksV unless its ENABLED=0 or an old copy of it was found. No exception may
-// leave DllMain: one from a part ends only that part.
-template <typename F> static void RunPart(const TweaksV::SettingsSection& part, F&& start)
-{
-	if (!TweaksV::IsFeatureOn(part))
-		return;
-	try { start(); }
-	catch (...) { TweaksV::ReportFailure(part.feature, "unexpected exception - this part is skipped for this session"); }
-}
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
@@ -61,18 +46,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 			if (TweaksV::IsOn(TweaksV::kCheckForConflicts))			// 7.
 				TweaksV::CheckForConflicts();
 
-			// 8. The original plugins, in the order an ASI loader loaded their .asi files
-			//    (alphabetical), then TweaksV's own DirectStorage part.
-			bool phase1 = false;	// RageOpenV's GetSystemTimeAsFileTime hook is installed
-			RunPart(TweaksV::kHeapSection, [] { HeapAdjusterEnhanced::initializeGame(); });
-			RunPart(TweaksV::kModkitSection, [] { ModkitLimitAdjusterEnhanced::initializeGame(); });
-			RunPart(TweaksV::kPackfileSection, [] { PackfileLimitAdjusterEnhanced::initializeGame(); });
-			RunPart(TweaksV::kRageOpenVSection, [&] { phase1 = RageOpenV::DllMain(hModule, ul_reason_for_call, lpReserved) != FALSE; });
-			RunPart(TweaksV::kStoryModeSection, [] { StraightToStoryMode::initializeGame(); });
-			RunPart(TweaksV::kDirectStorageSection, [] { TweaksV::InitDirectStorage(); });
-
-			if (!phase1)											// 9. otherwise RageOpenV's hook
-				TweaksV::ShowStartupSummaryLater();					//    shows it, in Phase 1
+			const bool summaryLater = TweaksV::StartFeatures();		// 8. every feature that is on
+			if (!summaryLater)										// 9. unless a feature shows it
+				TweaksV::ShowStartupSummaryLater();					//    itself, later (RageOpenV)
 		}
 		catch (...)
 		{

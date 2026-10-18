@@ -258,12 +258,12 @@ static const unsigned char* TimeApi()
 	return reinterpret_cast<const unsigned char*>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetSystemTimeAsFileTime"));
 }
 
-// Phase 1: the first GetSystemTimeAsFileTime call after TweaksV.asi has loaded. Whether RageOpenV
+// The first GetSystemTimeAsFileTime call after TweaksV.asi has loaded. Whether RageOpenV
 // had hooked it is noted first: the hook removes itself once its one-time start-up has run.
-static bool g_apiHookedAtPhase1 = false;
-void RovPhase1()
+static bool g_apiHookedAtFirstRequest = false;
+void RovFirstTimeRequest()
 {
-	g_apiHookedAtPhase1 = memcmp(TimeApi(), g_apiBefore, 5) != 0;
+	g_apiHookedAtFirstRequest = memcmp(TimeApi(), g_apiBefore, 5) != 0;
 	FILETIME now{};
 	GetSystemTimeAsFileTime(&now);
 }
@@ -278,7 +278,7 @@ static std::string Joined(const std::vector<std::string>& items)
 
 void RovReport()
 {
-	wprintf(L"rov api hook: %ls | ", g_apiHookedAtPhase1 ? L"yes" : L"no");
+	wprintf(L"rov api hook: %ls | ", g_apiHookedAtFirstRequest ? L"yes" : L"no");
 	wprintf(L"rov api hook afterwards: %ls | ", memcmp(TimeApi(), g_apiBefore, 5) != 0 ? L"still there" : L"removed");
 	wprintf(L"console: %02X %02X | ", g_rovConsole[16], g_rovConsole[17]);
 	wprintf(L"rpf: %02X %02X %02X | ", g_rovCacheCallee[0], g_rovCacheCallee[1], g_rovCacheCallee[2]);

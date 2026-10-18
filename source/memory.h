@@ -1,6 +1,6 @@
 // TweaksV: carried over from RageOpenV (src/utils/memory.h) by Chiheb-Bacha, based on ClosedIV by
 // martonp96 - https://github.com/Chiheb-Bacha/RageOpenV (GPL-3.0).
-// Modified for TweaksV: namespace, the shared scanner, safety fixes (B-ROV-09/20), the code
+// Modified for TweaksV: namespace, the shared scanner, safety fixes, the code
 // writers replaced by TweaksVPatch.h, dead code removed. Every change is marked "TweaksV:".
 #pragma once
 #include <cstdint>
@@ -34,7 +34,7 @@ public:
 			for (auto& cb : funcs())
 			{
 				// TweaksV: one group's failure must not stop the others, and nothing may throw
-				// back into the game (plan 5.8)
+				// back into the game
 				try
 				{
 					cb.fn();
@@ -83,11 +83,11 @@ public:
 	// TweaksV: rip(), nop(), make_jmp(), make_call(), set_call() and put() removed - TweaksV writes
 	// game code only through TweaksVPatch.h (WriteCode, RedirectCalls), which keeps every write all
 	// or nothing, gives each page its own protection back and honours DRY_RUN and DIAGNOSTIC_MODE.
-	// ret(), call() and both make_jmp_ret() overloads were never used (Appendix G).
+	// ret(), call() and both make_jmp_ret() overloads were never used.
 
 	// TweaksV: returns false if the hook could not be created. It is queued, not enabled: each
 	// group enables all of its hooks at once with apply_hooks(), instead of every hook freezing
-	// all threads with MH_EnableHook(MH_ALL_HOOKS) (B-ROV-09)
+	// all threads with MH_EnableHook(MH_ALL_HOOKS)
 	template<class T>
 	bool hook(T* target, T** orig = nullptr)
 	{
@@ -106,7 +106,7 @@ public:
 		return true;
 	}
 
-	// TweaksV: enables every queued hook at once (B-ROV-09)
+	// TweaksV: enables every queued hook at once
 	static bool apply_hooks()
 	{
 		auto status = MH_ApplyQueued();
@@ -130,19 +130,19 @@ public:
 		using FuncType = RetType(__fastcall*)(Args...);
 		FuncType mainFunc;
 
-		std::string sig;
+		const TweaksV::GamePattern& pattern; // TweaksV: an entry of TweaksVPatterns.h - was std::string sig
 	public:
 		// TweaksV: no longer registers an init function of its own - the init function of the
 		// group that uses it calls run() after checking its switch, and skips the group if the
-		// function was not found (B-ROV-01)
-		func(const char* _sig) : sig(_sig), mainFunc(nullptr)
+		// function was not found
+		func(const TweaksV::GamePattern& _pattern) : mainFunc(nullptr), pattern(_pattern)
 		{
 		}
 
 		// TweaksV: returns whether the function was found
 		bool run()
 		{
-			mainFunc = memory::scan(sig.c_str()).as<FuncType>();
+			mainFunc = memory::scan(pattern).as<FuncType>();
 			return mainFunc != nullptr;
 		}
 
@@ -159,7 +159,7 @@ public:
 	};
 
 	// TweaksV: HookIAT() removed - import hooking cannot work on GTA V Enhanced (its imports are
-	// obfuscated, as the note in main.cpp says) and nothing called it (F-ROV-9)
+	// obfuscated, as the note in main.cpp says) and nothing called it
 
 	// TweaksV: + pTarget, the hooked function, for disabling the hook again later
 	static bool HookApi(const wchar_t* module, const char* funcName, PVOID pNewFunc, PVOID* pOldFunc, PVOID* pTarget = nullptr)
@@ -181,13 +181,14 @@ public:
 		return true;
 	}
 
-	static memory scan(const char* signature, bool ignoreFail = false)
+	// TweaksV: takes an entry of TweaksV's pattern table (was the pattern's text) and delegates to the
+	// shared MemScanner, which searches the same game image, logs every miss and adds the
+	// DIAGNOSTIC_MODE output; a miss still gives address 0
+	static memory scan(const TweaksV::GamePattern& pattern, bool ignoreFail = false)
 	{
-		// TweaksV: delegates to the shared MemScanner, which searches the same game
-		// image, logs every miss and adds the DIAGNOSTIC_MODE output; a miss still gives address 0
-		auto found = MemScanner::FindPatternBmh(signature);
+		auto found = MemScanner::Find(pattern);
 		if (!found && !ignoreFail) {
-			logger::write("info", " !! Pattern %s not found!", signature);
+			logger::write("info", " !! Pattern %s not found!", pattern.label);
 		}
 		return memory((uintptr_t)found);
 	}

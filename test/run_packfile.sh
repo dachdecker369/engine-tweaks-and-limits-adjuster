@@ -1,20 +1,11 @@
 #!/usr/bin/env bash
-# M4 (PackfileLimitAdjusterEnhanced) scenarios: a fake GTA5_Enhanced.exe with copies of the
+# PackfileLimitAdjusterEnhanced scenarios: a fake GTA5_Enhanced.exe with copies of the
 # patched game code loads the real TweaksV.asi. Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" .
 mkdir -p appdata
 
-pass=0; fail=0
-check() { if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  $1"; fail=$((fail+1)); fi; }
-setkey() { sed -b -i "0,/^$1=.*\r\$/s//$1=$2\r/" TweaksV.ini; }
-setpackkey() { sed -b -i "/^\[PACKFILE_SETTINGS\]/,/^\[/s/^$1=.*\r\$/$1=$2\r/" TweaksV.ini; }
-fresh_ini() { sed 's/$/\r/' "$T/base.ini" > TweaksV.ini; setkey SHOW_ERROR_POPUPS 0; }
-game() { cp "$1" GTA5_Enhanced.exe; shift; rm -f harness.out; LOCALAPPDATA="$AW" ./GTA5_Enhanced.exe TweaksV.asi "$@" > harness.out 2>&1; tr -d '\r' < harness.out; }
-log_has() { grep -q -- "$1" TweaksV.log; }
-count() { grep -c -- "$1" TweaksV.log; }
-has() { [[ "$out" == *"$1"* ]]; }
 MOVED='pack refs: 30 new 0 game 0 other, R31a new, R31b game (RW, 512 KB)'
 UNMOVED='pack refs: 0 new 30 game 0 other, R31a game, R31b game |'
 GAME_SIZES='pack sizes: D3=4500 D2=4500 D1=4500 I=4500'
@@ -33,21 +24,21 @@ check "the redirected call leads to a call stub that is read+execute, never writ
 check "no problems" "! log_has 'PROBLEM'"
 
 echo "== P2 PACKFILEARRAY_SIZE=20000"
-fresh_ini; setpackkey PACKFILEARRAY_SIZE 20000; out=$(game full_game.exe); echo "      $out"
+fresh_ini; setkey PACKFILEARRAY_SIZE 20000 PACKFILE_SETTINGS; out=$(game full_game.exe); echo "      $out"
 check "limits and configuration count 20000, array still full size" "has 'D3=20000 D2=4500 D1=4500 I=20000' && has 'config 3000 -> 20000' && has '$MOVED'"
 
 echo "== P3 PACKFILEARRAY_SIZE=1000 is raised to the game's own 4500"
-fresh_ini; setpackkey PACKFILEARRAY_SIZE 1000; out=$(game full_game.exe)
+fresh_ini; setkey PACKFILEARRAY_SIZE 1000 PACKFILE_SETTINGS; out=$(game full_game.exe)
 check "limits stay 4500, configuration count 4500" "has 'D3=4500 D2=4500 D1=4500 I=4500' && has 'config 3000 -> 4500'"
 check "clamp logged" "log_has 'PACKFILEARRAY_SIZE=1000 is outside 4500..65535 - using 4500'"
 
 echo "== P4 PACKFILEARRAY_SIZE=70000 is clamped to 65535"
-fresh_ini; setpackkey PACKFILEARRAY_SIZE 70000; out=$(game full_game.exe)
+fresh_ini; setkey PACKFILEARRAY_SIZE 70000 PACKFILE_SETTINGS; out=$(game full_game.exe)
 check "limits 65535" "has 'D3=65535 D2=4500 D1=4500 I=65535' && has 'config 3000 -> 65535'"
 check "clamp reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_SETTINGS\] PACKFILEARRAY_SIZE=70000 is outside 1..65535 - using 65535.'"
 
 echo "== P5 PACKFILEARRAY_SIZE=abc falls back to the default 13000"
-fresh_ini; setpackkey PACKFILEARRAY_SIZE abc; out=$(game full_game.exe)
+fresh_ini; setkey PACKFILEARRAY_SIZE abc PACKFILE_SETTINGS; out=$(game full_game.exe)
 check "limits 13000" "has 'D3=13000 D2=4500 D1=4500 I=13000'"
 check "invalid value reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_SETTINGS\] PACKFILEARRAY_SIZE=abc is not a number - using 13000.'"
 
@@ -58,27 +49,27 @@ check "both 'would' lines" "log_has 'DRY_RUN: would move the packfile array (31 
 
 echo "== P7 DIAGNOSTIC_MODE=1: every pattern, reference and site logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
-check "the 34 packfile patterns of this build each found exactly once" "[ \$(grep -c -E 'Pattern found: (48 83 C6|3b 05|89 48|48 8d 15|48 8d 3d \? \? \? \? 48 8b|89 c0 48 8d 0d|48 8d 0d|48 83 ec|48 c1 e8|48 89 2d|48 89 35|48 89 3d|BF).* 1 match,' TweaksV.log) -eq 34 ]"
+check "the 34 packfile patterns of this build each found exactly once" "[ \$(grep -c -E 'Pattern P-E-[A-Za-z0-9]+ found: .* 1 match,' TweaksV.log) -eq 34 ]"
 check "31 references logged" "[ \$(count 'PackfileLimitAdjusterEnhanced\] DIAGNOSTIC: reference at RVA') -eq 31 ]"
 check "direct size, indirect variable and call logged" "log_has 'DIAGNOSTIC: direct size at RVA .* holds 4500' && log_has 'DIAGNOSTIC: indirect size variable at RVA .* holds 4500' && log_has 'DIAGNOSTIC: streaming configuration call at RVA .* -> RVA'"
 check "still applied" "has 'D3=12000 D2=4500 D1=4500 I=12000'"
-check "patterns found once get no per-match lines (T2)" "! log_has ' match 1 of '"
+check "patterns found once get no per-match lines" "! log_has ' match 1 of '"
 
-echo "== P7b DIAGNOSTIC_MODE=1, a second identical copy of the 1158.13+ reference: each match logged with its bytes (T2)"
+echo "== P7b DIAGNOSTIC_MODE=1, a second identical copy of the 1158.13+ reference: each match logged with its bytes"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe twor31a)
-check "its line counts 2 matches" "log_has 'Pattern found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 2 matches, bytes: BF '"
+check "its line counts 2 matches" "log_has 'Pattern P-E-R31a found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 2 matches, bytes: BF '"
 check "one line per match: 16 bytes before it, | at its start, 48 bytes from it" "[ \$(tr -d '\r' < TweaksV.log | grep -c -E '\[MemScanner\]   match [12] of 2 at RVA 0x[0-9A-F]+:( [0-9A-F]{2}){16} \| BF( [0-9A-F]{2}){47}\$') -eq 2 ]"
 check "both copies' bytes shown" "[ \$(count '| BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 ') -eq 2 ]"
 check "no other pattern gets per-match lines" "[ \$(count ' match 1 of ') -eq 1 ]"
 check "the array still moved, no problem" "has 'pack refs: 30 new 0 game 0 other' && ! log_has 'PROBLEM'"
 
-echo "== P7c the game's obfuscated code that the old 1158.13+ pattern also matched (RVA 0x582A227): not matched now (T2)"
+echo "== P7c the game's obfuscated code that the old 1158.13+ pattern also matched (RVA 0x582A227): not matched now"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe junkr31a)
-check "found exactly once, no per-match lines" "log_has 'Pattern found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 1 match,' && ! log_has ' match 1 of '"
+check "found exactly once, no per-match lines" "log_has 'Pattern P-E-R31a found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 1 match,' && ! log_has ' match 1 of '"
 check "the array moved, no problem" "has '$MOVED' && ! log_has 'PROBLEM'"
 
 echo "== P8 [PACKFILE_SETTINGS] ENABLED=0"
-fresh_ini; setpackkey ENABLED 0; out=$(game full_game.exe)
+fresh_ini; setkey ENABLED 0 PACKFILE_SETTINGS; out=$(game full_game.exe)
 check "nothing changed" "has '$UNMOVED' && has '$GAME_SIZES' && has '$NO_HOOK'"
 check "no packfile lines" "! log_has '\[PackfileLimitAdjusterEnhanced\]'"
 

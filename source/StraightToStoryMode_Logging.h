@@ -2,13 +2,11 @@
 // https://github.com/Chiheb-Bacha/StraightToStoryMode (GPL-3.0).
 // Modified for TweaksV; every change is marked "TweaksV:".
 #pragma once
-#include <string_view>
-#include <fstream>
 #include <string>		// TweaksV
-#include "ClearLog.h"	// TweaksV: ClearLog() is shared now - its declaration moved there
+// TweaksV: <string_view>, <fstream> and ClearLog.h removed - unused (TweaksV.log is cleared once, by DllMain)
 
 namespace StraightToStoryMode // TweaksV: one namespace per original plugin
 {
 void Logging(std::string msg);
-// TweaksV: "void ClearLog();" removed - see ClearLog.h above (plan 4.1)
+// TweaksV: "void ClearLog();" removed - the one shared ClearLog() is declared in ClearLog.h
 } // namespace StraightToStoryMode

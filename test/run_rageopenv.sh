@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M5 (RageOpenV) scenarios: a fake GTA5_Enhanced.exe with copies of the code RageOpenV patches
+# RageOpenV scenarios: a fake GTA5_Enhanced.exe with copies of the code RageOpenV patches
 # (the hooked functions are real code, so the hooks are called end to end) loads the real
 # TweaksV.asi and then asks for the time once, as the game does. Fake LOCALAPPDATA: the real one
 # is never touched.
@@ -9,15 +9,6 @@ cp "$R/x64/Release/TweaksV.asi" .
 mkdir -p appdata mods/test newmods
 echo hi > mods/test/file.txt
 
-pass=0; fail=0
-check() { if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  $1"; fail=$((fail+1)); fi; }
-setkey() { sed -b -i "0,/^$1=.*\r\$/s//$1=$2\r/" TweaksV.ini; }
-setrovkey() { sed -b -i "/^\[RAGEOPENV_SETTINGS\]/,/^\[/s/^$1=.*\r\$/$1=$2\r/" TweaksV.ini; }
-fresh_ini() { sed 's/$/\r/' "$T/base.ini" > TweaksV.ini; setkey SHOW_ERROR_POPUPS 0; mkdir -p newmods; }
-game() { cp "$1" GTA5_Enhanced.exe; shift; rm -f harness.out; LOCALAPPDATA="$AW" timeout 60 ./GTA5_Enhanced.exe TweaksV.asi "$@" > harness.out 2>&1; tr -d '\r' < harness.out; }
-log_has() { grep -q -- "$1" TweaksV.log; }
-count() { grep -c -- "$1" TweaksV.log; }
-has() { [[ "$out" == *"$1"* ]]; }
 FILES_OK='file hooks 8/8, redirect 8/8, pass 8/8'
 OPEN_OK='open calls 5/5, behaviour ok'
 MOUNTS='mounts: mods:/ platform:/ platformcrc:/ common:/ commoncrc:/ dlcpacks:/'
@@ -46,13 +37,13 @@ fresh_ini; setkey CONSOLE 1; out=$(game full_game.exe)
 check "6 NOPs" "has 'console: 90 90'"
 
 echo "== R3 each switch on its own"
-fresh_ini; setrovkey MODS_FOLDER 0; out=$(game full_game.exe)
+fresh_ini; setkey MODS_FOLDER 0 RAGEOPENV_SETTINGS; out=$(game full_game.exe)
 check "MODS_FOLDER=0: no file hooks, the rest on" "has 'file hooks 0/8' && has '$OPEN_OK' && has '$NEWMODS_OK' && log_has 'MODS_FOLDER=0'"
-fresh_ini; setrovkey OPEN_RPF 0; out=$(game full_game.exe)
+fresh_ini; setkey OPEN_RPF 0 RAGEOPENV_SETTINGS; out=$(game full_game.exe)
 check "OPEN_RPF=0: no encryption calls redirected, the rest on" "has 'open calls 0/5' && has '$FILES_OK' && has '$NEWMODS_OK' && log_has 'OPEN_RPF=0'"
-fresh_ini; setrovkey NEWMODS 0; out=$(game full_game.exe)
+fresh_ini; setkey NEWMODS 0 RAGEOPENV_SETTINGS; out=$(game full_game.exe)
 check "NEWMODS=0: no newmods hooks, the rest on" "has 'newmods hooks 0/2' && has '$FILES_OK' && has '$OPEN_OK' && log_has 'NEWMODS=0'"
-fresh_ini; setrovkey SKIP_RPF_CACHE_CHECK 0; out=$(game full_game.exe)
+fresh_ini; setkey SKIP_RPF_CACHE_CHECK 0 RAGEOPENV_SETTINGS; out=$(game full_game.exe)
 check "SKIP_RPF_CACHE_CHECK=0: the cache check is left on" "has 'rpf: 48 89 5C' && log_has 'SKIP_RPF_CACHE_CHECK=0' && has '$FILES_OK'"
 
 echo "== R4 no newmods folder: nothing to mount, no hooks for it, not a problem"
@@ -81,13 +72,13 @@ check "the four 'would' lines" "log_has 'DRY_RUN: would skip the RPF cache check
 
 echo "== R6 DIAGNOSTIC_MODE=1: every pattern found once, every site logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
-check "the 19 RageOpenV patterns each found exactly once" "[ \$(grep -c -E 'Pattern found: (e8 \? \? \? \? 48 8d 0d \? \? \? \? 48 8d 15|41 56 56 57 53|66 c7 01|41 57 41 56 56 57 53|56 57 53 48 81 ec 60 02 00 00 48 89 d7|e8 \? \? \? \? 80 7c|e8 \? \? \? \? 8b 46|e8 \? \? \? \? 48 8b 46|c6 86|e8 \? \? \? \? 48 8d 05|41 57 41 56 41 55 41 54|56 57 53 48 81 ec \? \? \? \? 48 83 79|56 57 53 48 81 ec \? \? \? \? 4c 89 cf).* 1 match,' TweaksV.log) -eq 19 ]"
+check "the 19 RageOpenV patterns each found exactly once (all but the console's)" "[ \$(grep -c -E 'Pattern R-E-[A-Z][0-9] found: .* 1 match,' TweaksV.log) -eq 19 ] && ! log_has 'Pattern R-E-C1'"
 check "the 8 file functions logged; the 4 computed starts checked (no unwind data, CC before)" "[ \$(count 'RageOpenV\] DIAGNOSTIC: \(OpenBulk\|GetFileTime\|GetFileSize\|GetAttributes\)') -eq 8 ] && [ \$(count 'no unwind data, byte before it CC') -eq 4 ]"
 check "the 5 encryption calls and the newmods sites logged" "[ \$(count 'RageOpenV\] DIAGNOSTIC: the .* call at RVA') -eq 5 ] && log_has 'DIAGNOSTIC: initial mount call at RVA'"
 check "still all hooked" "has '$FILES_OK' && has '$OPEN_OK' && has '$NEWMODS_OK'"
 
 echo "== R7 [RAGEOPENV_SETTINGS] ENABLED=0: no hook at all"
-fresh_ini; setrovkey ENABLED 0; out=$(game full_game.exe)
+fresh_ini; setkey ENABLED 0 RAGEOPENV_SETTINGS; out=$(game full_game.exe)
 check "time hook not installed, nothing written" "has 'rov api hook: no' && has 'rpf: 48 89 5C' && has '$NOTHING'"
 check "no RageOpenV lines" "! log_has '\[RageOpenV\]'"
 
@@ -102,7 +93,7 @@ check "all 8 hooked and working through the other mod's jump" "has '$FILES_OK' &
 check "warning logged, not a problem" "log_has 'GetFileTime 1 at RVA .* already starts with a jump - another mod may have hooked it' && ! log_has 'PROBLEM'"
 check "every page back to its own protection" "has 'protect: all restored'"
 
-echo "== R10 the computed start of GetFileTime 2 is not a function start (plan R9): skipped"
+echo "== R10 the computed start of GetFileTime 2 is not a function start: skipped"
 fresh_ini; out=$(game full_game.exe rovnotstart)
 check "no file hooks; the others on" "has 'file hooks 0/8' && has '$OPEN_OK' && has '$NEWMODS_OK'"
 check "reason logged with the byte found" "log_has 'GetFileTime 2 at RVA .* is not a function start (no unwind data, byte before it 48)'"
@@ -112,7 +103,7 @@ fresh_ini; out=$(game full_game.exe rovmissing)
 check "no file hooks; the others on" "has 'file hooks 0/8' && has '$OPEN_OK'"
 check "reason logged" "log_has 'GetFileSize 2 was not found in the game code'"
 
-echo "== R12 the two DecryptHeader2 calls lead to different functions (B-ROV-05): nothing redirected"
+echo "== R12 the two DecryptHeader2 calls lead to different functions: nothing redirected"
 fresh_ini; out=$(game full_game.exe rovdecrypt2)
 check "no encryption call redirected; the others on" "has 'open calls 0/5' && has '$FILES_OK' && has '$NEWMODS_OK'"
 check "reason logged and reported" "log_has 'the two DecryptHeader2 calls lead to different functions' && log_has 'PROBLEM: Unencrypted (OPEN) RPF archives cannot be loaded'"
@@ -139,8 +130,8 @@ check "the four parts reported" "log_has 'PROBLEM: The RPF cache check is not sk
 check "one start-up summary for both moments (shown after the one-time start-up)" "[ \$(count 'Start-up summary not shown (SHOW_ERROR_POPUPS=0)') -eq 1 ]"
 
 echo "== R17 LOG_MODS=1 / LOG_DEVICE=1: RageOpenV's own lines appear"
-fresh_ini; setrovkey LOG_MODS 1; setrovkey LOG_DEVICE 1; out=$(game full_game.exe)
-check "a redirected file is logged (T-ROV-4)" "log_has '\[mods\]\[RageOpenV::OpenBulkImpl\] Redirecting to /mods/test/file.txt'"
+fresh_ini; setkey LOG_MODS 1 RAGEOPENV_SETTINGS; setkey LOG_DEVICE 1 RAGEOPENV_SETTINGS; out=$(game full_game.exe)
+check "a redirected file is logged" "log_has '\[mods\]\[RageOpenV::OpenBulkImpl\] Redirecting to /mods/test/file.txt'"
 check "the device mounts are logged" "log_has '\[device\].*fiDevice::Mount\] platform:/' && log_has '\[device\]\[RageOpenV::InitialMountHook\] Mods path:'"
 
 echo "== R18 FreeLibrary while hooked: TweaksV.asi stays loaded (pinned), no crash afterwards"

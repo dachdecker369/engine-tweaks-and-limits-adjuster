@@ -4,8 +4,8 @@
 #pragma once
 
 #include <windows.h>		// TweaksV
-#include <string>
 #include <vector>
+#include "TweaksVPatterns.h"	// TweaksV: the patterns; <string> removed - unused now
 #include "StubMemory.h"		// TweaksV: FindPrevFreeRegion and AllocateStubMemory are shared now
 
 namespace ModkitLimitAdjusterEnhanced // TweaksV: one namespace per original plugin
@@ -13,23 +13,23 @@ namespace ModkitLimitAdjusterEnhanced // TweaksV: one namespace per original plu
 
 struct PatternPair
 {
-	std::string pattern;
+	const TweaksV::GamePattern* pattern;	// TweaksV: an entry of TweaksVPatterns.h - was std::string
 	int offset;
 };
 
 struct PatternPairExtended
 {
-	std::string pattern;
+	const TweaksV::GamePattern* pattern;	// TweaksV: an entry of TweaksVPatterns.h - was std::string
 	int offset;
 	int mulModifier;
 	int addModifier;
 };
 
 void initializeGame();
-// TweaksV: the absolute-address relocation function is removed - only the other game edition used it (F-MOD-4)
+// TweaksV: the absolute-address relocation function is removed - only the other game edition used it
 void RelocateRelativeModkitArray(void* newModkitArray, const std::vector<PatternPair>& list);
 void AdjustModkitArrayLimit();
-// TweaksV: FindPrevFreeRegion and AllocateStubMemory removed - shared now, see StubMemory.h (plan 4.1)
+// TweaksV: FindPrevFreeRegion and AllocateStubMemory removed - shared now, see StubMemory.h
 void FatalErrorExit();
 void patchHardcodedArrayLimits();
 
