@@ -86,6 +86,7 @@
   - The new list always has the full 100000 entries, as read/write data; the capacity is clamped to the game's own size..100000;
   - The 8 references and the 4 capacities are written together, all or nothing;
   - `LOG_SEARCHES=1` (testing) sends the four calls to the game's tree searches through TweaksV's call stubs to a wrapper that only counts (atomics, nothing else on the streaming thread) and logs, 10 seconds in and then every minute while the numbers change, how many searches ran, the most entries one returned and how many returned more than the game's own list could hold - the number that says whether a map load needs the larger list. A call another mod has hooked, or a pair of calls that does not lead to the same tree search, skips the part; the calls are redirected in the same all-or-nothing write as the references and capacities;
+  - Measured on 1.0.1158.16 with Forests of San Andreas: Revised and GTA V Remastered: Enhanced loaded (`LOG_SEARCHES=1`): 180353 searches in three minutes, the largest returned 1123 entries, and 7209 returned more than the game's own list of 1000 could hold - each of those would have been cut off without the larger list;
   - A failure is reported in the start-up summary and leaves the game as it was;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
