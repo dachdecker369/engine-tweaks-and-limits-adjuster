@@ -38,6 +38,7 @@
   - A label the table does not have, or a malformed pattern, stops the build;
   - The tests check that `PATTERNS.md` lists exactly the table's patterns, and that the code uses each one once;
   - `TweaksV.log` names each pattern by its label, and `TEST_BREAK_PATTERN` (test builds only) takes a label.
+  - `GTA5_Enhanced.exe` is encrypted on disk, so patterns are looked for in the running game: test builds save a copy of its code with `TEST_DUMP_CODE` - its code, constants and function table, never its data.
 
 - **One feature table:** `TweaksVFeatures.cpp` lists each feature once: its section of `TweaksV.ini`, the old stand-alone plugins that do its job and the function that starts it. DllMain starts the features from it and the conflict check takes their old plugins from it, so a new feature is one entry there, plus its settings.
 
@@ -108,7 +109,7 @@
 - **Build:** all of TweaksV's code, its own and the merged plugins', builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
   - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four. Control Flow Guard and CET only take effect in a game that turns them on itself, which GTA V Enhanced 1.0.1158.16 does not; TweaksV carries them so that it never leaves a gap in a game that does, nor is refused by one.
 
-- **Tests:** `test\` holds fake-game test suites (302 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (309 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 

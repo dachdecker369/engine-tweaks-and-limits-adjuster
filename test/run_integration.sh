@@ -188,5 +188,26 @@ check "the log was held, and is left as it was" "has 'log held' && [ \"\$(cat Tw
 check "the log is written to %LOCALAPPDATA%\\TweaksV, and the start-up summary says why; the game is patched" "grep -q 'PROBLEM: The TweaksV.log in the game folder is not used: Windows error 32, file in use. TweaksV.log is written to ' appdata/TweaksV/TweaksV.log && grep -q 'Start-up summary not shown (SHOW_ERROR_POPUPS=0): 1 problem' appdata/TweaksV/TweaksV.log && has '$ALL_ON_HEAP'"
 rm -f TweaksV.log; rm -rf appdata/TweaksV
 
+# Test builds only: the game's code as it is in memory, for finding patterns. The fake game's copies of
+# the game code lie in .fakesit, its own data in .data - the part that must never be saved.
+echo "== I17 TEST_DUMP_CODE in a test build: the game's code saved in %LOCALAPPDATA%\\TweaksV at start and later, never its data"
+d=appdata/TweaksV
+fresh_ini; setkey DRY_RUN 1; addkey TEST_DUMP_CODE 1; rm -rf $d
+out=$(ASI=TweaksV_test.asi game full_game.exe wait)
+check "both copies there, format 1, the second taken 1 s later; nothing in the game folder; the log header lists the switch" "[ \"\$(head -c 8 $d/GameCode-start.bin)\" = TWKVDUMP ] && [ \"\$(head -c 8 $d/GameCode-later.bin)\" = TWKVDUMP ] && [ \"\$(od -An -tu4 -j8 -N4 $d/GameCode-start.bin | tr -d ' ')\" = 1 ] && [ \"\$(od -An -tu4 -j32 -N4 $d/GameCode-later.bin | tr -d ' ')\" = 1 ] && [ ! -e GameCode-start.bin ] && log_has 'TEST BUILD - not for release. .* TEST_DUMP_CODE=1'"
+check "the log names the sections saved, the code among them, and leaves out .data" "log_has 'TEST BUILD: GameCode-start.bin saved, the game as it was 0 s after TweaksV started, before anything was patched: .* - sections HEADERS .text .*fakesit' && log_has 'TEST BUILD: GameCode-later.bin saved, the game as it was 1 s after TweaksV started: ' && log_has 'not saved (the game writes to them):.* .data[ .]'"
+check "the copy holds the game's code as TweaksV found it (the heap site), the game is unpatched (DRY_RUN), no problem" "od -An -tx1 -v $d/GameCode-start.bin | tr -d ' \n' | grep -q 'ba000080284531c041b101e811223344488d0d' && has '$GAME_HEAP' && ! log_has 'PROBLEM'"
+fresh_ini; addkey TEST_DUMP_CODE 99999; rm -rf $d; out=$(ASI=TweaksV_test.asi game full_game.exe)
+check "TEST_DUMP_CODE=99999 is a problem, and nothing is saved" "log_has 'PROBLEM: TweaksV.ini: \[TWEAKSV\] TEST_DUMP_CODE=99999 is not a number of seconds from 1 to 3600 - the game.s code is not saved.' && [ ! -e $d/GameCode-start.bin ]"
+fresh_ini; addkey TEST_DUMP_CODE abc; rm -rf $d; out=$(ASI=TweaksV_test.asi game full_game.exe)
+check "TEST_DUMP_CODE=abc as well" "log_has 'PROBLEM: TweaksV.ini: \[TWEAKSV\] TEST_DUMP_CODE=abc is not a number of seconds' && [ ! -e $d/GameCode-start.bin ]"
+mkdir -p $d; echo "not a dump" > victim.txt; ln victim.txt $d/GameCode-start.bin
+fresh_ini; setkey DRY_RUN 1; addkey TEST_DUMP_CODE 1; out=$(ASI=TweaksV_test.asi game full_game.exe wait)
+check "GameCode-start.bin a hard link to another file: that file left alone, a problem; the later copy saved" "[ \"\$(cat victim.txt)\" = 'not a dump' ] && log_has 'PROBLEM: TEST_DUMP_CODE: GameCode-start.bin was not saved: it is a hard link' && [ -f $d/GameCode-later.bin ]"
+rm -f victim.txt
+fresh_ini; addkey TEST_DUMP_CODE 1; rm -rf $d; out=$(game full_game.exe)
+check "the release build ignores TEST_DUMP_CODE: nothing saved, no problem" "[ ! -e $d/GameCode-start.bin ] && ! log_has 'TEST BUILD' && ! log_has 'PROBLEM' && has '$ALL_ON_HEAP'"
+rm -rf $d
+
 echo
 echo "INTEGRATION SCENARIOS: $pass passed, $fail failed"

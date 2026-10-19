@@ -79,6 +79,7 @@ namespace TweaksV
 			"The layout of this file - TweaksV keeps it up to date, do not change it", false),
 		TestText(kTweaksVSection, "TEST_BREAK_PATTERN"),
 		TestText(kTweaksVSection, "TEST_LOG_LIMIT_KB"),
+		TestText(kTweaksVSection, "TEST_DUMP_CODE"),
 
 		Switch(kHeapSection, "ENABLED", true),
 		Number(kHeapSection, "HEAP_SIZE", 2000, 1, 2047, "Heap size in MB"),
@@ -129,6 +130,7 @@ namespace TweaksV
 	inline constexpr const Setting& kIniVersion = FindSetting(kTweaksVSection, "INI_VERSION");
 	inline constexpr const Setting& kTestBreakPattern = FindSetting(kTweaksVSection, "TEST_BREAK_PATTERN");
 	inline constexpr const Setting& kTestLogLimitKb = FindSetting(kTweaksVSection, "TEST_LOG_LIMIT_KB");
+	inline constexpr const Setting& kTestDumpCode = FindSetting(kTweaksVSection, "TEST_DUMP_CODE");
 	inline constexpr const Setting& kHeapSize = FindSetting(kHeapSection, "HEAP_SIZE");
 	inline constexpr const Setting& kModkitArraySize = FindSetting(kModkitSection, "MODKITARRAY_SIZE");
 	inline constexpr const Setting& kPackfileArraySize = FindSetting(kPackfileSection, "PACKFILEARRAY_SIZE");

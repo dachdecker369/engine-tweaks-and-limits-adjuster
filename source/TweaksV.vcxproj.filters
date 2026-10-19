@@ -37,6 +37,9 @@
     <ClCompile Include="TweaksVDirectStorage.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVDump.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVFeatures.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -124,6 +127,9 @@
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVDirectStorage.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVDump.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVFeatures.h">

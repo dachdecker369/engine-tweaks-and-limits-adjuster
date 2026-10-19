@@ -61,7 +61,7 @@ Developer checks - not for release:
 Add these switches to the `msbuild` line above:
 
 - **Code Analysis:** `-p:TweaksVAnalyze=true` runs the MSVC code analysis (`/analyze`). Builds into `object\Analyze`.
-- **Test Builds:** `-p:TweaksVTestBuild=true` gives `object\Test\Release\TweaksV.asi`. Add `TEST_BREAK_PATTERN=<label>` under `[TWEAKSV]` in `TweaksV.ini`, with the label of a pattern in [PATTERNS.md](PATTERNS.md), such as `S-E2`. That pattern then counts as missing, and you can watch its part be skipped cleanly. `TEST_LOG_LIMIT_KB=<KB>` lowers the 64 MB limit of `TweaksV.log`, so you can watch it being reached. The log header will list `TEST BUILD`.
+- **Test Builds:** `-p:TweaksVTestBuild=true` gives `object\Test\Release\TweaksV.asi`. Add `TEST_BREAK_PATTERN=<label>` under `[TWEAKSV]` in `TweaksV.ini`, with the label of a pattern in [PATTERNS.md](PATTERNS.md), such as `S-E2`. That pattern then counts as missing, and you can watch its part be skipped cleanly. `TEST_LOG_LIMIT_KB=<KB>` lowers the 64 MB limit of `TweaksV.log`, so you can watch it being reached. `TEST_DUMP_CODE=<seconds>` (1 to 3600) saves the game's code as it is in memory - decrypted, unlike `GTA5_Enhanced.exe` on disk - for looking for patterns: `GameCode-start.bin` before TweaksV patches anything, `GameCode-later.bin` that many seconds later, about 50 MB each, in `%LOCALAPPDATA%\TweaksV`. They hold the game's code, constants and function table, never its data; the format is in `source\TweaksVDump.h`. Delete them when you are done. The log header will list `TEST BUILD`.
 
 ## Testing
 

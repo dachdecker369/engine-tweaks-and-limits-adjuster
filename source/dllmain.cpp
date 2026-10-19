@@ -12,6 +12,7 @@
 #include "ClearLog.h"		// Shared: ClearLog()
 #include "IsEnhanced.h"		// Shared: IsEnhanced()
 #include "TweaksVConflicts.h"
+#include "TweaksVDump.h"		// test builds: TEST_DUMP_CODE
 #include "TweaksVFeatures.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
@@ -45,6 +46,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 				TweaksV::OpenConsole();
 			if (TweaksV::IsOn(TweaksV::kCheckForConflicts))			// 7.
 				TweaksV::CheckForConflicts();
+#ifdef TWEAKSV_TEST_BUILD
+			TweaksV::StartCodeDump();								//    test builds: before anything is patched
+#endif
 
 			const bool summaryLater = TweaksV::StartFeatures();		// 8. every feature that is on
 			if (!summaryLater)										// 9. unless a feature shows it
