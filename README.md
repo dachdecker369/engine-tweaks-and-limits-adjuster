@@ -77,6 +77,18 @@ Add these switches to the `msbuild` line above:
 2. Remove the standalone versions of the five original plugins and alloc8or's `DirectStorageFix.asi`. Otherwise standalone modules take priority and disable the respective portions of `TweaksV.asi`.
 3. `TweaksV.asi` goes in the game folder next to `GTA5_Enhanced.exe`.
 4. Add the ASI loader file `xinput1_4.dll` from the [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) download. It is the only file needed; Script Hook V itself is not.
+5. Settings from the old plugins carry over by name: `HEAP_SIZE`, `MODKITARRAY_SIZE` and `PACKFILEARRAY_SIZE` keep their sections and keys. `RageOpenV.ini`'s `[config] console` is `CONSOLE` under `[TWEAKSV]`; its `[log] info`, `mods` and `device` are `LOG_INFO`, `LOG_MODS` and `LOG_DEVICE` under `[RAGEOPENV_SETTINGS]`; its `[log] rpf` is gone, nothing ever read it.
+
+## Other mods
+
+- **NaturalVision Enhanced** sets the heap size as well. ASI loaders load alphabetically and the last one to set it wins; TweaksV's files keep their names, so you can rename `TweaksV.asi` to `zTweaksV.asi` to load it last.
+- **gameconfig.xml:** a gameconfig that raises the archive count has no effect while the Packfile part is on - TweaksV replaces that count with `PACKFILEARRAY_SIZE` when the game reads its configuration. Everything else in a gameconfig works as usual.
+- **Zolika Patch:** the ModkitLimit Extender's author warned that its modkit patch may not be compatible with Zolika Patch's; the same goes for TweaksV's Modkit part.
+- **Script Hook V, ScriptHookVDotNet, OpenIV:** neither needed nor touched. Only the ASI loader file from the Script Hook V download is used, and OpenIV's `OpenIV.asi` must not be installed next to TweaksV (its job is TweaksV's RageOpenV part).
+
+## Reporting a problem
+
+Attach `TweaksV.log` - its first lines name the game build and the files in use - and `TweaksV.ini`; say which store the game comes from (Rockstar, Steam, Epic); list the other `.asi` and `.dll` files in the game folder; and describe what happened against what you expected. A crash dump helps if you have one. Security problems go the private way described below.
 
 ## Security
 

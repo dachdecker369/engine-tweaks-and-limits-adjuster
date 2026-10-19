@@ -119,6 +119,9 @@
 - **Build:** all of TweaksV's code, its own and the merged plugins', builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
   - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four. Control Flow Guard and CET only take effect in a game that turns them on itself, which GTA V Enhanced 1.0.1158.16 does not; TweaksV carries them so that it never leaves a gap in a game that does, nor is refused by one.
 
+- **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from; the mod page carries the credits and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
+  - Provenance: RageOpenV's README asks that its binaries not be redistributed - a request, not a license term (the GPL-3.0 allows redistribution and forbids further restrictions), so the credits stay prominent; martonp96's original ClosedIV repository is no longer public, and RageOpenV's README is the source of that credit.
+
 - **Tests:** `test\` holds fake-game test suites (363 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
@@ -138,3 +141,78 @@ Known bugs and open issues in TweaksV.
 - **What:** MinHook, the hook library, keeps the trampolines of TweaksV's hooks in memory that is writable and executable at once. That only helps an attack that can already write to the game's memory. The rest of the code review's hardening is done: links, the user name and the size limit of `TweaksV.log`, newmods' paths, problems after the start-up summary, the exploit mitigations.
 - **Status:** accepted. It is MinHook's own design, and `vendor\MinHook` stays unchanged; TweaksV's own stubs are never writable and executable at once.
 - **When it goes:** when MinHook keeps its trampolines read and execute only, or TweaksV moves to a hook library that does.
+
+## Bugs Found in the Originals
+
+What the merge found in the five original projects, with the file and line in the originals (the archives in `upstream\`) and what TweaksV does instead - the list to work from if they are ever reported upstream. The IDs are the ones the open issues use (B-ROV-18). Severity: crash = could crash or close the game, corrupt = could silently corrupt memory or behaviour, robust = fragile or unsafe practice, hygiene = cleanliness; "latent" = only reached in some situations, such as a pattern miss after a game update. Two entries concerned the Legacy code, which TweaksV does not carry.
+
+### HeapAdjusterEnhanced (`Heap Adjuster\Game.cpp`)
+
+| ID | Severity | Where and what | TweaksV |
+|---|---|---|---|
+| B-HEAP-01 | crash, latent | `initializeGame`, lines 38 and 45: the pattern's success flag is never checked; after a miss `loc` is 0x1 and line 45 writes through it | a miss is reported and the part skipped |
+| B-HEAP-02 | corrupt | line 51: `heapSize * 1024 * 1024` overflows `int` from `HEAP_SIZE=2048` up | 64-bit math; clamped to the game's own size..2047 |
+| B-HEAP-03 | robust | line 11: the INI value is written as it is, 0 and negative included | clamped and logged |
+| B-HEAP-04 | robust | nothing checks that the target is the imm32 of `mov edx, imm32` | the byte before it must be `BA` |
+| B-HEAP-05 | robust | line 11: the INI is read by a global initialiser during CRT start-up, through a relative path | read in `initializeGame` from the settings table |
+| B-HEAP-06 | hygiene | a C++/CLI project for native code; the .sln points at a missing path; `app.rc` and `app.ico` are not built; an orphan .filters file; a Win32 post-build copy | not carried over: one native project |
+
+### ModkitLimitAdjusterEnhanced (`Game.cpp`, `MemScanner.cpp`)
+
+| ID | Severity | Where and what | TweaksV |
+|---|---|---|---|
+| B-MOD-01 | corrupt, latent | `RelocateRelativeModkitArray`, line 104: `assert(curTarget == oldAddress)` is the only consistency check, and Release builds leave it out | a real check, and the array must lie inside the game |
+| B-MOD-02 | crash, latent | `initializeGame`, line 29: `AllocateStubMemory`'s result is not checked | checked; the part is skipped |
+| B-MOD-03 | robust | line 234: the data array is allocated read/write/execute | read/write |
+| B-MOD-04 | corrupt | line 18: `MODKITARRAY_SIZE` is not clamped - a value below the game's own shrinks the array | the array always has the full size; the limits are clamped to the game's own size..65536 |
+| B-MOD-05 | crash, latent | `FatalErrorExit`, lines 242-252, and `MemScanner.cpp` lines 140-143: a miss shows a message box and calls `exit(1)` inside DllMain, after earlier patterns were already written | two passes: nothing is written before everything is found; a failure is reported and the part skipped |
+| B-MOD-06 | robust | `MemScanner.cpp` line 58 relies on windows.h's `max()` macro; line 90: `std::stoi` throws on a malformed token, inside DllMain; the scanner calls the plugin's `FatalErrorExit` | `std::max`; a malformed pattern is caught; a miss returns null |
+
+### PackfileLimitAdjusterEnhanced (`Game.cpp`, `Hooking.h`, `Logging.h`)
+
+| ID | Severity | Where and what | TweaksV |
+|---|---|---|---|
+| B-PACK-01 | crash, latent | `Hooking.h` lines 50-54, `HookManager::SetCall`: writes `E8` and the rel32 into game code without `VirtualProtect` | `TweaksV::RedirectCalls`: protection changed and restored, the cache flushed, `E8` verified first |
+| B-PACK-02 | robust | `EnhancedPatch`, line 120: the second `VirtualProtect` passes `PAGE_EXECUTE_READWRITE` instead of the old protection, leaving the page writable and executable | every page gets its own protection back |
+| B-PACK-03 | corrupt, latent | `RelocateRelativePackFileArray`, line 178: an assert-only consistency check, as B-MOD-01 | a real check |
+| B-PACK-04 | crash, latent | `initializeGame`, lines 51-53: the allocation is not checked before the `memset` | checked |
+| B-PACK-05 | corrupt, latent | lines 55-64 and 325-335: the limits are raised before the array is moved, so a failed move leaves raised limits on the small array; `FatalErrorExit` exits inside DllMain | the array is moved first, always at full size; two passes; a failure is reported, never fatal |
+| B-PACK-06 | corrupt, latent | line 182: every reference is pointed at the new array's start without checking that it pointed at the old array's start | every reference must point at the same array, inside the game |
+| B-PACK-07 | robust | line 40: no clamp; the code's default 12000 differs from the released INI's 13000 | clamped; the default is 13000 |
+| B-PACK-08 | build break | `Logging.h` line 5 defines a non-inline global in a header every .cpp includes: linking fails with LNK2005 "LOGFILE already defined" and LNK1169 (MSVC 14.51), so the published project does not build; `Game.h` declares static functions in a header | the global is gone; the static functions are declared in `Game.cpp` |
+
+### StraightToStoryMode (`Game.cpp`)
+
+| ID | Severity | Where and what | TweaksV |
+|---|---|---|---|
+| B-STORY-01 | crash, latent | `initializeGame`, lines 36-37 and 81: no null checks (the author's TODO on line 14); a miss ends in `exit(1)` or pointer arithmetic on null | a miss skips only that screen |
+| B-STORY-02 | corrupt, latent | line 44: the splash jump is hard-coded as `E9 86 01 00 00`; an update that moves the jump's target but keeps the pattern lands it in the wrong place | `0F 84` verified, the `jmp` computed from the game's own `jz` |
+| B-STORY-03 | robust | no site verifies the original bytes | verified; bytes already patched are skipped quietly |
+| B-STORY-04 | robust | no configuration | `SKIP_SPLASH_SCREEN`, `SKIP_LEGAL_SCREEN`, `SKIP_LANDING_PAGE` |
+| B-STORY-05 | - | concerned the Legacy code, which TweaksV does not carry | - |
+
+### RageOpenV (`src\`)
+
+| ID | Severity | Where and what | TweaksV |
+|---|---|---|---|
+| B-ROV-01 | crash, latent | the init lambdas in `hooks\*.cpp` and `gtav\rage\fiDevice.cpp` lines 6 and 16: scan results are used unchecked - `.add(n).set_call()`, `.rip()` and `.hook()` on address 0 | every group finds and checks all of its addresses first; a miss skips the group |
+| B-ROV-02 | robust | `utils\memory.h` line 325, `scoped_unlock`: `VirtualProtect` with a null old-protection pointer fails, so the protection is never restored | restored after every write |
+| B-ROV-03 | - | concerned the Legacy console patch, which TweaksV does not carry | - |
+| B-ROV-04 | hygiene | `main.cpp` lines 11-16: the console patch is applied with the console off | only with `CONSOLE=1` |
+| B-ROV-05 | corrupt, latent | `hooks\PackfileEncryptionHooks.cpp` lines 73-77: the second DecryptHeader2 call is redirected without checking that it calls the same function as the first | both must lead to the same function |
+| B-ROV-06 | corrupt | `PackfileEncryptionHooks.cpp` line 5: `currentEncryption` is one global, written by one hook and read by the later ones; archives opened on different threads mix up their tags | `thread_local`; `ParseHeaderHook` checks the entry table and the file count |
+| B-ROV-07 | crash | `utils\config.h` with `inicpp.h`: inicpp throws on a line without `=` (a `;` comment), on section errors and on a missing or non-boolean key - reached from DllMain and from every log write | the settings come from `TweaksV.ini` through the Win32 INI functions |
+| B-ROV-08 | crash, latent | `utils\memory.h` line 65, `memory::init`: the trampoline area is requested at the fixed address exe+0x20000000 without a failure check | memory near the game from `AllocateStubMemory`, checked |
+| B-ROV-09 | robust | `memory.h` lines 153-159, `memory::hook`: `MH_EnableHook(MH_ALL_HOOKS)` after every hook, freezing all threads each time | hooks are queued, one apply per group |
+| B-ROV-10 | robust | `main.cpp` lines 3-10: the one-time guard is a plain `bool` | an atomic, claimed with `exchange` before the start-up runs; the hook switches itself off afterwards |
+| B-ROV-11 | robust | `utils\log.cpp` lines 16, 33 and 35: a 256-byte line buffer truncates paths; `printf` on every line even without a console; INI lookups and a file open per line | lines go to `TweaksV.log`; the switches are read once |
+| B-ROV-12 | robust | `fiDevice.cpp`: a "device" log line is formatted on every device call even when device logging is off | the switch is checked first |
+| B-ROV-13 | corrupt | `fiDevice.cpp` lines 51 and 92-98, `Open` and `Close`: `Open` allocates an `ifstream` that `Close` never deletes - memory and a file handle leak per file | deleted in `Close` |
+| B-ROV-14 | corrupt | `fiDevice.cpp` line 46: the `handleNames` map is used from several game threads without a lock, and `operator[]` in log calls inserts entries | a shared mutex; log calls insert nothing |
+| B-ROV-15 | robust | `fiDevice.cpp` line 156, `FindFileBegin`: `wprintf_s(fileName, 256, ...)` prints to stdout with the name as the format string instead of formatting into it, so the search always fails | formatted into a buffer of the real length |
+| B-ROV-16 | corrupt | `fiDevice.cpp` line 402, `ConvertFoundData`: `*(uint64*)&nFileSizeHigh` swaps the halves of the file size | `(high << 32) \| low` |
+| B-ROV-17 | hang | `fiDevice.cpp` lines 232-240, `SafeRead`: `bytesRead` is unsigned, so `bytesRead < 0` is never true and the loop never ends at the end of a file | stops when 0 bytes are read |
+| B-ROV-18 | robust | `fiDevice.cpp` line 86, `Seek64`: `SEEK_END` subtracts the distance; Win32 adds it | the open issue B-ROV-18 above |
+| B-ROV-19 | corrupt | `fiDevice.cpp` lines 56-70, `ReadFile` and `ReadBulk`: after a short read the stream's failbit is set and every later `seekg` and `read` silently fails | the stream is cleared before seeking |
+| B-ROV-20 | hygiene | dead code: `memory::HookIAT`, `memory::ret`, `memory::make_jmp_ret`, `memory::call`, `rage::fiDeviceRelative`, the "rpf" log key; lazy scans inside game calls | removed; `Mount` and `SetPath` are resolved at start-up |
+| B-ROV-21 | robust | paths relative to the current directory (`CustomDevice.cpp` line 36, `fiDevice.h` line 138, `FileReadHooks.cpp` line 22); `ToFullPath` ignores each device's `SetPath`; DllMain writes `RageOpenV.ini` and uses `std::filesystem` calls that can throw | absolute paths, logged at start-up; `TweaksV.ini`; non-throwing calls |
