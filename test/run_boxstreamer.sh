@@ -10,6 +10,8 @@ MOVED='box refs: 8 new 0 game 0 other (RW, 784 KB)'
 UNMOVED='box refs: 0 new 8 game 0 other |'
 GAME_CAPS='box caps: 1000 1000 1000 1000'
 NEW_CAPS='box caps: 10000 10000 10000 10000'
+CALLS_GAME='box calls: 0 redirected 4 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000'
+CALLS_COUNTED='box calls: 4 redirected 0 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000'
 NOT_ENLARGED='PROBLEM: The box streamer.s traversal list is not enlarged this session'
 
 echo "== B1 defaults: list moved, capacity 10000, the other plugins still fine"
@@ -19,6 +21,7 @@ check "all 4 capacities 10000" "has '$NEW_CAPS'"
 check "status line" "log_has 'Box streamer traversal list moved and its capacity raised from 1000 to 10000 entries'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack refs: 30 new 0 game 0 other'"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
+check "the tree-search calls untouched (LOG_SEARCHES=0): the game's own searches run" "has '$CALLS_GAME'"
 check "no problems" "! log_has 'PROBLEM'"
 
 echo "== B2 TRAVERSAL_LIST_SIZE=50000: capacities 50000, the list still full size"
@@ -88,6 +91,40 @@ echo "== B14 none of the game code present (plain fake game): logged and skipped
 fresh_ini; out=$(game plain_game.exe)
 check "harness survived" "grep -q 'loaded' harness.out"
 check "reported" "log_has 'A capacity of the box streamer.s traversal list was not found in the game code: B-E-L1' && log_has '$NOT_ENLARGED'"
+
+echo "== B15 LOG_SEARCHES=1: the four tree-search calls go through TweaksV's stubs, the searches are counted and summed up 10 s in"
+fresh_ini; setkey LOG_SEARCHES 1 BOXSTREAMER_SETTINGS; out=$(game full_game.exe wait); echo "      $out"
+check "list moved and capacities raised as before" "has '$MOVED' && has '$NEW_CAPS'"
+check "all four calls redirected; the game's searches still run with the game's arguments and their results come back unchanged" "has '$CALLS_COUNTED'"
+check "the four stubs are read+execute, every page back to its own protection" "has 'stubs: 10, all RX' && has 'protect: all restored (RX)'"
+check "the log says what is counted" "log_has 'LOG_SEARCHES: the 4 tree-search calls are counted; a summary follows after 10 seconds, then every minute while the numbers change.'"
+check "the summary: 4 searches, the largest 1000 of 10000, one more than the game's own list could hold" "log_has 'LOG_SEARCHES: 4 searches so far; the largest returned 1000 of 10000 entries; 1 returned more than the game.s own list (1000 entries) could hold.'"
+check "no problems" "! log_has 'PROBLEM'"
+
+echo "== B16 LOG_SEARCHES=1 and DIAGNOSTIC_MODE=1: every call and its redirection logged"
+fresh_ini; setkey LOG_SEARCHES 1 BOXSTREAMER_SETTINGS; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
+check "the four calls and their targets logged" "[ \$(count 'BoxStreamer\] DIAGNOSTIC: tree-search call at RVA .* -> RVA') -eq 4 ]"
+check "the four redirections logged as writes" "[ \$(count 'BoxStreamer\] DIAGNOSTIC: tree-search call at RVA .*: E8 .* -> E8') -eq 4 ]"
+check "still applied" "has '$MOVED' && has '$CALLS_COUNTED'"
+
+echo "== B17 LOG_SEARCHES=1, another mod already hooked a tree-search call: nothing written"
+fresh_ini; setkey LOG_SEARCHES 1 BOXSTREAMER_SETTINGS; out=$(game full_game.exe boxcallhooked); echo "      $out"
+check "nothing changed, the other mod's call kept" "has '$UNMOVED' && has '$GAME_CAPS' && has 'box calls: 0 redirected 3 game 1 other'"
+check "reason logged and reported" "log_has 'tree-search call at RVA .* is not a call into the game (another mod may have hooked it already) (B-E-L2)' && log_has '$NOT_ENLARGED'"
+
+echo "== B18 LOG_SEARCHES=1, a pair of calls leads to two different functions: nothing written"
+fresh_ini; setkey LOG_SEARCHES 1 BOXSTREAMER_SETTINGS; out=$(game full_game.exe boxcallsplit); echo "      $out"
+check "nothing changed" "has '$UNMOVED' && has '$GAME_CAPS' && has 'box calls: 0 redirected 4 game 0 other'"
+check "reason logged and reported" "log_has 'tree-search calls of the box streamer do not lead to the same function: RVA .* and RVA .* (B-E-L3)' && log_has '$NOT_ENLARGED'"
+
+echo "== B19 LOG_SEARCHES=1 and DRY_RUN=1: the calls are checked, nothing written"
+fresh_ini; setkey LOG_SEARCHES 1 BOXSTREAMER_SETTINGS; setkey DRY_RUN 1; out=$(game full_game.exe)
+check "nothing changed" "has '$UNMOVED' && has '$GAME_CAPS' && has '$CALLS_GAME'"
+check "the 'would' line names the calls" "log_has 'DRY_RUN: would move the box streamer.s traversal list (8 references) and raise its capacity from 1000 to 10000 (4 sites) and redirect the 4 tree-search calls (LOG_SEARCHES).'"
+
+echo "== B20 LOG_SEARCHES=0 with a hooked call: the calls are not looked at, the list is moved all the same"
+fresh_ini; out=$(game full_game.exe boxcallhooked)
+check "list moved, the other mod's call kept, no problem" "has '$MOVED' && has 'box calls: 0 redirected 3 game 1 other' && ! log_has 'PROBLEM'"
 
 echo
 echo "BOXSTREAMER SCENARIOS: $pass passed, $fail failed"

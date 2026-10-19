@@ -50,9 +50,9 @@ check "all five in one start-up summary, nothing written back" "grep -q 'Start-u
 echo "== a damaged TweaksV.ini (4 KB of random bytes) and an empty one: no crash, every key added, defaults used"
 perl -e 'srand(42); print map { chr(int(rand(256))) } 1..4096' > TweaksV.ini
 out=$(game full_game.exe); echo "      ${out:0:160}"
-check "random bytes: the game runs on with the defaults" "grep -q 'heap: 2000 MB' harness.out && [ \$(grep -c 'added the missing key' TweaksV.log) -eq 32 ]"
+check "random bytes: the game runs on with the defaults" "grep -q 'heap: 2000 MB' harness.out && [ \$(grep -c 'added the missing key' TweaksV.log) -eq 33 ]"
 : > TweaksV.ini
 out=$(game full_game.exe); echo "      ${out:0:160}"
-check "empty: every key added, the defaults used" "grep -q 'heap: 2000 MB' harness.out && [ \$(grep -c 'added the missing key' TweaksV.log) -eq 32 ]"
+check "empty: every key added, the defaults used" "grep -q 'heap: 2000 MB' harness.out && [ \$(grep -c 'added the missing key' TweaksV.log) -eq 33 ]"
 
 echo "INI DEFAULT CHECKS: $pass passed, $fail failed"

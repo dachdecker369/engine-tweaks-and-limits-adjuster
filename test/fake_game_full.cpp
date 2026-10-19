@@ -20,6 +20,8 @@
 //   boxninth       a ninth lea loads the list (a changed game)
 //   boxmismatch    one capacity of the list holds 1001 instead of 1000
 //   boxbadsize     every capacity of the list holds an implausible 200000
+//   boxcallhooked  the second tree-search call of the box streamer already leads outside the game (another mod's hook)
+//   boxcallsplit   the third tree-search call leads to the other tree search than the first
 //   dstorage       loads the stand-in dstorage.dll (fake_dstorage.cpp) before TweaksV, calls it after
 //   dsotherinterface  with dstorage: first asks for a DirectStorage interface TweaksV does not know
 //   fileopens      opens files in its folder (and one outside) after TweaksV has started
@@ -167,18 +169,20 @@ static Site g_packCallSite = SITE(g_packH1, 17);	// the rel32 of the E8 at +0x10
 
 // BoxStreamer: the four sites that hand the capacity of the traversal list to the tree search
 // ("mov dword ptr [rsp+20h], 1000"), three of them followed by the "lea r13, [rip+disp32]" that loads
-// the list, and the other five leas that load it (two "lea r14", three "lea r13"). g_boxRef4 and
-// g_boxRef8 are the same bytes, as in the game, where two of the query functions are near-identical
-// copies: only a scan for every lea that loads the list finds both. The list itself is below, outside
-// this section, as the game's is.
+// the list, each followed by the "call rel32" to the tree search (LOG_SEARCHES redirects it), and the
+// other five leas that load the list (two "lea r14", three "lea r13"). g_boxRef4 and g_boxRef8 are the
+// same bytes, as in the game, where two of the query functions are near-identical copies: only a scan
+// for every lea that loads the list finds both. The list itself and the two tree searches are below,
+// outside this section, as the game's are.
 volatile unsigned char g_boxCap1[] = { 0x48, 0x8B, 0x44, 0x24, 0x40, 0x48, 0x8B, 0x48, 0x08, 0xC7, 0x44, 0x24, 0x20, 0xE8, 0x03, 0x00, 0x00,
-	0x48, 0x8D, 0x54, 0x24, 0x60, 0x4C, 0x8D, 0x44, 0x24, 0x70, 0x4D, 0x89, 0xF1, 0xCC };									// imm32 at +13
+	0x48, 0x8D, 0x54, 0x24, 0x60, 0x4C, 0x8D, 0x44, 0x24, 0x70, 0x4D, 0x89, 0xF1, 0xE8, 0, 0, 0, 0, 0xCC };					// imm32 at +13, call at +30
 volatile unsigned char g_boxCap2[] = { 0x48, 0x8B, 0x81, 0x08, 0x01, 0x00, 0x00, 0x48, 0x8B, 0x48, 0x08, 0xC7, 0x44, 0x24, 0x20, 0xE8, 0x03, 0x00, 0x00,
-	0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x89, 0x6C, 0x24, 0x38, 0x4D, 0x89, 0xE9, 0xE8, 0x11, 0x22, 0x33, 0x44, 0xCC };		// imm32 at +15, rel32 at +22
+	0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x89, 0x6C, 0x24, 0x38, 0x4D, 0x89, 0xE9, 0xE8, 0, 0, 0, 0, 0xCC };					// imm32 at +15, rel32 at +22, call at +34
 volatile unsigned char g_boxCap3[] = { 0x0F, 0x29, 0x44, 0x24, 0x40, 0x48, 0x8B, 0x48, 0x08, 0xC7, 0x44, 0x24, 0x20, 0xE8, 0x03, 0x00, 0x00,
-	0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x8D, 0x54, 0x24, 0x40, 0x48, 0x89, 0x6C, 0x24, 0x30, 0xCC };							// imm32 at +13, rel32 at +20
+	0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x8D, 0x54, 0x24, 0x40, 0x48, 0x89, 0x6C, 0x24, 0x30, 0x4C, 0x8D, 0x44, 0x24, 0x50,
+	0x4D, 0x89, 0xE9, 0xE8, 0, 0, 0, 0, 0xCC };																				// imm32 at +13, rel32 at +20, call at +42
 volatile unsigned char g_boxCap4[] = { 0x48, 0x8B, 0x01, 0x48, 0x8B, 0x48, 0x08, 0xC7, 0x44, 0x24, 0x20, 0xE8, 0x03, 0x00, 0x00,
-	0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x89, 0x6C, 0x24, 0x38, 0x4D, 0x89, 0xE9, 0xE8, 0x11, 0x22, 0x33, 0x44, 0xCC };		// imm32 at +11, rel32 at +18
+	0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x89, 0x6C, 0x24, 0x38, 0x4D, 0x89, 0xE9, 0xE8, 0, 0, 0, 0, 0xCC };					// imm32 at +11, rel32 at +18, call at +30
 volatile unsigned char g_boxRef1[] = { 0x31, 0xC9, 0x4C, 0x8D, 0x35, 0, 0, 0, 0, 0x4C, 0x89, 0x64, 0x24, 0x50, 0x4C, 0x89, 0x4C, 0x24, 0x38, 0xEB, 0x14, 0xCC };	// rel32 at +5
 volatile unsigned char g_boxRef2[] = { 0x66, 0x89, 0x5F, 0x0A, 0x48, 0x89, 0x2F, 0x0F, 0xB7, 0x77, 0x08, 0x4C, 0x8D, 0x35, 0, 0, 0, 0, 0x8B, 0x54, 0x24, 0x2C, 0xCC };	// rel32 at +14
 volatile unsigned char g_boxRef4[] = { 0x44, 0x0F, 0xB6, 0x64, 0x24, 0x37, 0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x8B, 0x5C, 0x24, 0x40, 0x4C, 0x8B, 0x44, 0x24, 0x38,
@@ -193,6 +197,7 @@ static Site g_boxCaps[] = { SITE(g_boxCap1, 13), SITE(g_boxCap2, 15), SITE(g_box
 static Site g_boxRefs[] = { SITE(g_boxRef1, 5), SITE(g_boxRef2, 14), SITE(g_boxCap2, 22), SITE(g_boxRef4, 9), SITE(g_boxCap3, 20),
 	SITE(g_boxRef6, 9), SITE(g_boxCap4, 18), SITE(g_boxRef8, 9) };
 static Site g_boxRef9Site = SITE(g_boxRef9, 3);
+static Site g_boxCalls[] = { SITE(g_boxCap1, 31), SITE(g_boxCap2, 35), SITE(g_boxCap3, 43), SITE(g_boxCap4, 31) };	// the rel32 of each call
 #pragma data_seg()
 
 // The game's own traversal list (1000 entries of 8 bytes). The harness reaches it only through this
@@ -200,6 +205,32 @@ static Site g_boxRef9Site = SITE(g_boxRef9, 3);
 // TweaksV's scan for the game's loads of the list would count.
 static uint64_t g_oldBoxListStorage[1000];
 static uint64_t* volatile g_oldBoxList = g_oldBoxListStorage;
+
+// The game's two tree searches behind the box streamer's four calls: the first and the third call lead
+// to the first search, the second and the fourth to the second. Each writes the number of entries the
+// harness asks for and returns it, and checks that it was given the harness's own arguments. The two
+// differ, so that the linker cannot fold them into one.
+using BoxTreeSearch = int (*)(void* tree, const float* min, const float* max, uint64_t* list, int capacity);
+static uint64_t g_boxSearchList[10000];
+static int g_boxSearchWanted = 0, g_boxSearchCallsA = 0, g_boxSearchCallsB = 0, g_boxSearchArgsBad = 0;
+static int FakeTreeSearch(void* tree, const float* min, const float* max, uint64_t* list, int capacity)
+{
+	if (tree != nullptr || !min || !max || list != g_boxSearchList || capacity != 10000)
+		g_boxSearchArgsBad++;
+	for (int i = 0; i < g_boxSearchWanted && i < capacity; i++)
+		list[i] = static_cast<uint64_t>(i);
+	return g_boxSearchWanted;
+}
+static __declspec(noinline) int FakeTreeSearchA(void* tree, const float* min, const float* max, uint64_t* list, int capacity)
+{
+	g_boxSearchCallsA++;
+	return FakeTreeSearch(tree, min, max, list, capacity);
+}
+static __declspec(noinline) int FakeTreeSearchB(void* tree, const float* min, const float* max, uint64_t* list, int capacity)
+{
+	g_boxSearchCallsB++;
+	return FakeTreeSearch(tree, min, max, list, capacity);
+}
 
 // The game's own function behind the streaming configuration call.
 static int g_origCalls = 0;
@@ -380,9 +411,46 @@ static void PrintPackfile(int argc, wchar_t** argv)
 	}
 }
 
+// Calls each of the four tree-search calls' targets the way the game would - TweaksV's stub or the
+// game's own tree search; "another mod's" address (option "boxcallhooked") not at all - asking for
+// 100, 400, 700 and 1000 entries of a 10000-entry list.
+// "box calls: 4 redirected 0 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000 | "
+static wchar_t g_boxCallsResult[160];
+static void CallBoxSearches()
+{
+	const unsigned char* const otherMod = ImageEnd() + 0x40000;
+	int redirected = 0, game = 0, other = 0;
+	int returns[4] = { -1, -1, -1, -1 };
+	const float lower[4] = { -10.0f, -10.0f, -10.0f, 0.0f };
+	const float upper[4] = { 10.0f, 10.0f, 10.0f, 0.0f };
+	for (int i = 0; i < 4; i++)
+	{
+		const unsigned char* target = Rel32Target(g_boxCalls[i]);
+		if (target == reinterpret_cast<const unsigned char*>(&FakeTreeSearchA) ||
+			target == reinterpret_cast<const unsigned char*>(&FakeTreeSearchB))
+		{
+			game++;
+		}
+		else if (target == otherMod || InImage(target))
+		{
+			other++;
+			continue;
+		}
+		else
+		{
+			redirected++;
+		}
+		g_boxSearchWanted = 100 + 300 * i;
+		returns[i] = reinterpret_cast<BoxTreeSearch>(const_cast<unsigned char*>(target))(nullptr, lower, upper, g_boxSearchList, 10000);
+	}
+	swprintf(g_boxCallsResult, 160, L"box calls: %d redirected %d game %d other, originals %dx+%dx, args %ls, returns %d %d %d %d | ",
+		redirected, game, other, g_boxSearchCallsA, g_boxSearchCallsB, g_boxSearchArgsBad == 0 ? L"ok" : L"BAD",
+		returns[0], returns[1], returns[2], returns[3]);
+}
+
 // "box refs: 8 new 0 game 0 other (RW, 784 KB) | box caps: 10000 10000 10000 10000 | " - "new" is the
 // common target of the first reference when that is outside the game and not the other mod's address
-// (option "boxmoved")
+// (option "boxmoved") - then the tree-search calls (above)
 static void PrintBoxStreamer()
 {
 	const unsigned char* const oldList = reinterpret_cast<const unsigned char*>(g_oldBoxList);
@@ -407,7 +475,8 @@ static void PrintBoxStreamer()
 		PrintNewArray(newList);
 		wprintf(L")");
 	}
-	wprintf(L" | box caps: %u %u %u %u | ", Imm32(g_boxCaps[0]), Imm32(g_boxCaps[1]), Imm32(g_boxCaps[2]), Imm32(g_boxCaps[3]));
+	wprintf(L" | box caps: %u %u %u %u | %ls", Imm32(g_boxCaps[0]), Imm32(g_boxCaps[1]), Imm32(g_boxCaps[2]), Imm32(g_boxCaps[3]),
+		g_boxCallsResult);
 }
 
 // Every site is written once before TweaksV loads, so all their pages are private copies alike; then
@@ -667,6 +736,15 @@ int wmain(int argc, wchar_t** argv)
 	if (HasOption(argc, argv, L"boxbadsize"))	// an implausible capacity
 		for (const Site& site : g_boxCaps)
 			SetImm32(site, 200000);
+	// ...and the four tree-search calls lead to the game's two tree searches, in pairs...
+	SetRel32(g_boxCalls[0], reinterpret_cast<const void*>(&FakeTreeSearchA));
+	SetRel32(g_boxCalls[1], reinterpret_cast<const void*>(&FakeTreeSearchB));
+	SetRel32(g_boxCalls[2], reinterpret_cast<const void*>(&FakeTreeSearchA));
+	SetRel32(g_boxCalls[3], reinterpret_cast<const void*>(&FakeTreeSearchB));
+	if (HasOption(argc, argv, L"boxcallhooked"))	// ...unless another mod hooked one of them already
+		SetRel32(g_boxCalls[1], ImageEnd() + 0x40000);
+	if (HasOption(argc, argv, L"boxcallsplit"))	// ...or a pair leads to two different functions
+		SetRel32(g_boxCalls[2], reinterpret_cast<const void*>(&FakeTreeSearchB));
 
 	RovSetup(argc, argv);
 	ForEachSite(TouchSite);
@@ -697,6 +775,7 @@ int wmain(int argc, wchar_t** argv)
 	}
 	RovFirstTimeRequest();	// the game asks for the time: RageOpenV's hook runs its one-time start-up
 	Sleep(1500); // the start-up summary thread runs
+	CallBoxSearches();	// the box streamer searches, as the game would call them
 	if (dstorage)
 		CallDStorage(dstorage, HasOption(argc, argv, L"dsotherinterface"));
 	if (HasOption(argc, argv, L"dsotherinterface"))
@@ -722,6 +801,8 @@ int wmain(int argc, wchar_t** argv)
 	RovReport();
 	wprintf(L"%ls%ls", g_dstorageResult, g_fileOpensResult);
 	CheckStub(Rel32Target(g_packCallSite));
+	for (const Site& site : g_boxCalls)
+		CheckStub(Rel32Target(site));
 	RovForEachCallTarget(CheckStub);
 	wprintf(L"stubs: %d, %ls | ", g_stubs, g_writableStubs == 0 ? L"all RX" : L"NOT all RX");
 	wprintf(L"protect: %ls %ls\n", g_notRestored == 0 ? L"all restored" : L"NOT restored",

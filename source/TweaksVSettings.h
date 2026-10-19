@@ -93,6 +93,7 @@ namespace TweaksV
 
 		Switch(kBoxStreamerSection, "ENABLED", true),
 		Number(kBoxStreamerSection, "TRAVERSAL_LIST_SIZE", 10000, 1000, 100000, "Map boxes one search of the box streamer can return (the game's own list holds 1000 - too few with heavy map mods, whose LODs then go missing)"),
+		Switch(kBoxStreamerSection, "LOG_SEARCHES", false, "TESTING ONLY: logs every minute how full the traversal list gets, and whether the game's own list would have overflowed (changes nothing)"),
 
 		Switch(kRageOpenVSection, "ENABLED", true),
 		Switch(kRageOpenVSection, "MODS_FOLDER", true, "Load replacement \"mods\" folder in the GTA V Enhanced directory"),
@@ -139,6 +140,7 @@ namespace TweaksV
 	inline constexpr const Setting& kModkitArraySize = FindSetting(kModkitSection, "MODKITARRAY_SIZE");
 	inline constexpr const Setting& kPackfileArraySize = FindSetting(kPackfileSection, "PACKFILEARRAY_SIZE");
 	inline constexpr const Setting& kTraversalListSize = FindSetting(kBoxStreamerSection, "TRAVERSAL_LIST_SIZE");
+	inline constexpr const Setting& kLogSearches = FindSetting(kBoxStreamerSection, "LOG_SEARCHES");
 	inline constexpr const Setting& kModsFolder = FindSetting(kRageOpenVSection, "MODS_FOLDER");
 	inline constexpr const Setting& kOpenRpf = FindSetting(kRageOpenVSection, "OPEN_RPF");
 	inline constexpr const Setting& kSkipRpfCacheCheck = FindSetting(kRageOpenVSection, "SKIP_RPF_CACHE_CHECK");

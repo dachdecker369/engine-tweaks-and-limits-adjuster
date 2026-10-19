@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // TweaksV - the box streamer's traversal list: the map boxes one search of the game's box streamer can
 // return. The game's own list holds 1000 entries, too few with heavy map mods, where LODs then go
-// missing. TRAVERSAL_LIST_SIZE in [BOXSTREAMER_SETTINGS] moves the list to a larger one.
+// missing. TRAVERSAL_LIST_SIZE in [BOXSTREAMER_SETTINGS] moves the list to a larger one; LOG_SEARCHES
+// (testing) logs how full it gets, and whether the game's own list would have overflowed.
 #pragma once
 
 namespace TweaksV

@@ -31,6 +31,8 @@ The game's box streamer finds the map boxes to stream for the area around the pl
 
 `TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER_SETTINGS]` in `TweaksV.ini` (default 10000, up to 100000) moves the list to a larger one. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own.
 
+For testing, `LOG_SEARCHES=1` logs every minute how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all.
+
 ## Design
 
 - **GTA V Enhanced Only:** TweaksV does nothing in Legacy.

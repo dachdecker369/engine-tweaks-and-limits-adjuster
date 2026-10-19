@@ -85,6 +85,7 @@
   - The four capacity sites are found by pattern and must agree on the game's own size. The list's address comes from the `lea` after three of them, and the game's code is scanned for every `lea` that loads it: exactly 8 must be found (two of the game's four query functions are near-identical copies, which no pattern tells apart), so a list another mod has moved, or a game that has changed, is left alone;
   - The new list always has the full 100000 entries, as read/write data; the capacity is clamped to the game's own size..100000;
   - The 8 references and the 4 capacities are written together, all or nothing;
+  - `LOG_SEARCHES=1` (testing) sends the four calls to the game's tree searches through TweaksV's call stubs to a wrapper that only counts (atomics, nothing else on the streaming thread) and logs, 10 seconds in and then every minute while the numbers change, how many searches ran, the most entries one returned and how many returned more than the game's own list could hold - the number that says whether a map load needs the larger list. A call another mod has hooked, or a pair of calls that does not lead to the same tree search, skips the part; the calls are redirected in the same all-or-nothing write as the references and capacities;
   - A failure is reported in the start-up summary and leaves the game as it was;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
@@ -118,7 +119,7 @@
 - **Build:** all of TweaksV's code, its own and the merged plugins', builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
   - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four. Control Flow Guard and CET only take effect in a game that turns them on itself, which GTA V Enhanced 1.0.1158.16 does not; TweaksV carries them so that it never leaves a gap in a game that does, nor is refused by one.
 
-- **Tests:** `test\` holds fake-game test suites (346 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (363 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 

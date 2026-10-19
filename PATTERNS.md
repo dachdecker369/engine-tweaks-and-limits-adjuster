@@ -107,14 +107,14 @@ References to the packfile array (`AdjustPackFileArrayLimit`, rel32 moved to the
 
 ## BoxStreamer
 
-The four sites that hand the traversal list's capacity to the tree search (`mov dword ptr [rsp+20h], imm32`; every one MUST hold the same game size, 1000 on the current build). The list itself has no pattern of its own: two of the box streamer's four query functions are near-identical copies, so the second of the two `lea` instructions that load the list in each cannot be told apart by the bytes around it. Instead `B-E-L2`, `B-E-L3` and `B-E-L4` end in the `lea r13, [rip+disp32]` that loads the list (the three must agree on its address), and the game's code is then scanned for every `lea r64, [rip+disp32]` that loads it, which must find exactly 8 - on the current build at RVAs 0x92C4AB, 0x92C764, 0x92C7D3, 0x92CA12, 0x92DDCD, 0x92E013, 0x92E089 and 0x92E2D2 (the list is at RVA 0x3ED6B40: 1000 entries of 8 bytes). `DIAGNOSTIC_MODE=1` logs every one of them.
+The four sites that hand the traversal list's capacity to the tree search (`mov dword ptr [rsp+20h], imm32`; every one MUST hold the same game size, 1000 on the current build). The list itself has no pattern of its own: two of the box streamer's four query functions are near-identical copies, so the second of the two `lea` instructions that load the list in each cannot be told apart by the bytes around it. Instead `B-E-L2`, `B-E-L3` and `B-E-L4` end in the `lea r13, [rip+disp32]` that loads the list (the three must agree on its address), and the game's code is then scanned for every `lea r64, [rip+disp32]` that loads it, which must find exactly 8 - on the current build at RVAs 0x92C4AB, 0x92C764, 0x92C7D3, 0x92CA12, 0x92DDCD, 0x92E013, 0x92E089 and 0x92E2D2 (the list is at RVA 0x3ED6B40: 1000 entries of 8 bytes). `DIAGNOSTIC_MODE=1` logs every one of them. With `LOG_SEARCHES=1` the `call rel32` to the tree search that follows each site (the call column) is redirected through TweaksV's call stubs; `B-E-L1` and `B-E-L3` must lead to the same function (RVA 0x1EBFB20 on the current build), `B-E-L2` and `B-E-L4` to the same other one (0x1EC0140).
 
-| Label | Pattern | Offset: capacity, lea rel32 | 1.0.1158.16 | RVA |
+| Label | Pattern | Offset: capacity, lea rel32, call | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
-| B-E-L1 | `48 8B 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 48 8D 54 24 60 4C 8D 44 24 70 4D 89 F1` | 13, - | found | 0x92C527 |
-| B-E-L2 | `48 8B 81 08 01 00 00 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 15, 22 | found | 0x92C7C0 |
-| B-E-L3 | `0F 29 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 13, 20 | found | 0x92DDBC |
-| B-E-L4 | `48 8B 01 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 11, 18 | found | 0x92E07A |
+| B-E-L1 | `48 8B 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 48 8D 54 24 60 4C 8D 44 24 70 4D 89 F1` | 13, -, 30 | found | 0x92C527 |
+| B-E-L2 | `48 8B 81 08 01 00 00 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 15, 22, 34 | found | 0x92C7C0 |
+| B-E-L3 | `0F 29 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 13, 20, 42 | found | 0x92DDBC |
+| B-E-L4 | `48 8B 01 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 11, 18, 30 | found | 0x92E07A |
 
 ## RageOpenV
 
