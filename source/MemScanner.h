@@ -5,6 +5,7 @@
 // Altered version - modified for TweaksV (see MemScanner.cpp).
 #pragma once
 #include <cstdint>
+#include <vector>		// TweaksV: FindRipRelativeLeas
 #include "TweaksVPatterns.h"	// TweaksV: the patterns
 
 namespace MemScanner
@@ -14,4 +15,10 @@ namespace MemScanner
     // the original's Boyer-Moore-Horspool search, which TweaksV replaced (see MemScanner.cpp). The
     // overloads with a start address or a size, and the byte+mask one, are removed: nothing used them.
     uint8_t* Find(const TweaksV::GamePattern& pattern);
+
+    // TweaksV: every "lea r64, [rip+disp32]" (a REX.W prefix, opcode 8D, ModRM mod 00 r/m 101: 7 bytes) in
+    // the game's code that loads target, in address order, at most limit of them. For a static array the
+    // game loads in places the bytes around them cannot tell apart (TweaksVBoxStreamer.cpp): one unique
+    // site gives the address, this finds every load of it. Nothing is logged.
+    std::vector<uint8_t*> FindRipRelativeLeas(const void* target, size_t limit);
 }

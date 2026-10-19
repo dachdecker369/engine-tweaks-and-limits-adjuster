@@ -374,4 +374,51 @@ namespace MemScanner
 
         return address;
     }
+
+    // TweaksV: the loads are looked for the way Find looks for a pattern: the opcode and the ModRM at 16
+    // positions at a time, the prefix and the displacement only where both match.
+    std::vector<uint8_t*> FindRipRelativeLeas(const void* target, size_t limit)
+    {
+        constexpr size_t kLength = 7;
+        std::vector<uint8_t*> found;
+        const auto wanted = reinterpret_cast<intptr_t>(target);
+        const auto loads = [&found, wanted](uint8_t* at) // at[1] is the opcode 8D, at[2] a ModRM 00 ... 101
+        {
+            if ((at[0] & 0xF8) != 0x48) // a REX prefix with W
+                return;
+            int32_t disp = 0;
+            memcpy(&disp, at + 3, sizeof(disp));
+            if (reinterpret_cast<intptr_t>(at + kLength) + disp == wanted)
+                found.push_back(at);
+        };
+        const __m128i opcode = _mm_set1_epi8(static_cast<char>(0x8D));
+        const __m128i modrmBits = _mm_set1_epi8(static_cast<char>(0xC7));
+        const __m128i modrm = _mm_set1_epi8(0x05);
+        for (const Range& range : ReadableCode())
+        {
+            const size_t available = static_cast<size_t>(range.end - range.begin);
+            if (available < kLength)
+                continue;
+            const size_t lastStart = available - kLength; // the whole instruction stays inside the range
+            size_t at = 0;
+            for (; at + 15 <= lastStart && found.size() < limit; at += 16)
+            {
+                const __m128i x = _mm_loadu_si128(reinterpret_cast<const __m128i*>(range.begin + at + 1));
+                const __m128i y = _mm_loadu_si128(reinterpret_cast<const __m128i*>(range.begin + at + 2));
+                unsigned mask = static_cast<unsigned>(_mm_movemask_epi8(_mm_and_si128(_mm_cmpeq_epi8(x, opcode),
+                    _mm_cmpeq_epi8(_mm_and_si128(y, modrmBits), modrm))));
+                while (mask && found.size() < limit)
+                {
+                    unsigned long bit = 0;
+                    _BitScanForward(&bit, mask);
+                    loads(range.begin + at + bit);
+                    mask &= mask - 1;
+                }
+            }
+            for (; at <= lastStart && found.size() < limit; at++)
+                if (range.begin[at + 1] == 0x8D && (range.begin[at + 2] & 0xC7) == 0x05)
+                    loads(range.begin + at);
+        }
+        return found;
+    }
 }

@@ -7,11 +7,11 @@ Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game bui
 | | |
 |---|---|
 | **Game Build** | 1.0.1158.16 |
-| **Found** | 72 of the 72 patterns this build uses |
+| **Found** | 76 of the 76 patterns this build uses |
 | **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-F1..F8` run only with a mods folder in the game directory (with `DIAGNOSTIC_MODE=1`, also without one). `R-E-M0..M2` and `R-E-D1..D2` run only with `NEWMODS=1` and a newmods folder in the game directory (with `NEWMODS=1` and `DIAGNOSTIC_MODE=1`, also without the folder). |
 | **Matches** | All match exactly once. To check: boot once with `DIAGNOSTIC_MODE=1`, `CONSOLE=1` and `NEWMODS=1` enabled. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once. |
 
-Build uses 72 of 76 patterns:
+Build uses 76 of 80 patterns:
 - Packfile picks one of three direct size patterns and one of two references by game build.
 - `R-E-D3` belonged to code that was never used. Removed.
 
@@ -104,6 +104,17 @@ References to the packfile array (`AdjustPackFileArrayLimit`, rel32 moved to the
 | P-E-R30 | `48 89 35 ? ? ? ? b9 ? ? ? ? ba ? ? ? ? e8 ? ? ? ? b9 ? ? ? ? 48 c7 44 08` | 3 | found | 0x1276ED5 |
 | P-E-R31a | `BF 08 00 00 00 BE 10 00 00 00 4C 8D 05` | 13 (builds 1.0.1158.13 and later). The two constants are TweaksV's: upstream's `BF ? ? ? ? BE ? ? ? ? 4C 8D 05` also matched obfuscated code at 0x582A227 | found | 0x10F163 |
 | P-E-R31b | `41 ? ? ? ? ? ? ? ? ? ? 41 bb ? ? ? ? ? 8d` | 20 (older builds) | not used on current build | - |
+
+## BoxStreamer
+
+The four sites that hand the traversal list's capacity to the tree search (`mov dword ptr [rsp+20h], imm32`; every one MUST hold the same game size, 1000 on the current build). The list itself has no pattern of its own: two of the box streamer's four query functions are near-identical copies, so the second of the two `lea` instructions that load the list in each cannot be told apart by the bytes around it. Instead `B-E-L2`, `B-E-L3` and `B-E-L4` end in the `lea r13, [rip+disp32]` that loads the list (the three must agree on its address), and the game's code is then scanned for every `lea r64, [rip+disp32]` that loads it, which must find exactly 8 - on the current build at RVAs 0x92C4AB, 0x92C764, 0x92C7D3, 0x92CA12, 0x92DDCD, 0x92E013, 0x92E089 and 0x92E2D2 (the list is at RVA 0x3ED6B40: 1000 entries of 8 bytes). `DIAGNOSTIC_MODE=1` logs every one of them.
+
+| Label | Pattern | Offset: capacity, lea rel32 | 1.0.1158.16 | RVA |
+|---|---|---|---|---|
+| B-E-L1 | `48 8B 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 48 8D 54 24 60 4C 8D 44 24 70 4D 89 F1` | 13, - | found | 0x92C527 |
+| B-E-L2 | `48 8B 81 08 01 00 00 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 15, 22 | found | 0x92C7C0 |
+| B-E-L3 | `0F 29 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 13, 20 | found | 0x92DDBC |
+| B-E-L4 | `48 8B 01 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 11, 18 | found | 0x92E07A |
 
 ## RageOpenV
 

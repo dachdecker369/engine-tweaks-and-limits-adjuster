@@ -23,13 +23,14 @@ namespace TweaksV
 	inline constexpr SettingsSection kHeapSection{ "HEAP_SETTINGS", "HeapAdjusterEnhanced" };
 	inline constexpr SettingsSection kModkitSection{ "MODKIT_SETTINGS", "ModkitLimitAdjusterEnhanced" };
 	inline constexpr SettingsSection kPackfileSection{ "PACKFILE_SETTINGS", "PackfileLimitAdjusterEnhanced" };
+	inline constexpr SettingsSection kBoxStreamerSection{ "BOXSTREAMER_SETTINGS", "BoxStreamer" };
 	inline constexpr SettingsSection kRageOpenVSection{ "RAGEOPENV_SETTINGS", "RageOpenV" };
 	inline constexpr SettingsSection kStoryModeSection{ "STRAIGHTTOSTORYMODE_SETTINGS", "StraightToStoryMode" };
 	inline constexpr SettingsSection kDirectStorageSection{ "DIRECTSTORAGE_SETTINGS", "DirectStorage" };
 
 	// The sections in file order; every one but the first is a part of TweaksV with an ENABLED key.
 	inline constexpr const SettingsSection* kSections[] = { &kTweaksVSection, &kHeapSection, &kModkitSection,
-		&kPackfileSection, &kRageOpenVSection, &kStoryModeSection, &kDirectStorageSection };
+		&kPackfileSection, &kBoxStreamerSection, &kRageOpenVSection, &kStoryModeSection, &kDirectStorageSection };
 
 	// The layout of TweaksV.ini this build writes and reads (INI_VERSION). It goes up only when a key
 	// changes its meaning or moves - new keys are simply added to an older file.
@@ -90,6 +91,9 @@ namespace TweaksV
 		Switch(kPackfileSection, "ENABLED", true),
 		Number(kPackfileSection, "PACKFILEARRAY_SIZE", 13000, 1, 65535, "Number of archives"),
 
+		Switch(kBoxStreamerSection, "ENABLED", true),
+		Number(kBoxStreamerSection, "TRAVERSAL_LIST_SIZE", 10000, 1000, 100000, "Map boxes one search of the box streamer can return (the game's own list holds 1000 - too few with heavy map mods, whose LODs then go missing)"),
+
 		Switch(kRageOpenVSection, "ENABLED", true),
 		Switch(kRageOpenVSection, "MODS_FOLDER", true, "Load replacement \"mods\" folder in the GTA V Enhanced directory"),
 		Switch(kRageOpenVSection, "OPEN_RPF", true, "Allow unencrypted (\"OPEN\") RPF archives"),
@@ -134,6 +138,7 @@ namespace TweaksV
 	inline constexpr const Setting& kHeapSize = FindSetting(kHeapSection, "HEAP_SIZE");
 	inline constexpr const Setting& kModkitArraySize = FindSetting(kModkitSection, "MODKITARRAY_SIZE");
 	inline constexpr const Setting& kPackfileArraySize = FindSetting(kPackfileSection, "PACKFILEARRAY_SIZE");
+	inline constexpr const Setting& kTraversalListSize = FindSetting(kBoxStreamerSection, "TRAVERSAL_LIST_SIZE");
 	inline constexpr const Setting& kModsFolder = FindSetting(kRageOpenVSection, "MODS_FOLDER");
 	inline constexpr const Setting& kOpenRpf = FindSetting(kRageOpenVSection, "OPEN_RPF");
 	inline constexpr const Setting& kSkipRpfCacheCheck = FindSetting(kRageOpenVSection, "SKIP_RPF_CACHE_CHECK");

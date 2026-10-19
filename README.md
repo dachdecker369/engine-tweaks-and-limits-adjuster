@@ -1,6 +1,6 @@
 # TweaksV
 
-TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.com/Chiheb-Bacha) into one plugin, `TweaksV.asi`, and adds a DirectStorage fix of its own.
+TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.com/Chiheb-Bacha) into one plugin, `TweaksV.asi`, and adds two parts of its own: a DirectStorage fix and a larger traversal list for the game's box streamer.
 
 ## Plugins Merged
 
@@ -25,13 +25,19 @@ For testing, two more switches log what happens and change nothing:
 
 The idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/DirectStorageFix); TweaksV's code is its own. With `DirectStorageFix.asi` installed, TweaksV switches its own DirectStorage part off.
 
+## Box streamer
+
+The game's box streamer finds the map boxes to stream for the area around the player and keeps what one search returns in a list of 1000 entries. With heavy map mods a search returns more: the boxes the list has no room for are never streamed, and their LODs are missing.
+
+`TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER_SETTINGS]` in `TweaksV.ini` (default 10000, up to 100000) moves the list to a larger one. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own.
+
 ## Design
 
 - **GTA V Enhanced Only:** TweaksV does nothing in Legacy.
 - **Generated Files:** `TweaksV.ini` and `TweaksV.log` are created on the first boot. Every feature can be switched off or on.
   - They go in the game folder, or in `%LOCALAPPDATA%\TweaksV` if the game folder is read-only.
   - The files in the game folder have priority.
-- **Merged Code:** Every original function keeps its name, each plugin lives in its own C++ namespace, and every change is marked `// TweaksV:`. Files keep their names, except each plugin's `Game` and `Logging` files, which get the plugin's name in front (`StraightToStoryMode_Game.cpp`). TweaksV's own code, the DirectStorage part included, is in the `TweaksV*` files and `dllmain.cpp`.
+- **Merged Code:** Every original function keeps its name, each plugin lives in its own C++ namespace, and every change is marked `// TweaksV:`. Files keep their names, except each plugin's `Game` and `Logging` files, which get the plugin's name in front (`StraightToStoryMode_Game.cpp`). TweaksV's own code, the DirectStorage and box streamer parts included, is in the `TweaksV*` files and `dllmain.cpp`.
 - **Shared Code:** Each setting is one entry in the table in `TweaksVSettings.h`, each byte pattern one in `TweaksVPatterns.h` (listed in [PATTERNS.md](PATTERNS.md)), and each feature one in `TweaksVFeatures.cpp`. Patches to the game's code go through `TweaksVPatch`, hooks on its functions through MinHook. A new feature is an entry in these tables, plus its own code.
 - **Upstream:** `upstream/` folder holds the original code as zip archives - makes future updates easier to compare.
 
@@ -76,7 +82,7 @@ Please report a security problem privately, not in a public issue: [SECURITY.md]
 
 ## Credits
 
-All credit for the merged plugins' research and code, and for the idea behind the DirectStorage part, goes to the authors listed in [CREDITS.md](CREDITS.md).
+All credit for the merged plugins' research and code, and for the ideas behind TweaksV's own parts, goes to the authors listed in [CREDITS.md](CREDITS.md).
 
 Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

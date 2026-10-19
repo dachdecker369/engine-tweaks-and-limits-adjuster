@@ -11,7 +11,7 @@ namespace TweaksV
 {
 	struct GamePattern
 	{
-		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, R- RageOpenV, S- StraightToStoryMode
+		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, R- RageOpenV, S- StraightToStoryMode
 		const char* text;	// the bytes in hex, one space apart; ? matches any byte
 	};
 
@@ -76,6 +76,14 @@ namespace TweaksV
 		{ "P-E-R30", "48 89 35 ? ? ? ? b9 ? ? ? ? ba ? ? ? ? e8 ? ? ? ? b9 ? ? ? ? 48 c7 44 08" },
 		{ "P-E-R31a", "BF 08 00 00 00 BE 10 00 00 00 4C 8D 05" },
 		{ "P-E-R31b", "41 ? ? ? ? ? ? ? ? ? ? 41 bb ? ? ? ? ? 8d" },
+
+		// BoxStreamer: the four sites that hand the traversal list's capacity to the tree search; the three
+		// that end in "4C 8D 2D" are followed by the lea that loads the list, whose other loads are found by
+		// their address (TweaksVBoxStreamer.cpp)
+		{ "B-E-L1", "48 8B 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 48 8D 54 24 60 4C 8D 44 24 70 4D 89 F1" },
+		{ "B-E-L2", "48 8B 81 08 01 00 00 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D" },
+		{ "B-E-L3", "0F 29 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D" },
+		{ "B-E-L4", "48 8B 01 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D" },
 
 		// RageOpenV: the console, the RPF cache check, the 8 file functions, the 5 encryption calls, the
 		// newmods mount call and archive function, and the game functions the newmods devices call

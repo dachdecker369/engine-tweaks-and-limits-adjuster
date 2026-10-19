@@ -26,7 +26,8 @@
   - A pattern miss is logged and returns null instead of exiting the game;
   - Malformed patterns no longer throw;
   - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match;
-  - A new search: only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. It compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than the original search, which went through the whole image almost byte by byte.
+  - A new search: only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. It compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than the original search, which went through the whole image almost byte by byte;
+  - A second search, built the same way, finds every `lea` that loads one address - for a static list the game loads in places no pattern can tell apart (the box streamer's).
 
 - **One patch module:** every patch to the game's code goes through `TweaksVPatch`, one writer for bytes and one for redirected calls (a hook on a function's start - RageOpenV's file and archive functions, DirectStorage's - is MinHook's, see T-HARDEN):
   - A group of writes is all or nothing: every page is made writable first, so a page that cannot be changed leaves the game as it was;
@@ -79,6 +80,14 @@
   - The original's link error (a variable defined in a header) is gone;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
+- **BoxStreamer (TweaksV's own part):** `[BOXSTREAMER_SETTINGS] TRAVERSAL_LIST_SIZE` (default 10000) is read from `TweaksV.ini`. The game's box streamer keeps the map boxes one search returns in a static list of 1000 entries; with heavy map mods it fills up, and the boxes it has no room for are never streamed, so their LODs are missing. TweaksV moves the list to a larger one and raises the capacity the game hands its tree searches:
+  - The idea is the CitizenFX Collective's fix for FiveM, as 0x-FADED ported it to GTA V Legacy. TweaksV's code is its own, written from the game's code alone: none of theirs was read;
+  - The four capacity sites are found by pattern and must agree on the game's own size. The list's address comes from the `lea` after three of them, and the game's code is scanned for every `lea` that loads it: exactly 8 must be found (two of the game's four query functions are near-identical copies, which no pattern tells apart), so a list another mod has moved, or a game that has changed, is left alone;
+  - The new list always has the full 100000 entries, as read/write data; the capacity is clamped to the game's own size..100000;
+  - The 8 references and the 4 capacities are written together, all or nothing;
+  - A failure is reported in the start-up summary and leaves the game as it was;
+  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+
 - **RageOpenV:** the mods folder, unencrypted (OPEN) RPF archives, the RPF cache check skip and the experimental newmods folder each have a switch in `[RAGEOPENV_SETTINGS]`, read from `TweaksV.ini` (no more `RageOpenV.ini`). Fixes:
   - Every hook group finds and checks all of its addresses first, and installs all of its hooks or none; a missing pattern no longer crashes the game;
   - Function starts worked out from a pattern are checked, and calls that another mod has already redirected are left alone;
@@ -109,7 +118,7 @@
 - **Build:** all of TweaksV's code, its own and the merged plugins', builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
   - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four. Control Flow Guard and CET only take effect in a game that turns them on itself, which GTA V Enhanced 1.0.1158.16 does not; TweaksV carries them so that it never leaves a gap in a game that does, nor is refused by one.
 
-- **Tests:** `test\` holds fake-game test suites (309 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (346 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 

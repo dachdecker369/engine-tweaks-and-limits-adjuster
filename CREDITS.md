@@ -26,6 +26,8 @@ TweaksV merges the projects below. All credit for the original research and code
 ## Ideas behind TweaksV's own parts
 
 - **alloc8or** - DirectStorageFix, the idea behind TweaksV's DirectStorage part (only its description is used, none of its code) - https://github.com/alloc8or/DirectStorageFix
+- **CitizenFX Collective** - the box streamer traversal list fix in FiveM, the idea behind TweaksV's BoxStreamer part (none of its code is used) - https://github.com/citizenfx/fivem
+- **Tanuki / 0x-FADED** - the port of that fix to GTA V Legacy (none of its code is used) - https://github.com/0x-FADED
 
 ## Libraries and tools
 

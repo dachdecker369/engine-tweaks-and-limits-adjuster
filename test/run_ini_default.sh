@@ -15,10 +15,11 @@ sed 's/$/\r/' "$T/expected_default.ini" > expected.ini
 check "TweaksV.ini is created" '[ -f TweaksV.ini ]'
 check "it is exactly the new default text (CRLF)" 'cmp -s TweaksV.ini expected.ini'
 check "the log says it was created" 'grep -q "Created TweaksV.ini with the default settings" TweaksV.log'
-check "log header: HEAP_SIZE=2000, PACKFILEARRAY_SIZE=13000 and INI_VERSION=1" 'grep -q "HeapAdjusterEnhanced: HEAP_SIZE=2000" TweaksV.log && grep -q "PackfileLimitAdjusterEnhanced: PACKFILEARRAY_SIZE=13000" TweaksV.log && grep -q "TweaksV: .*INI_VERSION=1" TweaksV.log'
+check "log header: HEAP_SIZE=2000, PACKFILEARRAY_SIZE=13000, TRAVERSAL_LIST_SIZE=10000 and INI_VERSION=1" 'grep -q "HeapAdjusterEnhanced: HEAP_SIZE=2000" TweaksV.log && grep -q "PackfileLimitAdjusterEnhanced: PACKFILEARRAY_SIZE=13000" TweaksV.log && grep -q "BoxStreamer: TRAVERSAL_LIST_SIZE=10000" TweaksV.log && grep -q "TweaksV: .*INI_VERSION=1" TweaksV.log'
 check "log header: NEWMODS=0 and CONSOLE=0" 'grep -q "NEWMODS=0" TweaksV.log && grep -q "CONSOLE=0" TweaksV.log'
 check "the heap is set to 2000 MB" 'grep -q "heap: 2000 MB" harness.out'
 check "the packfile limit is 13000" 'grep -q "I=13000" harness.out'
+check "the box streamer list capacity is 10000" 'grep -q "box caps: 10000 10000 10000 10000" harness.out'
 check "newmods is not mounted" 'grep -q "NEWMODS=0 - the newmods folder is not mounted" TweaksV.log'
 check "no message box was needed (harness finished)" 'grep -q "heap:" harness.out'
 
@@ -49,9 +50,9 @@ check "all five in one start-up summary, nothing written back" "grep -q 'Start-u
 echo "== a damaged TweaksV.ini (4 KB of random bytes) and an empty one: no crash, every key added, defaults used"
 perl -e 'srand(42); print map { chr(int(rand(256))) } 1..4096' > TweaksV.ini
 out=$(game full_game.exe); echo "      ${out:0:160}"
-check "random bytes: the game runs on with the defaults" "grep -q 'heap: 2000 MB' harness.out && [ \$(grep -c 'added the missing key' TweaksV.log) -eq 30 ]"
+check "random bytes: the game runs on with the defaults" "grep -q 'heap: 2000 MB' harness.out && [ \$(grep -c 'added the missing key' TweaksV.log) -eq 32 ]"
 : > TweaksV.ini
 out=$(game full_game.exe); echo "      ${out:0:160}"
-check "empty: every key added, the defaults used" "grep -q 'heap: 2000 MB' harness.out && [ \$(grep -c 'added the missing key' TweaksV.log) -eq 30 ]"
+check "empty: every key added, the defaults used" "grep -q 'heap: 2000 MB' harness.out && [ \$(grep -c 'added the missing key' TweaksV.log) -eq 32 ]"
 
 echo "INI DEFAULT CHECKS: $pass passed, $fail failed"

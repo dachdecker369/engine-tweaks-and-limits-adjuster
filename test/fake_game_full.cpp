@@ -1,7 +1,7 @@
 // Test harness for TweaksV: pretends to be GTA5_Enhanced.exe and contains copies of the game
-// code TweaksV patches: HeapAdjusterEnhanced's, StraightToStoryMode's, ModkitLimitAdjusterEnhanced's
-// and PackfileLimitAdjusterEnhanced's here, RageOpenV's in fake_game_rov.cpp. Prints every patch site
-// after TweaksV.asi has loaded.
+// code TweaksV patches: HeapAdjusterEnhanced's, StraightToStoryMode's, ModkitLimitAdjusterEnhanced's,
+// PackfileLimitAdjusterEnhanced's and the BoxStreamer part's here, RageOpenV's in fake_game_rov.cpp.
+// Prints every patch site after TweaksV.asi has loaded.
 // Link it with a version resource (fake_game_version.rc) for the game build to pretend to be.
 // Usage: GTA5_Enhanced.exe [TweaksV.asi] [options...]
 //   prepatched     StraightToStoryMode's patches are already applied (an old .asi ran first)
@@ -15,6 +15,11 @@
 //   packbadsize    the direct size limit holds an implausible 70000
 //   twor31a        a second, identical copy of the 1158.13+ packfile reference (its pattern matches twice)
 //   junkr31a       the game's obfuscated code that the old 1158.13+ reference pattern also matched
+//   boxmoved       every reference to the box streamer's traversal list points outside the game (another mod moved it)
+//   boxsplit       one reference to the list points somewhere else in the game
+//   boxninth       a ninth lea loads the list (a changed game)
+//   boxmismatch    one capacity of the list holds 1001 instead of 1000
+//   boxbadsize     every capacity of the list holds an implausible 200000
 //   dstorage       loads the stand-in dstorage.dll (fake_dstorage.cpp) before TweaksV, calls it after
 //   dsotherinterface  with dstorage: first asks for a DirectStorage interface TweaksV does not know
 //   fileopens      opens files in its folder (and one outside) after TweaksV has started
@@ -159,7 +164,42 @@ static Site g_packR31bSite = SITE(g_packR31b, 20);
 static Site g_packR31aCopySite = SITE(g_packR31aCopy, 13);
 static Site g_packIndirectSite = SITE(g_packI1, 2);
 static Site g_packCallSite = SITE(g_packH1, 17);	// the rel32 of the E8 at +0x10
+
+// BoxStreamer: the four sites that hand the capacity of the traversal list to the tree search
+// ("mov dword ptr [rsp+20h], 1000"), three of them followed by the "lea r13, [rip+disp32]" that loads
+// the list, and the other five leas that load it (two "lea r14", three "lea r13"). g_boxRef4 and
+// g_boxRef8 are the same bytes, as in the game, where two of the query functions are near-identical
+// copies: only a scan for every lea that loads the list finds both. The list itself is below, outside
+// this section, as the game's is.
+volatile unsigned char g_boxCap1[] = { 0x48, 0x8B, 0x44, 0x24, 0x40, 0x48, 0x8B, 0x48, 0x08, 0xC7, 0x44, 0x24, 0x20, 0xE8, 0x03, 0x00, 0x00,
+	0x48, 0x8D, 0x54, 0x24, 0x60, 0x4C, 0x8D, 0x44, 0x24, 0x70, 0x4D, 0x89, 0xF1, 0xCC };									// imm32 at +13
+volatile unsigned char g_boxCap2[] = { 0x48, 0x8B, 0x81, 0x08, 0x01, 0x00, 0x00, 0x48, 0x8B, 0x48, 0x08, 0xC7, 0x44, 0x24, 0x20, 0xE8, 0x03, 0x00, 0x00,
+	0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x89, 0x6C, 0x24, 0x38, 0x4D, 0x89, 0xE9, 0xE8, 0x11, 0x22, 0x33, 0x44, 0xCC };		// imm32 at +15, rel32 at +22
+volatile unsigned char g_boxCap3[] = { 0x0F, 0x29, 0x44, 0x24, 0x40, 0x48, 0x8B, 0x48, 0x08, 0xC7, 0x44, 0x24, 0x20, 0xE8, 0x03, 0x00, 0x00,
+	0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x8D, 0x54, 0x24, 0x40, 0x48, 0x89, 0x6C, 0x24, 0x30, 0xCC };							// imm32 at +13, rel32 at +20
+volatile unsigned char g_boxCap4[] = { 0x48, 0x8B, 0x01, 0x48, 0x8B, 0x48, 0x08, 0xC7, 0x44, 0x24, 0x20, 0xE8, 0x03, 0x00, 0x00,
+	0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x89, 0x6C, 0x24, 0x38, 0x4D, 0x89, 0xE9, 0xE8, 0x11, 0x22, 0x33, 0x44, 0xCC };		// imm32 at +11, rel32 at +18
+volatile unsigned char g_boxRef1[] = { 0x31, 0xC9, 0x4C, 0x8D, 0x35, 0, 0, 0, 0, 0x4C, 0x89, 0x64, 0x24, 0x50, 0x4C, 0x89, 0x4C, 0x24, 0x38, 0xEB, 0x14, 0xCC };	// rel32 at +5
+volatile unsigned char g_boxRef2[] = { 0x66, 0x89, 0x5F, 0x0A, 0x48, 0x89, 0x2F, 0x0F, 0xB7, 0x77, 0x08, 0x4C, 0x8D, 0x35, 0, 0, 0, 0, 0x8B, 0x54, 0x24, 0x2C, 0xCC };	// rel32 at +14
+volatile unsigned char g_boxRef4[] = { 0x44, 0x0F, 0xB6, 0x64, 0x24, 0x37, 0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x8B, 0x5C, 0x24, 0x40, 0x4C, 0x8B, 0x44, 0x24, 0x38,
+	0xE9, 0xEB, 0xFD, 0xFF, 0xFF, 0xCC };	// rel32 at +9
+volatile unsigned char g_boxRef6[] = { 0x44, 0x0F, 0xB6, 0x64, 0x24, 0x2F, 0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x8B, 0x6C, 0x24, 0x38, 0x4C, 0x8B, 0x44, 0x24, 0x30,
+	0xE9, 0xEA, 0xFD, 0xFF, 0xFF, 0xCC };	// rel32 at +9
+volatile unsigned char g_boxRef8[] = { 0x44, 0x0F, 0xB6, 0x64, 0x24, 0x37, 0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0x48, 0x8B, 0x5C, 0x24, 0x40, 0x4C, 0x8B, 0x44, 0x24, 0x38,
+	0xE9, 0xEB, 0xFD, 0xFF, 0xFF, 0xCC };	// rel32 at +9
+// a ninth lea, which the game does not have: its first byte becomes 4C only with the option "boxninth"
+volatile unsigned char g_boxRef9[] = { 0xCC, 0x8D, 0x05, 0, 0, 0, 0, 0xCC };	// rel32 at +3
+static Site g_boxCaps[] = { SITE(g_boxCap1, 13), SITE(g_boxCap2, 15), SITE(g_boxCap3, 13), SITE(g_boxCap4, 11) };
+static Site g_boxRefs[] = { SITE(g_boxRef1, 5), SITE(g_boxRef2, 14), SITE(g_boxCap2, 22), SITE(g_boxRef4, 9), SITE(g_boxCap3, 20),
+	SITE(g_boxRef6, 9), SITE(g_boxCap4, 18), SITE(g_boxRef8, 9) };
+static Site g_boxRef9Site = SITE(g_boxRef9, 3);
 #pragma data_seg()
+
+// The game's own traversal list (1000 entries of 8 bytes). The harness reaches it only through this
+// pointer, set when the program is loaded: none of its own code may load the list with a lea, which
+// TweaksV's scan for the game's loads of the list would count.
+static uint64_t g_oldBoxListStorage[1000];
+static uint64_t* volatile g_oldBoxList = g_oldBoxListStorage;
 
 // The game's own function behind the streaming configuration call.
 static int g_origCalls = 0;
@@ -340,6 +380,36 @@ static void PrintPackfile(int argc, wchar_t** argv)
 	}
 }
 
+// "box refs: 8 new 0 game 0 other (RW, 784 KB) | box caps: 10000 10000 10000 10000 | " - "new" is the
+// common target of the first reference when that is outside the game and not the other mod's address
+// (option "boxmoved")
+static void PrintBoxStreamer()
+{
+	const unsigned char* const oldList = reinterpret_cast<const unsigned char*>(g_oldBoxList);
+	const unsigned char* const otherMod = ImageEnd() + 0x30000;
+	const unsigned char* first = Rel32Target(g_boxRefs[0]);
+	const unsigned char* newList = InImage(first) || first == otherMod ? nullptr : first;
+	int moved = 0, game = 0, other = 0;
+	for (const Site& site : g_boxRefs)
+	{
+		const unsigned char* target = Rel32Target(site);
+		if (target == oldList)
+			game++;
+		else if (newList && target == newList)
+			moved++;
+		else
+			other++;
+	}
+	wprintf(L"box refs: %d new %d game %d other", moved, game, other);
+	if (newList)
+	{
+		wprintf(L" (");
+		PrintNewArray(newList);
+		wprintf(L")");
+	}
+	wprintf(L" | box caps: %u %u %u %u | ", Imm32(g_boxCaps[0]), Imm32(g_boxCaps[1]), Imm32(g_boxCaps[2]), Imm32(g_boxCaps[3]));
+}
+
 // Every site is written once before TweaksV loads, so all their pages are private copies alike; then
 // the whole section is made read+execute, as the game's code is (MakeSitesReadExecute). TweaksV must
 // make each page it patches writable and give it its own protection back.
@@ -353,12 +423,14 @@ static void ForEachSite(void (*fn)(const Site&))
 {
 	static Site singles[] = { SITE(g_heapSite, 0), SITE(g_splashSite, 0), SITE(g_legalSite, 0), SITE(g_landingSite, 0),
 		SITE(g_landingCallee, 0), SITE(g_packI1, 0), SITE(g_packH1, 0), SITE(g_packR31a, 0), SITE(g_packR31b, 0),
-		SITE(g_packR31aCopy, 0) };
+		SITE(g_packR31aCopy, 0), SITE(g_boxRef9, 0) };
 	for (const Site& site : singles) fn(site);
 	for (const Site& site : g_modkitRefs) fn(site);
 	for (const Site& site : g_modkitLimits) fn(site);
 	for (const Site& site : g_packDirect) fn(site);
 	for (const Site& site : g_packRefs) fn(site);
+	for (const Site& site : g_boxCaps) fn(site);
+	for (const Site& site : g_boxRefs) fn(site);
 	Site indirect = { reinterpret_cast<volatile unsigned char*>(&g_packIndirectSize), 0, sizeof(g_packIndirectSize) };
 	fn(indirect);
 }
@@ -578,6 +650,24 @@ int wmain(int argc, wchar_t** argv)
 		for (const Site& site : g_packDirect)
 			SetImm32(site, 70000);
 
+	// Every reference to the box streamer's traversal list points at the game's own list, and every
+	// capacity holds its 1000 entries...
+	for (const Site& site : g_boxRefs)
+		SetRel32(site, g_oldBoxList);
+	SetRel32(g_boxRef9Site, g_oldBoxList);
+	if (HasOption(argc, argv, L"boxmoved"))		// ...unless another mod moved the list already
+		for (const Site& site : g_boxRefs)
+			SetRel32(site, ImageEnd() + 0x30000);
+	if (HasOption(argc, argv, L"boxsplit"))		// ...or one points somewhere else in the game
+		SetRel32(g_boxRefs[1], g_oldBoxList + 8);
+	if (HasOption(argc, argv, L"boxninth"))		// ...or a ninth lea loads the list
+		g_boxRef9[0] = 0x4C;
+	if (HasOption(argc, argv, L"boxmismatch"))	// one capacity holds 1001 instead of 1000
+		SetImm32(g_boxCaps[2], 1001);
+	if (HasOption(argc, argv, L"boxbadsize"))	// an implausible capacity
+		for (const Site& site : g_boxCaps)
+			SetImm32(site, 200000);
+
 	RovSetup(argc, argv);
 	ForEachSite(TouchSite);
 	RovForEachDataSite(TouchData);
@@ -628,6 +718,7 @@ int wmain(int argc, wchar_t** argv)
 	ForEachSite(CheckSite);
 	RovForEachDataSite(CheckData);
 	PrintPackfile(argc, argv);
+	PrintBoxStreamer();
 	RovReport();
 	wprintf(L"%ls%ls", g_dstorageResult, g_fileOpensResult);
 	CheckStub(Rel32Target(g_packCallSite));

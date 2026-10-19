@@ -31,6 +31,9 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVBoxStreamer.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVConflicts.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -123,6 +126,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="TweaksVBoxStreamer.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVConflicts.h">
       <Filter>TweaksV</Filter>
     </ClInclude>

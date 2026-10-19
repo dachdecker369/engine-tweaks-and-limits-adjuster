@@ -12,6 +12,7 @@
 #include "PackfileLimitAdjusterEnhanced_Game.h"
 #include "main.h"
 #include "StraightToStoryMode_Game.h"
+#include "TweaksVBoxStreamer.h"
 #include "TweaksVDirectStorage.h"
 #include "TweaksVSummary.h"
 
@@ -20,9 +21,10 @@ namespace TweaksV
 	namespace
 	{
 		// The five original plugins in the order an ASI loader loaded their .asi files (alphabetical),
-		// then TweaksV's own DirectStorage part. ZHeapAdjuster.asi is the rename the HeapAdjuster author
-		// recommends; OpenRPF.asi and OpenIV.asi do RageOpenV's job, and alloc8or's DirectStorageFix.asi
-		// that of the DirectStorage part.
+		// TweaksV's own box streamer part among the limit adjusters, and its DirectStorage part last.
+		// ZHeapAdjuster.asi is the rename the HeapAdjuster author recommends; OpenRPF.asi and OpenIV.asi
+		// do RageOpenV's job, and alloc8or's DirectStorageFix.asi that of the DirectStorage part. No
+		// stand-alone plugin does the box streamer part's job in GTA V Enhanced.
 		constexpr Feature kFeatures[] = {
 			{ &kHeapSection, { L"HeapAdjuster.asi", L"ZHeapAdjuster.asi" },
 				[] { HeapAdjusterEnhanced::initializeGame(); return false; } },
@@ -30,6 +32,8 @@ namespace TweaksV
 				[] { ModkitLimitAdjusterEnhanced::initializeGame(); return false; } },
 			{ &kPackfileSection, { L"PackfileLimitAdjusterEnhanced.asi" },
 				[] { PackfileLimitAdjusterEnhanced::initializeGame(); return false; } },
+			{ &kBoxStreamerSection, {},
+				[] { InitBoxStreamer(); return false; } },
 			// RageOpenV's start-up runs later, in its GetSystemTimeAsFileTime hook, which then shows the summary
 			{ &kRageOpenVSection, { L"RageOpenV.asi", L"OpenRPF.asi", L"OpenIV.asi" },
 				[] { return RageOpenV::DllMain(nullptr, DLL_PROCESS_ATTACH, nullptr) != FALSE; } },
