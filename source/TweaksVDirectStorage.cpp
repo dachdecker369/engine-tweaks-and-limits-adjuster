@@ -8,11 +8,12 @@
 //                   files it reads; OpenFile refuses the folder's other files as not found, so they stay
 //                   free. Files outside the game folder are never refused: the game reads its saves and
 //                   settings (Documents\Rockstar Games\...\Profiles) through OpenFile, too.
-//   LOG_CALLS       testing: the game's calls into DirectStorage (DStorageSetConfiguration, ...1,
-//                   DStorageGetFactory and the factory's OpenFile) and the code that made them
-//   LOG_FILE_OPENS  testing: every open (NtCreateFile) of a file or folder inside the game folder:
-//                   the access and sharing asked for, the result and the code that asked for it, plus
-//                   a summary every minute
+//   DIAGNOSTIC_MODE the game's calls into DirectStorage (DStorageSetConfiguration, ...1,
+//                   DStorageGetFactory and the factory's OpenFile) with the code that made them, the
+//                   factory's functions and the configuration values, and every open (NtCreateFile) of
+//                   a file or folder inside the game folder: the access and sharing asked for, the
+//                   result and the code that asked for it, 20,000 lines at most, plus a summary every
+//                   minute
 // Written for TweaksV; the idea comes from alloc8or's DirectStorageFix.
 
 #include "TweaksVDirectStorage.h"
@@ -57,7 +58,7 @@ namespace TweaksV
 
 		// The switches, read once: the hooks never read TweaksV.ini.
 		bool g_unlockFiles = false;				// UNLOCK_FILES
-		bool g_logCalls = false;				// LOG_CALLS
+		bool g_logCalls = false;				// DIAGNOSTIC_MODE: the calls into DirectStorage are logged
 		bool g_diagnostic = false;				// DIAGNOSTIC_MODE
 		std::wstring g_gameFolder;				// without a trailing backslash
 
@@ -342,7 +343,7 @@ namespace TweaksV
 				std::to_string(HIWORD(info->dwFileVersionLS)) + "." + std::to_string(LOWORD(info->dwFileVersionLS));
 		}
 
-		// ---- LOG_FILE_OPENS
+		// ---- the file opens (DIAGNOSTIC_MODE)
 
 		using NtCreateFileFn = NTSTATUS(NTAPI*)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PIO_STATUS_BLOCK,
 			PLARGE_INTEGER, ULONG, ULONG, ULONG, ULONG, PVOID, ULONG);
@@ -454,7 +455,7 @@ namespace TweaksV
 			{
 				++g_notShown;
 				if (line == kMaxLines + 1)
-					WriteLog(kTag, "LOG_FILE_OPENS: " + std::to_string(kMaxLines) + " open lines written - from now on "
+					WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(kMaxLines) + " open lines written - from now on "
 						"the opens are only counted (see the summaries).");
 				return;
 			}
@@ -662,7 +663,7 @@ namespace TweaksV
 			return 0;
 		}
 
-		// LOG_CALLS: every call; otherwise only the refusals after the summary, which are rare.
+		// DIAGNOSTIC_MODE: every call; otherwise only the refusals after the summary, which are rare.
 		void LogOpenFile(uint64_t number, std::wstring_view path, bool readable, bool refused, HRESULT result)
 		{
 			const std::string name = readable ? ShortPath(path) : std::string("(unreadable path)");
@@ -745,13 +746,13 @@ namespace TweaksV
 		void HookFactoryOpenFile(REFIID riid, void** ppv)
 		{
 			const ExclusiveLock lock(g_openFileLock);	// a second caller waits until OpenFile is hooked
-			// with UNLOCK_FILES a failure is a problem for the start-up summary; for LOG_CALLS alone a log line
+			// with UNLOCK_FILES a failure is a problem for the start-up summary; for DIAGNOSTIC_MODE alone a log line
 			const auto fail = [](const std::string& why)
 			{
 				if (g_unlockFiles)
 					ReportFailure(kTag, "The files in the game folder are not unlocked this session: " + why + ".");
 				else
-					WriteLog(kTag, "LOG_CALLS: OpenFile is not logged: " + why + ".");
+					WriteLog(kTag, "DIAGNOSTIC: OpenFile is not logged: " + why + ".");
 			};
 			if (!IsEqualGUID(riid, kFactoryId))
 			{
@@ -796,11 +797,11 @@ namespace TweaksV
 				WriteLog(kTag, "UNLOCK_FILES: from now on DirectStorage may open only the .rpf and .cache files in the game "
 					"folder (OpenFile at " + DescribeCode(target) + " hooked); files outside it are not touched.");
 			else
-				WriteLog(kTag, "LOG_CALLS: the game's OpenFile calls are logged (OpenFile at " + DescribeCode(target) +
+				WriteLog(kTag, "DIAGNOSTIC: the game's OpenFile calls are logged (OpenFile at " + DescribeCode(target) +
 					" hooked); UNLOCK_FILES=0, so every file is opened.");
 		}
 
-		// ---- LOG_CALLS
+		// ---- the calls into DirectStorage (DIAGNOSTIC_MODE)
 
 		using GetFactoryFn = HRESULT(WINAPI*)(REFIID riid, void** ppv);
 		using SetConfigurationFn = HRESULT(WINAPI*)(const void* configuration);
@@ -952,22 +953,23 @@ namespace TweaksV
 	void InitDirectStorage()
 	{
 		const bool unlock = IsOn(kUnlockFiles);
-		const bool logCalls = IsOn(kLogCalls);
-		const bool logOpens = IsOn(kLogFileOpens);
-		if (!unlock && !logCalls && !logOpens)
+		const bool diagnostic = IsDiagnosticMode();	// the calls into DirectStorage and the file opens are logged
+		const bool logCalls = diagnostic;
+		const bool logOpens = diagnostic;
+		if (!unlock && !diagnostic)
 		{
-			WriteLog(kTag, "UNLOCK_FILES=0, LOG_CALLS=0 and LOG_FILE_OPENS=0 - nothing to do.");
+			WriteLog(kTag, "UNLOCK_FILES=0 and DIAGNOSTIC_MODE=0 - nothing to do.");
 			return;
 		}
 
 		g_unlockFiles = unlock;
 		g_logCalls = logCalls;
-		g_diagnostic = IsDiagnosticMode();
+		g_diagnostic = diagnostic;
 		g_gameFolder = GetGameFolder();
 		const bool loaded = GetModuleHandleW(L"dstorage.dll") != nullptr;
 		WriteLog(kTag, "dstorage.dll " + FileVersionOf(g_gameFolder + L"\\dstorage.dll") + ", dstoragecore.dll " +
 			FileVersionOf(g_gameFolder + L"\\dstoragecore.dll") + "; dstorage.dll is " + (loaded ? "loaded" : "not loaded") + ".");
-		const std::wstring fix = FindDirectStorageFix();	// only with CHECK_FOR_CONFLICTS=0: otherwise this part is off
+		const std::wstring fix = FindDirectStorageFix();	// only with CONFLICT_CHECK=0: otherwise this part is off
 		if (!fix.empty())
 			WriteLog(kTag, "Note: " + ToUtf8(fix) + " is installed as well - it changes DirectStorage's file opens, too.");
 
@@ -1015,7 +1017,7 @@ namespace TweaksV
 						reinterpret_cast<LPVOID*>(&g_originalSetConfiguration)) ? 1 : 0;
 					hooked += InstallHook(L"dstorage.dll", "DStorageSetConfiguration1", reinterpret_cast<LPVOID>(&HookSetConfiguration1),
 						reinterpret_cast<LPVOID*>(&g_originalSetConfiguration1)) ? 1 : 0;
-					WriteLog(kTag, "LOG_CALLS: the game's DirectStorage calls are logged (" + std::to_string(hooked) +
+					WriteLog(kTag, "DIAGNOSTIC: the game's DirectStorage calls are logged (" + std::to_string(hooked) +
 						" of 3 functions hooked).");
 				}
 				if (unlock && factory)
@@ -1030,7 +1032,7 @@ namespace TweaksV
 		if (logOpens && InstallHook(L"ntdll.dll", "NtCreateFile", reinterpret_cast<LPVOID>(&HookNtCreateFile),
 			reinterpret_cast<LPVOID*>(&g_originalNtCreateFile)))
 		{
-			WriteLog(kTag, "LOG_FILE_OPENS: every open of a file or folder in " + ToUtf8(g_gameFolder) + " is logged, " +
+			WriteLog(kTag, "DIAGNOSTIC: every open of a file or folder in " + ToUtf8(g_gameFolder) + " is logged, " +
 				std::to_string(kLinesPerWay) + " lines per file, caller and sharing; a summary follows every minute.");
 			const HANDLE thread = CreateThread(nullptr, 0, SummaryThread, nullptr, 0, nullptr);
 			if (thread)

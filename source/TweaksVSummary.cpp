@@ -70,7 +70,7 @@ namespace TweaksV
 			if (dropped > 0)
 				text += L"• ... and " + std::to_wstring(dropped) + L" more.\n\n";
 			text += L"The game continues without the affected parts. Details are in TweaksV.log:\n" + GetLogPathW() +
-				L"\n\nTo stop this message, set SHOW_ERROR_POPUPS=0 in TweaksV.ini.";
+				L"\n\nTo stop this message, set ERROR_POPUP=0 in TweaksV.ini.";
 			MessageBoxW(nullptr, text.c_str(), L"TweaksV", MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST);
 		}
 
@@ -96,8 +96,8 @@ namespace TweaksV
 				if (items.empty())
 					break;
 
-				if (!IsOn(kShowErrorPopups))
-					WriteLog("TweaksV", "Problem after the start-up summary not shown (SHOW_ERROR_POPUPS=0): " +
+				if (!IsOn(kErrorPopup))
+					WriteLog("TweaksV", "Problem after the start-up summary not shown (ERROR_POPUP=0): " +
 						std::to_string(items.size()) + " problem(s), see above.");
 				else if (g_lateBoxes >= kMaxLateBoxes)
 					WriteLog("TweaksV", "Problem after the start-up summary not shown: " + std::to_string(kMaxLateBoxes) +
@@ -155,9 +155,9 @@ namespace TweaksV
 
 		if (!first || items.empty())
 			return;
-		if (!IsOn(kShowErrorPopups))
+		if (!IsOn(kErrorPopup))
 		{
-			WriteLog("TweaksV", "Start-up summary not shown (SHOW_ERROR_POPUPS=0): " + std::to_string(items.size() + dropped) +
+			WriteLog("TweaksV", "Start-up summary not shown (ERROR_POPUP=0): " + std::to_string(items.size() + dropped) +
 				" problem(s), see above.");
 			return;
 		}

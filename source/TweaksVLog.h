@@ -30,7 +30,7 @@ namespace TweaksV
 	// RageOpenV's DllMain so the console also works when RageOpenV is off.
 	void OpenConsole();
 
-	// Absolute path of the log file in use: empty if none could be opened, "(off - LOG_TO_FILE=0)"
+	// Absolute path of the log file in use: empty if none could be opened, "(off - LOG=0)"
 	// if logging to a file is off, and the game folder's TweaksV.log before ClearLogFile() has run.
 	std::wstring GetLogPathW();
 

@@ -33,17 +33,11 @@ public:
 
 	static bool get_log(const char* key)
 	{
-		// TweaksV: [log] info/mods/device are LOG_INFO/LOG_MODS/LOG_DEVICE in [RAGEOPENV_SETTINGS],
-		// read once and kept; "rpf" was never read and is gone
-		static const bool info = TweaksV::IsOn(TweaksV::kLogInfo);
-		static const bool mods = TweaksV::IsOn(TweaksV::kLogMods);
-		static const bool device = TweaksV::IsOn(TweaksV::kLogDevice);
-		if (strcmp(key, "info") == 0)
-			return info;
-		if (strcmp(key, "mods") == 0)
-			return mods;
-		if (strcmp(key, "device") == 0)
-			return device;
+		// TweaksV: [log] info and mods follow DIAGNOSTIC_MODE under [TWEAKSV], the one testing switch of
+		// 2.0.0, read once and kept; "device" went with the newmods folder, "rpf" was never read
+		static const bool diagnostic = TweaksV::IsDiagnosticMode();
+		if (strcmp(key, "info") == 0 || strcmp(key, "mods") == 0)
+			return diagnostic;
 		return false;
 	}
 };

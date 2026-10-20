@@ -7,9 +7,9 @@
 // ("mov dword ptr [rsp+20h], 1000"); a search stops at the capacity minus 16. With heavy map mods the
 // list fills up, and the boxes it has no room for are never streamed: their LODs are missing.
 //   TRAVERSAL_LIST_SIZE  the new list's capacity, from the game's own 1000 up to 100000
-//   LOG_SEARCHES         testing: the four calls to the tree searches go through TweaksV's call stubs
-//                        to a wrapper that only counts; 10 seconds in and then every minute, the log
-//                        says how many searches ran, the most entries one returned and how many
+//   DIAGNOSTIC_MODE      the measurement: the four calls to the tree searches go through TweaksV's call
+//                        stubs to a wrapper that only counts; 10 seconds in and then every minute, the
+//                        log says how many searches ran, the most entries one returned and how many
 //                        returned more than the game's own list could hold - the number that says
 //                        whether a map load needs the larger list at all
 // Eight "lea r64, [rip+disp32]" load the list, two per query function. Two of the functions are
@@ -52,7 +52,7 @@ namespace TweaksV
 		constexpr size_t kLeaSize = 7;				// REX.W, 8D, ModRM, disp32
 		constexpr size_t kTreeSearches = 2;			// the tree searches the query functions call
 		constexpr int kSearchHeadroom = 16;			// a search stops this many entries short of the capacity
-		constexpr DWORD kFirstSummaryMs = 10000;	// LOG_SEARCHES: the first summary, then one every minute
+		constexpr DWORD kFirstSummaryMs = 10000;	// DIAGNOSTIC_MODE: the first summary, then one every minute
 		constexpr DWORD kSummaryEveryMs = 60000;
 
 		// A capacity site: where the imm32 of "mov dword ptr [rsp+20h], imm32" lies in the pattern's match;
@@ -82,7 +82,7 @@ namespace TweaksV
 				"(details in TweaksV.log).");
 		}
 
-		// ---- LOG_SEARCHES
+		// ---- the measurement (DIAGNOSTIC_MODE)
 
 		// The tree searches' arguments: the tree, the area's two corners, the list and its capacity; the
 		// result is the number of entries written (0 or less: none).
@@ -125,7 +125,7 @@ namespace TweaksV
 
 		void LogSummary()
 		{
-			WriteLog(kTag, "LOG_SEARCHES: " + std::to_string(g_searches.load()) + " searches so far; the largest returned " +
+			WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(g_searches.load()) + " searches so far; the largest returned " +
 				std::to_string(g_largest.load()) + " of " + std::to_string(g_capacity) + " entries; " +
 				std::to_string(g_overVanilla.load()) + " returned more than the game's own list (" + std::to_string(g_vanillaSize) +
 				" entries) could hold.");
@@ -155,10 +155,10 @@ namespace TweaksV
 
 	void InitBoxStreamer()
 	{
-		const bool logSearches = IsOn(kLogSearches);
+		const bool logSearches = IsDiagnosticMode();	// the measurement: the four tree-search calls are counted
 
 		// 1. the four capacity sites: every one must be the expected instruction and hold the same size -
-		// the game's own - and the lea after three of them must load the same list. With LOG_SEARCHES,
+		// the game's own - and the lea after three of them must load the same list. With DIAGNOSTIC_MODE,
 		// the call after each must lead into the game, and each pair to the same tree search.
 		uint8_t* capacities[std::size(kCapacitySites)] = {};
 		uint8_t* calls[std::size(kCapacitySites)] = {};
@@ -285,7 +285,7 @@ namespace TweaksV
 			WriteLog(kTag, "DRY_RUN: would move the box streamer's traversal list (" + std::to_string(references.size()) +
 				" references) and raise its capacity from " + std::to_string(gameSize) + " to " + std::to_string(size) + " (" +
 				std::to_string(std::size(capacities)) + " sites)" +
-				(logSearches ? " and redirect the " + std::to_string(std::size(calls)) + " tree-search calls (LOG_SEARCHES)" : std::string()) + ".");
+				(logSearches ? " and redirect the " + std::to_string(std::size(calls)) + " tree-search calls (DIAGNOSTIC_MODE)" : std::string()) + ".");
 			return;
 		}
 
@@ -299,7 +299,7 @@ namespace TweaksV
 		}
 
 		// 5. one write, all or nothing: the eight references to the new list, the four capacities to its
-		// size and, with LOG_SEARCHES, the four calls to the counting wrappers
+		// size and, with DIAGNOSTIC_MODE, the four calls to the counting wrappers
 		std::vector<CodeWrite> writes;
 		for (uint8_t* reference : references)
 		{
@@ -342,13 +342,13 @@ namespace TweaksV
 			std::to_string(size) + " entries.");
 		if (logSearches)
 		{
-			WriteLog(kTag, "LOG_SEARCHES: the " + std::to_string(std::size(calls)) + " tree-search calls are counted; a summary follows "
+			WriteLog(kTag, "DIAGNOSTIC: the " + std::to_string(std::size(calls)) + " tree-search calls are counted; a summary follows "
 				"after 10 seconds, then every minute while the numbers change.");
 			const HANDLE thread = CreateThread(nullptr, 0, SummaryThread, nullptr, 0, nullptr);
 			if (thread)
 				CloseHandle(thread);
 			else
-				ReportFailure(kTag, "LOG_SEARCHES: the summary thread could not be started (" + DescribeError(GetLastError()) +
+				ReportFailure(kTag, "DIAGNOSTIC: the summary thread could not be started (" + DescribeError(GetLastError()) +
 					") - the searches are counted but never logged.");
 		}
 	}

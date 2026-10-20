@@ -19,24 +19,24 @@ check "heap and story mode still applied" "[[ \"\$out\" == *'heap: 1024 MB'* && 
 check "no problems" "! log_has 'PROBLEM'"
 
 echo "== K2 MODKITARRAY_SIZE=4096: limits for 4096, array still full size"
-fresh_ini; setkey MODKITARRAY_SIZE 4096 MODKIT_SETTINGS; out=$(game full_game.exe); echo "      $out"
+fresh_ini; setkey MODKITARRAY_SIZE 4096 MODKIT_LIMIT; out=$(game full_game.exe); echo "      $out"
 check "limits 4095/4099/8192" "[[ \"\$out\" == *'limits: 4095 4099 4099 4099 4099 8192 4095 4095'* ]]"
 check "array still 128 KB" "[[ \"\$out\" == *\"$NEW_ARRAY\"* ]]"
 
 echo "== K3 MODKITARRAY_SIZE=500 is raised to the game's own 1024"
-fresh_ini; setkey MODKITARRAY_SIZE 500 MODKIT_SETTINGS; out=$(game full_game.exe); echo "      $out"
+fresh_ini; setkey MODKITARRAY_SIZE 500 MODKIT_LIMIT; out=$(game full_game.exe); echo "      $out"
 check "limits stay at the game's values" "[[ \"\$out\" == *\"$GAME_LIMITS\"* ]]"
 check "clamp logged" "log_has 'MODKITARRAY_SIZE=500 is outside 1024..65536 - using 1024'"
 
 echo "== K4 MODKITARRAY_SIZE=70000 is clamped to 65536"
-fresh_ini; setkey MODKITARRAY_SIZE 70000 MODKIT_SETTINGS; out=$(game full_game.exe)
+fresh_ini; setkey MODKITARRAY_SIZE 70000 MODKIT_LIMIT; out=$(game full_game.exe)
 check "limits for 65536" "[[ \"\$out\" == *\"$MAX_LIMITS\"* ]]"
-check "clamp reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[MODKIT_SETTINGS\] MODKITARRAY_SIZE=70000 is outside 1..65536 - using 65536.'"
+check "clamp reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[MODKIT_LIMIT\] MODKITARRAY_SIZE=70000 is outside 1..65536 - using 65536.'"
 
 echo "== K5 MODKITARRAY_SIZE=abc falls back to the default 65536"
-fresh_ini; setkey MODKITARRAY_SIZE abc MODKIT_SETTINGS; out=$(game full_game.exe)
+fresh_ini; setkey MODKITARRAY_SIZE abc MODKIT_LIMIT; out=$(game full_game.exe)
 check "limits for 65536" "[[ \"\$out\" == *\"$MAX_LIMITS\"* ]]"
-check "invalid value reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[MODKIT_SETTINGS\] MODKITARRAY_SIZE=abc is not a number - using 65536.'"
+check "invalid value reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[MODKIT_LIMIT\] MODKITARRAY_SIZE=abc is not a number - using 65536.'"
 
 echo "== K6 DRY_RUN=1: everything found and checked, nothing written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
@@ -50,8 +50,8 @@ check "the 14 modkit patterns each found exactly once" "[ \$(grep -c -E 'Pattern
 check "6 references logged" "[ \$(count 'ModkitLimitAdjusterEnhanced\] DIAGNOSTIC: reference at RVA') -eq 6 ]"
 check "8 limits logged, all decoding to 1024" "[ \$(count 'DIAGNOSTIC: limit at RVA .* -> game size 1024') -eq 8 ]"
 
-echo "== K8 [MODKIT_SETTINGS] ENABLED=0"
-fresh_ini; setkey ENABLED 0 MODKIT_SETTINGS; out=$(game full_game.exe)
+echo "== K8 [MODKIT_LIMIT] ENABLED=0"
+fresh_ini; setkey ENABLED 0 MODKIT_LIMIT; out=$(game full_game.exe)
 check "nothing changed" "[[ \"\$out\" == *'modkit refs: game array'* && \"\$out\" == *\"$GAME_LIMITS\"* ]]"
 check "no modkit lines" "! log_has '\[ModkitLimitAdjusterEnhanced\]'"
 

@@ -91,12 +91,6 @@
     <ClCompile Include="PackfileLimitAdjusterEnhanced_Logging.cpp">
       <Filter>PackfileLimitAdjusterEnhanced</Filter>
     </ClCompile>
-    <ClCompile Include="CustomDevice.cpp">
-      <Filter>RageOpenV</Filter>
-    </ClCompile>
-    <ClCompile Include="fiDevice.cpp">
-      <Filter>RageOpenV</Filter>
-    </ClCompile>
     <ClCompile Include="FileReadHooks.cpp">
       <Filter>RageOpenV</Filter>
     </ClCompile>

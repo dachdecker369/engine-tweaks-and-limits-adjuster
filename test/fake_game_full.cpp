@@ -179,7 +179,7 @@ static Site g_packCallSite = SITE(g_packH1, 17);	// the rel32 of the E8 at +0x10
 
 // BoxStreamer: the four sites that hand the capacity of the traversal list to the tree search
 // ("mov dword ptr [rsp+20h], 1000"), three of them followed by the "lea r13, [rip+disp32]" that loads
-// the list, each followed by the "call rel32" to the tree search (LOG_SEARCHES redirects it), and the
+// the list, each followed by the "call rel32" to the tree search (DIAGNOSTIC_MODE redirects it), and the
 // other five leas that load the list (two "lea r14", three "lea r13"). g_boxRef4 and g_boxRef8 are the
 // same bytes, as in the game, where two of the query functions are near-identical copies: only a scan
 // for every lea that loads the list finds both. The list itself and the two tree searches are below,
@@ -692,7 +692,7 @@ static void CheckStub(const unsigned char* callTarget)
 		g_writableStubs++;
 }
 
-// DirectStorage (TweaksV's UNLOCK_FILES and LOG_CALLS): the calls the game makes into dstorage.dll,
+// DirectStorage (TweaksV's UNLOCK_FILES and DIAGNOSTIC_MODE): the calls the game makes into dstorage.dll,
 // and the factory's OpenFile for 3 archives (one with a full path) and 3 other files.
 static wchar_t g_dstorageResult[400];
 static void CallDStorage(HMODULE dstorage, bool otherInterfaceFirst)
@@ -751,7 +751,7 @@ static void CallDStorage(HMODULE dstorage, bool otherInterfaceFirst)
 		results[5], results[6], results[7], openFileCalls());
 }
 
-// File opens in the game folder (TweaksV's LOG_FILE_OPENS): one file 6 times with the same sharing,
+// File opens in the game folder (TweaksV's DIAGNOSTIC_MODE): one file 6 times with the same sharing,
 // a missing file, the folder itself, a file in a subfolder and a file outside the game folder.
 static wchar_t g_fileOpensResult[160];
 static void OpenFiles()

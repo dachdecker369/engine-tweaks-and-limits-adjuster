@@ -20,7 +20,7 @@ check() { if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL 
 # setkey KEY VALUE [SECTION]: the first KEY in the file, or the KEY in [SECTION].
 # addkey KEY VALUE: a key under [TWEAKSV] that the file does not have yet.
 INI=base.ini
-fresh_ini() { sed 's/$/\r/' "$T/${1:-$INI}" > TweaksV.ini; setkey SHOW_ERROR_POPUPS 0; }
+fresh_ini() { sed 's/$/\r/' "$T/${1:-$INI}" > TweaksV.ini; setkey ERROR_POPUP 0; }
 setkey() {
 	if [ -n "${3:-}" ]; then sed -b -i "/^\[$3\]/,/^\[/s/^$1=.*\r\$/$1=$2\r/" TweaksV.ini
 	else sed -b -i "0,/^$1=.*\r\$/s//$1=$2\r/" TweaksV.ini; fi

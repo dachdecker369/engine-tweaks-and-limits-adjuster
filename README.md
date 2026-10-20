@@ -16,12 +16,9 @@ TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.
 
 With DirectStorage on, GTA V Enhanced opens the files in its folder at start-up, not just its archives, and keeps them open. Other programs can then only read them: while the game runs, mods can't write their own files there and scripts can't be reloaded.
 
-`UNLOCK_FILES=1` under `[DIRECTSTORAGE_SETTINGS]` in `TweaksV.ini` (on by default) lets DirectStorage open only the `.rpf` and `.cache` files in the game folder, the ones it reads there. Every other file in the game folder stays free. Files outside the game folder are never refused: the game reads its saves and settings through DirectStorage, too.
+`UNLOCK_FILES=1` under `[DIRECTSTORAGE]` in `TweaksV.ini` (on by default) lets DirectStorage open only the `.rpf` and `.cache` files in the game folder, the ones it reads there. Every other file in the game folder stays free. Files outside the game folder are never refused: the game reads its saves and settings through DirectStorage, too.
 
-For testing, two more switches log what happens and change nothing:
-
-- `LOG_CALLS=1` logs the game's calls into DirectStorage, including every file it asks DirectStorage to open.
-- `LOG_FILE_OPENS=1` logs every file and folder in the game folder that is opened, with its access, sharing, result and caller.
+With `DIAGNOSTIC_MODE=1` the part logs the game's calls into DirectStorage, including every file it asks DirectStorage to open, and every file and folder in the game folder that is opened, with its access, sharing, result and caller (see "TweaksV.ini" below).
 
 The idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/DirectStorageFix); TweaksV's code is its own. With `DirectStorageFix.asi` installed, TweaksV switches its own DirectStorage part off.
 
@@ -29,17 +26,49 @@ The idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/Di
 
 The game's box streamer finds the map boxes to stream for the area around the player and keeps what one search returns in a list of 1000 entries. With heavy map mods a search returns more: the boxes the list has no room for are never streamed, and their LODs are missing.
 
-`TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER_SETTINGS]` in `TweaksV.ini` (default 10000, up to 100000) moves the list to a larger one. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own.
+`TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER]` in `TweaksV.ini` (default 10000, up to 100000) moves the list to a larger one. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own.
 
-For testing, `LOG_SEARCHES=1` logs every minute how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all.
+With `DIAGNOSTIC_MODE=1` the part counts the searches and logs, 10 seconds in and then every minute, how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all.
 
 ## Decal definitions
 
 The game reads its decal definitions - the kinds of bullet holes, blood, scorch and tyre marks, liquids, graffiti and so on - from the `decals.dat` files into an array of 260 entries. Once 260 are registered, every further definition is dropped silently; the files are read in order, so it is the definitions of the last files - add-on and mod content - that go missing, and the decals that use them never appear. This is a limit on the kinds of decal, not on the decals on screen. Vanilla 1.0.1158.16 already registers 259 of the 260, so a mod that adds two definitions is one too many for the game's own array.
 
-`DECALDEFS_SIZE` under `[DECALDEFS_SETTINGS]` in `TweaksV.ini` (default 2048, up to 16384) moves the array to a larger one and raises the limit everywhere the game uses it. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own, written from TweaksV's own findings about the game. The published patches were known as the idea and as a guide to what to look for; no line of their code was read for the build or went into TweaksV.
+`DECALDEFS_SIZE` under `[DECALS]` in `TweaksV.ini` (default 2048, up to 16384) moves the array to a larger one and raises the limit everywhere the game uses it. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own, written from TweaksV's own findings about the game. The published patches were known as the idea and as a guide to what to look for; no line of their code was read for the build or went into TweaksV.
 
-For testing, `LOG_DECALDEFS=1` logs how many decal definitions are registered - 10 seconds in and then every minute while the number changes - and whether the game's own array of 260 would have dropped some, so you can see whether your load needs the larger array at all. With `DRY_RUN=1` it measures the game as it is.
+With `DIAGNOSTIC_MODE=1` the part logs how many decal definitions are registered - 10 seconds in and then every minute while the number changes - and whether the game's own array of 260 would have dropped some, so you can see whether your load needs the larger array at all. With `DRY_RUN=1` as well, it measures the game as it is.
+
+## TweaksV.ini
+
+TweaksV writes `TweaksV.ini` next to `TweaksV.asi` on the first start - or in `%LOCALAPPDATA%\TweaksV` if the game folder cannot be written to - with every setting at its default, and adds back any setting that goes missing. `1` is on, `0` is off (`true` and `false` work too). The file carries no comments; this is what each key does.
+
+| Section | Key | Default | What it does |
+|---|---|---|---|
+| `[TWEAKSV]` | `ENABLED` | 1 | the master switch: 0 means TweaksV changes nothing |
+| | `LOG` | 1 | writes `TweaksV.log`, in the game folder or in `%LOCALAPPDATA%\TweaksV` when the game folder cannot take it |
+| | `DIAGNOSTIC_MODE` | 0 | testing: every part that is on logs every pattern, site and write, and runs its measurement - see "Diagnostics" below |
+| | `DRY_RUN` | 0 | testing: everything is looked for and checked, nothing is written or hooked |
+| | `CONSOLE` | 0 | a console window that mirrors the log |
+| | `ERROR_POPUP` | 1 | a message box when something could not be applied, and one for a part that stops working later (at most three per session) |
+| | `CONFLICT_CHECK` | 1 | looks for the old plugins TweaksV replaces, in the game folder and its `scripts` and `plugins` subfolders, and switches the matching part off while they are there |
+| | `VERSION` | 2 | the layout of this file; TweaksV keeps it - leave the line in |
+| `[HEAP_ADJUSTER]` | `ENABLED` | 1 | the part on or off - every part's section has this key |
+| | `HEAP_SIZE` | 2000 | the game's heap in MB, 1 to 2047; a value below the game's own is raised to it |
+| `[MODKIT_LIMIT]` | `MODKITARRAY_SIZE` | 65536 | the number of vehicle modkit IDs, up to 65536 (the game's own: 1024) |
+| `[PACKFILE_LIMIT]` | `PACKFILEARRAY_SIZE` | 13000 | the number of RPF archives, up to 65535 (the game's own: 7260); it also replaces the archive count of `gameconfig.xml` |
+| `[BOXSTREAMER]` | `TRAVERSAL_LIST_SIZE` | 10000 | map boxes one search of the box streamer can return, 1000 to 100000 (the game's own: 1000) |
+| `[DECALS]` | `DECALDEFS_SIZE` | 2048 | decal definitions the game can hold, 260 to 16384 (the game's own: 260) |
+| `[RAGEOPENV]` | `MODS_FOLDER` | 1 | replacement files from the `mods` folder in the game folder |
+| | `OPEN_RPF` | 1 | unencrypted ("OPEN") RPF archives can be loaded |
+| | `SKIP_RPF_CACHE_CHECK` | 1 | skips the game's RPF cache check (needed for modified archives; 0 only for testing) |
+| `[STRAIGHTTOSTORYMODE]` | `SKIP_SPLASH_SCREEN` | 1 | skips the splash screen |
+| | `SKIP_LEGAL_SCREEN` | 1 | skips the legal screen |
+| | `SKIP_LANDING_PAGE` | 1 | goes straight into Story Mode |
+| `[DIRECTSTORAGE]` | `UNLOCK_FILES` | 1 | DirectStorage may open only the `.rpf` and `.cache` files in the game folder, so its other files stay free while the game runs |
+
+**Coming from TweaksV 1.x:** the 1.x file has another layout and is not migrated. On the first start, TweaksV renames it to `TweaksV.old.ini`, writes a fresh `TweaksV.ini` with the defaults and says so in the start-up message - set your values again, the old file still holds them. You can also delete the old file before the first start. The same happens to any `TweaksV.ini` without `VERSION` under `[TWEAKSV]`, so leave that line in. What changed: the sections lost their `_SETTINGS` ending and `[DECALDEFS_SETTINGS]` is `[DECALS]`; `LOG_TO_FILE`, `SHOW_ERROR_POPUPS`, `CHECK_FOR_CONFLICTS` and `INI_VERSION` are `LOG`, `ERROR_POPUP`, `CONFLICT_CHECK` and `VERSION`; the testing switches `LOG_SEARCHES`, `LOG_DECALDEFS`, `LOG_INFO`, `LOG_MODS`, `LOG_CALLS` and `LOG_FILE_OPENS` are all `DIAGNOSTIC_MODE` now; `NEWMODS` and `LOG_DEVICE` are gone with the newmods folder.
+
+**Diagnostics:** `DIAGNOSTIC_MODE=1` makes every part that is on log every pattern it looks for (address, number of matches, bytes), every site it finds and every write, and run its measurement: the box streamer counts its searches, the decals part reads how many definitions are registered, RageOpenV logs every file request and every file served from `mods`, DirectStorage logs the game's calls into it and every file opened in the game folder. A part with `ENABLED=0` does nothing, so it logs nothing. Two ways to use it: with `DRY_RUN=1` nothing is hooked or written - the quiet check after a game update, which shows the patterns, the sites and the decal count of the unpatched game; alone, it is the full measurement of the running game with the mods folder served, and it hooks a little more than a normal boot (the box streamer's four search calls, the file opens). The file-open lines stop after 20,000; the opens are then only counted, with a summary every minute.
 
 ## Design
 
@@ -85,7 +114,7 @@ Add these switches to the `msbuild` line above:
 2. Remove the standalone versions of the five original plugins, alloc8or's `DirectStorageFix.asi` and `DecalPatch.asi`. Otherwise standalone modules take priority and disable the respective portions of `TweaksV.asi`.
 3. `TweaksV.asi` goes in the game folder next to `GTA5_Enhanced.exe`.
 4. Add the ASI loader file `xinput1_4.dll` from the [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) download. It is the only file needed; Script Hook V itself is not.
-5. Settings from the old plugins carry over by name: `HEAP_SIZE`, `MODKITARRAY_SIZE` and `PACKFILEARRAY_SIZE` keep their sections and keys. `RageOpenV.ini`'s `[config] console` is `CONSOLE` under `[TWEAKSV]`; its `[log] info`, `mods` and `device` are `LOG_INFO`, `LOG_MODS` and `LOG_DEVICE` under `[RAGEOPENV_SETTINGS]`; its `[log] rpf` is gone, nothing ever read it.
+5. Coming from TweaksV 1.x: your old `TweaksV.ini` is renamed to `TweaksV.old.ini` on the first start and a fresh one is written - see "TweaksV.ini" above. You can also delete the old file first.
 
 ## Other mods
 

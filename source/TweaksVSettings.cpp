@@ -178,36 +178,22 @@ namespace TweaksV
 
 	std::string DefaultIniText()
 	{
+		// the header is the one comment in the file: README.md explains the keys
 		std::string text =
-			"; ============================================================================\r\n"
-			"; Settings for TweaksV.asi (GTA V Enhanced)\r\n"
-			";\r\n"
-			"; TweaksV.ini in the game folder takes priority over %LOCALAPPDATA%\\TweaksV\\\r\n"
-			";\r\n"
+			"; ===========================================================================\r\n"
+			"; TweaksV.asi Configuration File (GTA V Enhanced)\r\n"
 			"; 1 = on, 0 = off (true/false also work)\r\n"
-			";\r\n"
-			"; Lines starting with ; are comments\r\n"
-			";\r\n"
-			"; Delete this file to get a fresh one with the default values on the next boot\r\n"
-			";\r\n"
-			"; If a setting is missing, TweaksV adds it back with its default value\r\n"
-			"; ============================================================================\r\n";
+			"; TweaksV.ini in the game folder takes priority over %LOCALAPPDATA%\\TweaksV\\\r\n"
+			"; Delete this file to get a fresh one with default values on next game boot\r\n"
+			"; Missing settings are added back by TweaksV with the default value\r\n"
+			"; For more details on what each setting does, check the README.md\r\n"
+			"; ===========================================================================\r\n";
 		for (const SettingsSection* section : kSections)
 		{
 			text += "\r\n[" + std::string(section->name) + "]\r\n";
 			for (const Setting& setting : kSettings)
-			{
-				if (setting.section != section || setting.testBuildOnly)
-					continue;
-				if (setting.comment)
-				{
-					text += "; " + std::string(setting.comment);
-					if (setting.kind == SettingKind::Number && setting.limitsInComment)
-						text += ". Default " + std::to_string(setting.defaultValue) + ". Maximum " + std::to_string(setting.maxValue);
-					text += "\r\n";
-				}
-				text += std::string(setting.key) + "=" + DefaultValueText(setting) + "\r\n";
-			}
+				if (setting.section == section && !setting.testBuildOnly)
+					text += std::string(setting.key) + "=" + DefaultValueText(setting) + "\r\n";
 		}
 		return text;
 	}

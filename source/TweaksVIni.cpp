@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - TweaksV.ini, the file: where it is, creating it and adding keys that are missing.
+// TweaksV - TweaksV.ini, the file: where it is, creating it, adding keys that are missing, and
+// replacing a file that has the layout of TweaksV 1.x.
 
 #include "TweaksVIni.h"
 
@@ -19,11 +20,15 @@ namespace TweaksV
 {
 	namespace
 	{
+		constexpr const wchar_t* kIniName = L"TweaksV.ini";
+		constexpr const wchar_t* kOldIniName = L"TweaksV.old.ini";	// what a file with the layout of 1.x becomes
+
 		bool g_iniAvailable = false;
 		std::wstring g_iniPath;							// the TweaksV.ini in use
 		bool g_iniInFallback = false;					// it is the one in %LOCALAPPDATA%\TweaksV
 		HANDLE g_iniHold = INVALID_HANDLE_VALUE;		// holds it from CreateOrUpdateIni() to ReleaseIniFile()
 		bool g_iniReadable = true;						// false: it failed its check and is not read at all
+		bool g_iniReplaced = false;						// it is the fresh file written in place of a 1.x file
 		std::string g_iniNotUsed;						// why it is not used, for the log header
 
 		// Section and key names are ASCII.
@@ -73,13 +78,13 @@ namespace TweaksV
 
 		std::wstring GameFolderIni()
 		{
-			return GetGameFolder() + L"\\TweaksV.ini";
+			return GetGameFolder() + L"\\" + kIniName;
 		}
 
 		std::wstring FallbackIni()
 		{
 			const std::wstring folder = GetFallbackFolder();
-			return folder.empty() ? std::wstring() : folder + L"\\TweaksV.ini";
+			return folder.empty() ? std::wstring() : folder + L"\\" + kIniName;
 		}
 
 		void SetIniPath(const std::wstring& path, bool inFallback)
@@ -88,12 +93,23 @@ namespace TweaksV
 			g_iniInFallback = inFallback;
 		}
 
+		// The folder of the TweaksV.ini in use, and which kind of folder it is for the own-file checks.
+		std::wstring IniFolder()
+		{
+			return g_iniInFallback ? GetFallbackFolder() : GetGameFolder();
+		}
+
+		FileFolder IniFolderKind()
+		{
+			return g_iniInFallback ? FileFolder::Own : FileFolder::Game;
+		}
+
 		// Writes the full default TweaksV.ini as a new file in folder, only where it is what its path says
 		// (TweaksVFiles.h). Comes back without a handle: error is ERROR_SUCCESS once it is written, and
 		// unsafe says why nothing was written where a link is in the way.
 		OwnFile WriteDefaultIni(const std::wstring& folder, FileFolder where)
 		{
-			OwnFile file = OpenOwnFile(folder, L"TweaksV.ini", where, CREATE_NEW, false);
+			OwnFile file = OpenOwnFile(folder, kIniName, where, CREATE_NEW, false);
 			if (file.handle == INVALID_HANDLE_VALUE)
 				return file;
 
@@ -118,8 +134,7 @@ namespace TweaksV
 		// file that fails the check is not read at all, and TweaksV uses its built-in defaults.
 		bool HoldIni()
 		{
-			const OwnFile held = HoldOwnFile(g_iniInFallback ? GetFallbackFolder() : GetGameFolder(), L"TweaksV.ini",
-				g_iniInFallback ? FileFolder::Own : FileFolder::Game);
+			const OwnFile held = HoldOwnFile(IniFolder(), kIniName, IniFolderKind());
 			if (held.handle != INVALID_HANDLE_VALUE)
 			{
 				g_iniHold = held.handle;
@@ -177,6 +192,60 @@ namespace TweaksV
 			if (added)
 				WritePrivateProfileStringW(nullptr, nullptr, nullptr, g_iniPath.c_str()); // flush
 		}
+
+		// True if the TweaksV.ini in use has the layout of TweaksV 1.x: no VERSION under [TWEAKSV]. Only
+		// the key names of that section are read - no value of a 1.x file is ever used.
+		bool HasLayout1()
+		{
+			return !ContainsKey(ReadKeyNames(Widen(kTweaksVSection.name)), Widen(kIniVersion.key));
+		}
+
+		// Replaces the 1.x TweaksV.ini in use: it is renamed to TweaksV.old.ini through the own-file
+		// checks (an older TweaksV.old.ini that passes them is replaced) and the fresh default file is
+		// written in its place; the start-up summary says so. A file that cannot be renamed stays, is
+		// reported, and TweaksV runs on its built-in defaults until the file is gone.
+		void ReplaceLayout1Ini()
+		{
+			ReleaseIniFile();	// the hold shares no delete: the rename needs a handle of its own
+			const OwnFile renamed = RenameOwnFile(IniFolder(), kIniName, kOldIniName, IniFolderKind());
+			if (!renamed.unsafe.empty() || renamed.error != ERROR_SUCCESS)
+			{
+				g_iniReadable = false;
+				g_iniNotUsed = "it has the layout of TweaksV 1.x and could not be renamed to TweaksV.old.ini (" + renamed.Reason() + ")";
+				ReportFailure("TweaksV", "TweaksV.ini (" + ToUtf8(g_iniPath) + ") has the layout of TweaksV 1.x and could not be renamed "
+					"to TweaksV.old.ini (" + renamed.Reason() + "). Delete or rename it yourself - TweaksV uses its built-in defaults "
+					"until then.");
+				return;
+			}
+
+			const OwnFile fresh = WriteDefaultIni(IniFolder(), IniFolderKind());
+			if (!fresh.unsafe.empty() || fresh.error != ERROR_SUCCESS)
+			{
+				g_iniReadable = false;
+				g_iniNotUsed = "the 1.x file was renamed to TweaksV.old.ini, but a fresh TweaksV.ini could not be written (" +
+					fresh.Reason() + ")";
+				ReportFailure("TweaksV", "TweaksV.ini had the layout of TweaksV 1.x and was renamed to TweaksV.old.ini, but a fresh "
+					"TweaksV.ini could not be written in " + ToUtf8(IniFolder()) + " (" + fresh.Reason() + "). TweaksV uses its "
+					"built-in defaults this session.");
+				return;
+			}
+
+			if (!HoldIni())	// reported there
+				return;
+			g_iniReplaced = true;
+			ReportFailure("TweaksV", "TweaksV.ini had the layout of TweaksV 1.x. It was renamed to TweaksV.old.ini and a fresh "
+				"TweaksV.ini written with the default settings - set your values again.");
+		}
+
+		// The TweaksV.ini in use exists and has passed its check: a 1.x file is replaced, a layout-2
+		// file gets the keys it is missing.
+		void UpdateIni()
+		{
+			if (HasLayout1())
+				ReplaceLayout1Ini();
+			else
+				AddMissingKeys();
+		}
 	}
 
 	const std::wstring& GetGameFolder()
@@ -230,13 +299,14 @@ namespace TweaksV
 		const std::wstring fallbackIni = FallbackIni();
 
 		// An existing TweaksV.ini: the game folder's always wins, else the one in
-		// %LOCALAPPDATA%\TweaksV. It is held while TweaksV reads it; only missing keys are added.
+		// %LOCALAPPDATA%\TweaksV. It is held while TweaksV reads it; a 1.x file is replaced, otherwise
+		// only missing keys are added.
 		if (FileExists(gameIni) || (!fallbackIni.empty() && FileExists(fallbackIni)))
 		{
 			const bool inFallback = !FileExists(gameIni);
 			SetIniPath(inFallback ? fallbackIni : gameIni, inFallback);
 			if (HoldIni())
-				AddMissingKeys();
+				UpdateIni();
 			return;
 		}
 
@@ -252,7 +322,7 @@ namespace TweaksV
 				if (game.error == ERROR_SUCCESS)
 					WriteLog("TweaksV", "Created TweaksV.ini with the default settings.");
 				else
-					AddMissingKeys(); // created by someone else in the meantime
+					UpdateIni(); // created by someone else in the meantime
 			}
 			return;
 		}
@@ -300,12 +370,19 @@ namespace TweaksV
 			return path + " (not used: " + g_iniNotUsed + " - built-in defaults are used)";
 		if (!g_iniAvailable)
 			return path + " (could not be created - built-in defaults are used)";
+
+		std::string notes;
+		if (g_iniReplaced)
+			notes = "the 1.x file was renamed to TweaksV.old.ini and this fresh file written";
 		if (g_iniInFallback)
-			return path + " (the game folder has no TweaksV.ini)";
-		const std::wstring fallback = FallbackIni();
-		if (!fallback.empty() && FileExists(fallback))
-			return path + " (wins over the unused copy in " + ToUtf8(GetFallbackFolder()) + ")";
-		return path;
+			notes += std::string(notes.empty() ? "" : "; ") + "the game folder has no TweaksV.ini";
+		else
+		{
+			const std::wstring fallback = FallbackIni();
+			if (!fallback.empty() && FileExists(fallback))
+				notes += std::string(notes.empty() ? "" : "; ") + "wins over the unused copy in " + ToUtf8(GetFallbackFolder());
+		}
+		return notes.empty() ? path : path + " (" + notes + ")";
 	}
 
 	std::wstring ReadIniValue(const char* section, const char* key)

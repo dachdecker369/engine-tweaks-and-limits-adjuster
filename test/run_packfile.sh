@@ -24,23 +24,23 @@ check "the redirected call leads to a call stub that is read+execute, never writ
 check "no problems" "! log_has 'PROBLEM'"
 
 echo "== P2 PACKFILEARRAY_SIZE=20000"
-fresh_ini; setkey PACKFILEARRAY_SIZE 20000 PACKFILE_SETTINGS; out=$(game full_game.exe); echo "      $out"
+fresh_ini; setkey PACKFILEARRAY_SIZE 20000 PACKFILE_LIMIT; out=$(game full_game.exe); echo "      $out"
 check "limits and configuration count 20000, array still full size" "has 'D3=20000 D2=4500 D1=4500 I=20000' && has 'config 3000 -> 20000' && has '$MOVED'"
 
 echo "== P3 PACKFILEARRAY_SIZE=1000 is raised to the game's own 4500"
-fresh_ini; setkey PACKFILEARRAY_SIZE 1000 PACKFILE_SETTINGS; out=$(game full_game.exe)
+fresh_ini; setkey PACKFILEARRAY_SIZE 1000 PACKFILE_LIMIT; out=$(game full_game.exe)
 check "limits stay 4500, configuration count 4500" "has 'D3=4500 D2=4500 D1=4500 I=4500' && has 'config 3000 -> 4500'"
 check "clamp logged" "log_has 'PACKFILEARRAY_SIZE=1000 is outside 4500..65535 - using 4500'"
 
 echo "== P4 PACKFILEARRAY_SIZE=70000 is clamped to 65535"
-fresh_ini; setkey PACKFILEARRAY_SIZE 70000 PACKFILE_SETTINGS; out=$(game full_game.exe)
+fresh_ini; setkey PACKFILEARRAY_SIZE 70000 PACKFILE_LIMIT; out=$(game full_game.exe)
 check "limits 65535" "has 'D3=65535 D2=4500 D1=4500 I=65535' && has 'config 3000 -> 65535'"
-check "clamp reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_SETTINGS\] PACKFILEARRAY_SIZE=70000 is outside 1..65535 - using 65535.'"
+check "clamp reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_LIMIT\] PACKFILEARRAY_SIZE=70000 is outside 1..65535 - using 65535.'"
 
 echo "== P5 PACKFILEARRAY_SIZE=abc falls back to the default 13000"
-fresh_ini; setkey PACKFILEARRAY_SIZE abc PACKFILE_SETTINGS; out=$(game full_game.exe)
+fresh_ini; setkey PACKFILEARRAY_SIZE abc PACKFILE_LIMIT; out=$(game full_game.exe)
 check "limits 13000" "has 'D3=13000 D2=4500 D1=4500 I=13000'"
-check "invalid value reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_SETTINGS\] PACKFILEARRAY_SIZE=abc is not a number - using 13000.'"
+check "invalid value reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_LIMIT\] PACKFILEARRAY_SIZE=abc is not a number - using 13000.'"
 
 echo "== P6 DRY_RUN=1: everything found and checked, nothing written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
@@ -68,8 +68,8 @@ fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe junkr31a)
 check "found exactly once, no per-match lines of its own" "log_has 'Pattern P-E-R31a found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 1 match,' && ! log_has 'P-E-R31a match 1 of '"
 check "the array moved, no problem" "has '$MOVED' && ! log_has 'PROBLEM'"
 
-echo "== P8 [PACKFILE_SETTINGS] ENABLED=0"
-fresh_ini; setkey ENABLED 0 PACKFILE_SETTINGS; out=$(game full_game.exe)
+echo "== P8 [PACKFILE_LIMIT] ENABLED=0"
+fresh_ini; setkey ENABLED 0 PACKFILE_LIMIT; out=$(game full_game.exe)
 check "nothing changed" "has '$UNMOVED' && has '$GAME_SIZES' && has '$NO_HOOK'"
 check "no packfile lines" "! log_has '\[PackfileLimitAdjusterEnhanced\]'"
 

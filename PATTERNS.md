@@ -7,22 +7,23 @@ Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game bui
 | | |
 |---|---|
 | **Game Build** | 1.0.1158.16 |
-| **Found** | 92 of the 92 patterns this build uses |
-| **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-F1..F8` run only with a mods folder in the game directory (with `DIAGNOSTIC_MODE=1`, also without one). `R-E-M0..M2` and `R-E-D1..D2` run only with `NEWMODS=1` and a newmods folder in the game directory (with `NEWMODS=1` and `DIAGNOSTIC_MODE=1`, also without the folder). |
-| **Matches** | All match exactly once, except `D-E-L12`, which matches exactly 7 times (the check seven decal-placing functions share). To check: boot once with `DIAGNOSTIC_MODE=1`, `CONSOLE=1` and `NEWMODS=1` enabled. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once (`D-E-L12`: exactly 7 times). |
+| **Found** | 87 of the 87 patterns this build uses |
+| **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-F1..F8` run only with a mods folder in the game directory (with `DIAGNOSTIC_MODE=1`, also without one). A part with `ENABLED=0` looks for none of its patterns. |
+| **Matches** | All match exactly once, except `D-E-L12`, which matches exactly 7 times (the check seven decal-placing functions share). To check: boot once with `DIAGNOSTIC_MODE=1` and `CONSOLE=1`, every part on. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once (`D-E-L12`: exactly 7 times). |
 
-Build uses 92 of 96 patterns:
+Build uses 87 of 96 patterns:
 - Packfile picks one of three direct size patterns and one of two references by game build.
 - `R-E-D3` belonged to code that was never used. Removed.
+- `R-E-M0`, `R-E-M1`, `R-E-M2`, `R-E-D1` and `R-E-D2` belonged to the newmods folder, which 2.0.0 drops. Removed.
 
 The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstorage.dll` and, on the factory the game gets for the interface `{6924EA0C-C3CD-4826-B10A-F64F4ED927C1}`, its function [4], `OpenFile` (`DStorageCore.dll+0x3F9D0` with DirectStorage 1.2.2311.1405 on 1.0.1158.16).
 
 ### When Game Updates
 
-1. Start the game with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1` - and `CONSOLE=1` and `NEWMODS=1`, so every pattern is looked for. Then game binary isn't patched. `TweaksV.log` lists every pattern not found, by its label.
+1. Start the game with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1` - and `CONSOLE=1`, with every part on, so every pattern is looked for. Then game binary isn't patched. `TweaksV.log` lists every pattern not found, by its label.
 2. Check whether the original plugin has been updated (`UPSTREAM.md`).
 3. Update the pattern in `source\TweaksVPatterns.h` and in this file - the tests check that both agree - and confirm that it matches exactly once. `GTA5_Enhanced.exe` is encrypted on disk, so look for the code in a copy of the running game: a test build with `TEST_DUMP_CODE=60` saves one (README, Test Builds).
-4. DirectStorage: if `UNLOCK_FILES=1` reports a problem (another interface, or an `OpenFile` outside DirectStorage's DLLs), look at the factory's functions with `LOG_CALLS=1` and `DIAGNOSTIC_MODE=1`.
+4. DirectStorage: if `UNLOCK_FILES=1` reports a problem (another interface, or an `OpenFile` outside DirectStorage's DLLs), look at the factory's functions with `DIAGNOSTIC_MODE=1`.
 
 ## HeapAdjusterEnhanced
 
@@ -107,7 +108,7 @@ References to the packfile array (`AdjustPackFileArrayLimit`, rel32 moved to the
 
 ## BoxStreamer
 
-The four sites that hand the traversal list's capacity to the tree search (`mov dword ptr [rsp+20h], imm32`; every one MUST hold the same game size, 1000 on the current build). The list itself has no pattern of its own: two of the box streamer's four query functions are near-identical copies, so the second of the two `lea` instructions that load the list in each cannot be told apart by the bytes around it. Instead `B-E-L2`, `B-E-L3` and `B-E-L4` end in the `lea r13, [rip+disp32]` that loads the list (the three must agree on its address), and the game's code is then scanned for every `lea r64, [rip+disp32]` that loads it, which must find exactly 8 - on the current build at RVAs 0x92C4AB, 0x92C764, 0x92C7D3, 0x92CA12, 0x92DDCD, 0x92E013, 0x92E089 and 0x92E2D2 (the list is at RVA 0x3ED6B40: 1000 entries of 8 bytes). `DIAGNOSTIC_MODE=1` logs every one of them. With `LOG_SEARCHES=1` the `call rel32` to the tree search that follows each site (the call column) is redirected through TweaksV's call stubs; `B-E-L1` and `B-E-L3` must lead to the same function (RVA 0x1EBFB20 on the current build), `B-E-L2` and `B-E-L4` to the same other one (0x1EC0140).
+The four sites that hand the traversal list's capacity to the tree search (`mov dword ptr [rsp+20h], imm32`; every one MUST hold the same game size, 1000 on the current build). The list itself has no pattern of its own: two of the box streamer's four query functions are near-identical copies, so the second of the two `lea` instructions that load the list in each cannot be told apart by the bytes around it. Instead `B-E-L2`, `B-E-L3` and `B-E-L4` end in the `lea r13, [rip+disp32]` that loads the list (the three must agree on its address), and the game's code is then scanned for every `lea r64, [rip+disp32]` that loads it, which must find exactly 8 - on the current build at RVAs 0x92C4AB, 0x92C764, 0x92C7D3, 0x92CA12, 0x92DDCD, 0x92E013, 0x92E089 and 0x92E2D2 (the list is at RVA 0x3ED6B40: 1000 entries of 8 bytes). `DIAGNOSTIC_MODE=1` logs every one of them. With `DIAGNOSTIC_MODE=1` the `call rel32` to the tree search that follows each site (the call column) is redirected through TweaksV's call stubs; `B-E-L1` and `B-E-L3` must lead to the same function (RVA 0x1EBFB20 on the current build), `B-E-L2` and `B-E-L4` to the same other one (0x1EC0140).
 
 | Label | Pattern | Offset: capacity, lea rel32, call | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
@@ -160,11 +161,11 @@ An entry, as the parser fills it from the `decals.dat` columns (80 bytes): +0x00
 | R-E-E3 | `e8 ? ? ? ? 48 8b 46 ? 66 c7 00 00 ? eb` | first DecryptHeader2 call | found | 0x10FFAE |
 | R-E-E4 | `e8 ? ? ? ? 48 8b 46 ? 8b 4c 24 ? 48 8d 14 08` | second DecryptHeader2 call (same callee as R-E-E3) | found | 0x11001C |
 | R-E-E5 | `c6 86 ? ? ? ? ? 48 89 f1 4c 89 fa 45 89 f0 45 31 c9` | +19: ParseHeader call | found | 0x10F5B0 |
-| R-E-M0 | `41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec ? ? ? ? 89 d6 49 89 ce` | the game's GetDevice (called) | found | 0x10CAF0 |
-| R-E-M1 | `e8 ? ? ? ? 48 8d 05 ? ? ? ? 66 c7 44 58 02 00 00 66 89 3d` | +26: the initial mount call | found | 0x4F8987 |
-| R-E-M2 | `41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec ? ? ? ? 45 89 cd 45 89 c6 49 89 d7 48 89 ce 8b 05` | the archive function (hooked) | found | 0x10F210 |
-| R-E-D1 | `56 57 53 48 81 ec ? ? ? ? 48 83 79 ? ? 0f 84 ? ? ? ? 48 89 d7` | the game's fiDevice::Mount (called) | found | 0x109D80 |
-| R-E-D2 | `56 57 53 48 81 ec ? ? ? ? 4c 89 cf 44 89 c3` | the game's fiDevice::SetPath (called) | found | 0x109B20 |
+| R-E-M0 | `41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec ? ? ? ? 89 d6 49 89 ce` | the game's GetDevice (called by the newmods device) - newmods is gone | removed | - |
+| R-E-M1 | `e8 ? ? ? ? 48 8d 05 ? ? ? ? 66 c7 44 58 02 00 00 66 89 3d` | +26: the initial mount call (newmods) - newmods is gone | removed | - |
+| R-E-M2 | `41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec ? ? ? ? 45 89 cd 45 89 c6 49 89 d7 48 89 ce 8b 05` | the archive function (hooked for newmods) - newmods is gone | removed | - |
+| R-E-D1 | `56 57 53 48 81 ec ? ? ? ? 48 83 79 ? ? 0f 84 ? ? ? ? 48 89 d7` | the game's fiDevice::Mount (called by the newmods device) - newmods is gone | removed | - |
+| R-E-D2 | `56 57 53 48 81 ec ? ? ? ? 4c 89 cf 44 89 c3` | the game's fiDevice::SetPath (called by the newmods device) - newmods is gone | removed | - |
 | R-E-D3 | `48 8d 05 ? ? ? ? 48 89 06 48 c7 46 ? ? ? ? ? 48 8d 15` | fiDeviceRelative's vtable - never used | removed | - |
 
 ## StraightToStoryMode

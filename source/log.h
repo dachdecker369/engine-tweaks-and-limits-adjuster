@@ -10,8 +10,8 @@ namespace RageOpenV // TweaksV: one namespace per original plugin
 namespace logger
 {
 	// TweaksV: "void init();" removed - the shared ClearLog() clears TweaksV.log once per start
-	// TweaksV: the type "error" is always written; "info", "mods" and "device" follow the LOG_INFO,
-	// LOG_MODS and LOG_DEVICE switches in TweaksV.ini
+	// TweaksV: the type "error" is always written; "info" and "mods" follow DIAGNOSTIC_MODE in
+	// TweaksV.ini, the one testing switch
 	void write(const char* type, const char* msg, ...);
 	void log(const char* type, const char* msg, ...);
 	void vwrite(const char* type, const char* msg, va_list args);

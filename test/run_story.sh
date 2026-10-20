@@ -20,17 +20,17 @@ check "'Patch successful!' logged" "log_has '\[StraightToStoryMode\] Patch succe
 check "no problems" "! log_has 'PROBLEM'"
 
 echo "== S2 the three switches off: nothing changed"
-fresh_ini; setkey SKIP_SPLASH_SCREEN 0 STRAIGHTTOSTORYMODE_SETTINGS; setkey SKIP_LEGAL_SCREEN 0 STRAIGHTTOSTORYMODE_SETTINGS; setkey SKIP_LANDING_PAGE 0 STRAIGHTTOSTORYMODE_SETTINGS
+fresh_ini; setkey SKIP_SPLASH_SCREEN 0 STRAIGHTTOSTORYMODE; setkey SKIP_LEGAL_SCREEN 0 STRAIGHTTOSTORYMODE; setkey SKIP_LANDING_PAGE 0 STRAIGHTTOSTORYMODE
 out=$(game full_game.exe); echo "      $out"
 check "all three sites unchanged" "[[ \"\$out\" == *\"$ORIG_SPLASH\"* && \"\$out\" == *\"$ORIG_LEGAL\"* && \"\$out\" == *\"$ORIG_LANDING\"* ]]"
 check "each switch logged" "log_has 'SKIP_SPLASH_SCREEN=0' && log_has 'SKIP_LEGAL_SCREEN=0' && log_has 'SKIP_LANDING_PAGE=0'"
 
 echo "== S3 only SKIP_LEGAL_SCREEN=0"
-fresh_ini; setkey SKIP_LEGAL_SCREEN 0 STRAIGHTTOSTORYMODE_SETTINGS; out=$(game full_game.exe); echo "      $out"
+fresh_ini; setkey SKIP_LEGAL_SCREEN 0 STRAIGHTTOSTORYMODE; out=$(game full_game.exe); echo "      $out"
 check "splash and landing patched, legal left alone" "[[ \"\$out\" == *\"$NEW_SPLASH\"* && \"\$out\" == *\"$ORIG_LEGAL\"* && \"\$out\" == *\"$NEW_LANDING\"* ]]"
 
-echo "== S4 [STRAIGHTTOSTORYMODE_SETTINGS] ENABLED=0"
-fresh_ini; setkey ENABLED 0 STRAIGHTTOSTORYMODE_SETTINGS; out=$(game full_game.exe); echo "      $out"
+echo "== S4 [STRAIGHTTOSTORYMODE] ENABLED=0"
+fresh_ini; setkey ENABLED 0 STRAIGHTTOSTORYMODE; out=$(game full_game.exe); echo "      $out"
 check "nothing changed" "[[ \"\$out\" == *\"$ORIG_SPLASH\"* && \"\$out\" == *\"$ORIG_LEGAL\"* && \"\$out\" == *\"$ORIG_LANDING\"* ]]"
 check "no StraightToStoryMode lines" "! log_has '\[StraightToStoryMode\]'"
 

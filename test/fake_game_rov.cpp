@@ -8,9 +8,7 @@
 //   rovmissing         GetFileSize 2's pattern is missing
 //   rovdecrypt2        the two DecryptHeader2 calls lead to different functions
 //   rovredirected      the DecryptHeader call already leads outside the game
-//   rovmountredirected the initial mount call already leads outside the game
 //   rovcachepatched    the RPF cache check function already starts with a ret
-//   rovdeviceprobe     after the newmods mount, the device TweaksV mounted is called with crafted paths
 #include <windows.h>
 #include <cstdint>
 #include <cstdio>
@@ -23,25 +21,17 @@
 __declspec(allocate(".fakefn")) unsigned char g_fakeCode[0x2000] = { 0xCC };
 
 // What the fake game functions were called with.
-static std::vector<std::string> g_fileCalls, g_setPathCalls, g_mountCalls, g_archiveCalls;
+static std::vector<std::string> g_fileCalls;
 static void RecordFile(const char* p) { g_fileCalls.push_back(p ? p : "(null)"); }
-static void RecordSetPath(const char* p) { g_setPathCalls.push_back(p ? p : "(null)"); }
-static void* g_device = nullptr;	// the first device RageOpenV mounted: one of TweaksV's rage::fiDeviceLocal
-static void RecordMount(const char* p, void* device) { g_mountCalls.push_back(p ? p : "(null)"); if (!g_device) g_device = device; }
-static void RecordArchive(const char* p) { g_archiveCalls.push_back(p ? p : "(null)"); }
 static void (*volatile g_recordFile)(const char*) = RecordFile;
-static void (*volatile g_recordSetPath)(const char*) = RecordSetPath;
-static void (*volatile g_recordMount)(const char*, void*) = RecordMount;
-static void (*volatile g_recordArchive)(const char*) = RecordArchive;
 
 // The game's own functions behind the redirected calls.
-static int g_decryptCalls = 0, g_decrypt2Calls = 0, g_parseCalls = 0, g_initialMountCalls = 0;
+static int g_decryptCalls = 0, g_decrypt2Calls = 0, g_parseCalls = 0;
 static __declspec(noinline) bool FakeFindEncryption(uint32_t) { return false; }
 static __declspec(noinline) void FakeDecryptHeader(uint32_t, char*, int) { g_decryptCalls++; }
 static __declspec(noinline) void FakeDecryptHeader2(uint32_t, uint32_t, char*, int) { g_decrypt2Calls++; }
 static __declspec(noinline) void FakeDecryptHeader2Other(uint32_t, uint32_t, char*, int) { g_decrypt2Calls += 100; }
 static __declspec(noinline) bool FakeParseHeader(void*, const char*, bool, void*) { g_parseCalls++; return true; }
-static __declspec(noinline) void FakeInitialMount() { g_initialMountCalls++; }
 
 // Call sites: only rewritten, never run. They live in the executable section of the other game code
 // copies (fake_game_full.cpp), because TweaksV only searches the game's code.
@@ -56,8 +46,6 @@ volatile unsigned char g_rovDecrypt2a[] = { 0xE8, 0, 0, 0, 0, 0x48, 0x8B, 0x46, 
 volatile unsigned char g_rovDecrypt2b[] = { 0xE8, 0, 0, 0, 0, 0x48, 0x8B, 0x46, 0x10, 0x8B, 0x4C, 0x24, 0x20, 0x48, 0x8D, 0x14, 0x08, 0xCC };
 volatile unsigned char g_rovParse[] = { 0xC6, 0x86, 0xB8, 0x00, 0x00, 0x00, 0x01, 0x48, 0x89, 0xF1, 0x4C, 0x89, 0xFA, 0x45, 0x89, 0xF0,
 	0x45, 0x31, 0xC9, 0xE8, 0, 0, 0, 0, 0xCC };												// the call is at +19
-volatile unsigned char g_rovMount[] = { 0xE8, 0, 0, 0, 0, 0x48, 0x8D, 0x05, 0, 0, 0, 0, 0x66, 0xC7, 0x44, 0x58, 0x02, 0x00, 0x00,
-	0x66, 0x89, 0x3D, 0, 0, 0, 0, 0xE8, 0, 0, 0, 0, 0xCC };									// the call is at +26
 #pragma data_seg()
 
 struct CallSite { volatile unsigned char* bytes; int offset; const char* name; };	// offset of the E8
@@ -128,9 +116,7 @@ struct Asm
 };
 
 enum : size_t { F_OPENBULK1, F_GETFILETIME1, F_GETFILESIZE1, F_GETATTRIBS1, F_OPENBULK2, F_GETFILETIME2, F_GETFILESIZE2,
-	F_GETATTRIBS2, F_OPENARCHIVE, F_GETDEVICE, F_MOUNT, F_SETPATH, F_COUNT };
-static const char* const kFileNames[] = { "OpenBulk 1", "GetFileTime 1", "GetFileSize 1", "GetAttributes 1", "OpenBulk 2",
-	"GetFileTime 2", "GetFileSize 2", "GetAttributes 2" };
+	F_GETATTRIBS2 };
 static unsigned char* FnStart(size_t index) { return g_fakeCode + index * 0x200 + 0x10; }
 
 // push rsi/rdi/rbx; sub rsp,0x260; record the path in rdx; return 1 - the start of a computed target
@@ -189,25 +175,6 @@ static void BuildFakeCode(bool notStart, bool missing, bool jump)
 	if (notStart)
 		FnStart(F_GETFILETIME2)[-1] = 0x48;
 
-	a.pos = FnStart(F_OPENARCHIVE) - g_fakeCode;		// 8 pushes; sub rsp,0x88; mov r13d,r9d; mov r14d,r8d; mov r15,rdx; mov rsi,rcx; mov eax,[rip]
-	a.hex("41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec 88 00 00 00 45 89 cd 45 89 c6 49 89 d7 48 89 ce 8b 05 00 00 00 00");
-	a.b({ 0x4C, 0x89, 0xF9 }); a.callPtr(&g_recordArchive); a.b({ 0xB8, 1, 0, 0, 0 });	// mov rcx, r15
-	a.hex("48 81 c4 88 00 00 00 5b 5d 5f 5e 41 5c 41 5d 41 5e 41 5f c3");
-
-	a.pos = FnStart(F_GETDEVICE) - g_fakeCode;		// 8 pushes; sub rsp,0x88; mov esi,edx; mov r14,rcx; return no device
-	a.hex("41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec 88 00 00 00 89 d6 49 89 ce 31 c0");
-	a.hex("48 81 c4 88 00 00 00 5b 5d 5f 5e 41 5c 41 5d 41 5e 41 5f c3");
-
-	a.pos = FnStart(F_MOUNT) - g_fakeCode;			// ...; cmp qword [rcx+0x10],0; jz +0; mov rdi,rdx; record(path, device); return true
-	a.hex("56 57 53 48 81 ec 60 02 00 00 48 83 79 10 00 0f 84 00 00 00 00 48 89 d7");
-	a.b({ 0x48, 0x89, 0xCA }); a.b({ 0x48, 0x89, 0xF9 }); a.callPtr(&g_recordMount); a.b({ 0xB0, 0x01 });	// mov rdx, rcx; mov rcx, rdi
-	a.hex("48 81 c4 60 02 00 00 5b 5f 5e c3");
-
-	a.pos = FnStart(F_SETPATH) - g_fakeCode;			// ...; mov rdi,r9; mov ebx,r8d; record
-	a.hex("56 57 53 48 81 ec 60 02 00 00 4c 89 cf 44 89 c3");
-	a.b({ 0x48, 0x89, 0xD1 }); a.callPtr(&g_recordSetPath);
-	a.hex("48 81 c4 60 02 00 00 5b 5f 5e c3");
-
 	FlushInstructionCache(GetCurrentProcess(), g_fakeCode, sizeof(g_fakeCode));
 }
 
@@ -221,12 +188,9 @@ static bool Has(int argc, wchar_t** argv, const wchar_t* option)
 
 static unsigned char g_apiBefore[5];
 
-static bool g_deviceProbe = false;	// rovdeviceprobe
-
 void RovSetup(int argc, wchar_t** argv)
 {
 	BuildFakeCode(Has(argc, argv, L"rovnotstart"), Has(argc, argv, L"rovmissing"), Has(argc, argv, L"rovjump"));
-	g_deviceProbe = Has(argc, argv, L"rovdeviceprobe");
 
 	SetCallTarget(g_rovCacheSite, const_cast<unsigned char*>(g_rovCacheCallee));
 	if (Has(argc, argv, L"rovcachepatched"))
@@ -236,8 +200,6 @@ void RovSetup(int argc, wchar_t** argv)
 	SetCallTarget(g_rovDecrypt2a, reinterpret_cast<const void*>(&FakeDecryptHeader2));
 	SetCallTarget(g_rovDecrypt2b, reinterpret_cast<const void*>(Has(argc, argv, L"rovdecrypt2") ? &FakeDecryptHeader2Other : &FakeDecryptHeader2));
 	SetCallTarget(g_rovParse + 19, reinterpret_cast<const void*>(&FakeParseHeader));
-	SetCallTarget(g_rovMount, reinterpret_cast<const void*>(&FakeInitialMount));	// the first call: anything in the game
-	SetCallTarget(g_rovMount + 26, Has(argc, argv, L"rovmountredirected") ? RovOutside() : reinterpret_cast<const void*>(&FakeInitialMount));
 
 	memcpy(g_apiBefore, reinterpret_cast<const void*>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetSystemTimeAsFileTime")), 5);
 }
@@ -247,7 +209,7 @@ void RovForEachDataSite(void (*fn)(const volatile unsigned char*, size_t))
 {
 	fn(g_rovConsole, sizeof(g_rovConsole)); fn(g_rovCacheSite, sizeof(g_rovCacheSite)); fn(g_rovCacheCallee, sizeof(g_rovCacheCallee));
 	fn(g_rovFindEnc, sizeof(g_rovFindEnc)); fn(g_rovDecrypt, sizeof(g_rovDecrypt)); fn(g_rovDecrypt2a, sizeof(g_rovDecrypt2a));
-	fn(g_rovDecrypt2b, sizeof(g_rovDecrypt2b)); fn(g_rovParse, sizeof(g_rovParse)); fn(g_rovMount, sizeof(g_rovMount));
+	fn(g_rovDecrypt2b, sizeof(g_rovDecrypt2b)); fn(g_rovParse, sizeof(g_rovParse));
 }
 
 // Where every call RageOpenV redirects leads now, for the call stub check.
@@ -255,7 +217,6 @@ void RovForEachCallTarget(void (*fn)(const unsigned char*))
 {
 	for (const CallSite& call : g_rovCalls)
 		fn(CallTargetOf(call.bytes + call.offset));
-	fn(CallTargetOf(g_rovMount + 26));
 }
 
 static const unsigned char* TimeApi()
@@ -271,68 +232,6 @@ void RovFirstTimeRequest()
 	g_apiHookedAtFirstRequest = memcmp(TimeApi(), g_apiBefore, 5) != 0;
 	FILETIME now{};
 	GetSystemTimeAsFileTime(&now);
-}
-
-// rovdeviceprobe: TweaksV's newmods device, called through its vtable as the game would, with crafted
-// paths. The slots are those of source\fiDevice.h: Open 1, Close 12, FindFileBegin 25, FindFileEnd 27,
-// FixRelativeName 29. run_rageopenv.sh puts inside.txt in newmods\dlcpacks\test and outside.txt in
-// the game folder.
-static std::wstring ProbeDevice(void* device)
-{
-	void** vtable = *reinterpret_cast<void***>(device);
-	const auto open = reinterpret_cast<HANDLE (*)(void*, const char*, bool)>(vtable[1]);
-	const auto close = reinterpret_cast<uint32_t (*)(void*, HANDLE)>(vtable[12]);
-	const auto findBegin = reinterpret_cast<HANDLE (*)(void*, const char*, void*)>(vtable[25]);
-	const auto findEnd = reinterpret_cast<int (*)(void*, HANDLE)>(vtable[27]);
-	const auto fixName = reinterpret_cast<void* (*)(void*, char*, int, const char*)>(vtable[29]);
-
-	const HANDLE inside = open(device, "dlcpacks:/test/inside.txt", true);
-	const bool insideOk = inside != INVALID_HANDLE_VALUE;
-	if (insideOk)
-		close(device, inside);
-	const bool dotsRefused = open(device, "dlcpacks:/../../outside.txt", true) == INVALID_HANDLE_VALUE;
-	char folder[MAX_PATH] = {};
-	GetCurrentDirectoryA(MAX_PATH, folder);
-	const std::string rooted = std::string(folder + 2) + "\\outside.txt";	// "\...\outside.txt": rooted, no drive
-	const bool rootedRefused = open(device, rooted.c_str(), true) == INVALID_HANDLE_VALUE;
-
-	alignas(8) unsigned char findData[0x118] = {};
-	const HANDLE search = findBegin(device, "dlcpacks:/test/", findData);
-	const bool searchOk = search != INVALID_HANDLE_VALUE;
-	if (searchOk)
-		findEnd(device, search);
-	const std::string longPath = "dlcpacks:/" + std::string(300, 'a') + "/";
-	const bool longRefused = findBegin(device, longPath.c_str(), findData) == INVALID_HANDLE_VALUE;
-
-	// a name that ends just before a page nobody may read: the copy must stop at the name's end
-	bool nameOk = false;
-	auto* pages = static_cast<unsigned char*>(VirtualAlloc(nullptr, 0x2000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
-	DWORD old = 0;
-	if (pages && VirtualProtect(pages + 0x1000, 0x1000, PAGE_NOACCESS, &old))
-	{
-		char* name = reinterpret_cast<char*>(pages + 0x1000 - 4);
-		memcpy(name, "abc", 4);
-		char dest[64];
-		memset(dest, 'x', sizeof(dest));
-		fixName(device, dest, static_cast<int>(sizeof(dest)), name);
-		nameOk = strcmp(dest, "abc") == 0;
-	}
-	if (pages)
-		VirtualFree(pages, 0, MEM_RELEASE);
-
-	wchar_t text[200];
-	swprintf(text, 200, L"device: inside %ls, dots %ls, rooted %ls, search %ls, long search %ls, name %ls",
-		insideOk ? L"ok" : L"WRONG", dotsRefused ? L"refused" : L"OPENED", rootedRefused ? L"refused" : L"OPENED",
-		searchOk ? L"ok" : L"WRONG", longRefused ? L"refused" : L"WRONG", nameOk ? L"ok" : L"WRONG");
-	return text;
-}
-
-static std::string Joined(const std::vector<std::string>& items)
-{
-	std::string text;
-	for (const auto& item : items)
-		text += (text.empty() ? "" : " ") + item;
-	return text;
 }
 
 void RovReport()
@@ -435,23 +334,6 @@ void RovReport()
 		memcpy(&enc1, entries[1] + 12, 4); memcpy(&offset, packfile + 0xB4 + 8, 4);
 		ok = ok && enc1 == 1 && offset == 0;
 		wprintf(L", behaviour %ls", ok ? L"ok" : L"WRONG");
-	}
-	wprintf(L" | ");
-
-	// newmods: the initial mount call and the archive function.
-	const unsigned char* mountTarget = CallTargetOf(g_rovMount + 26);
-	const void* mountHook = (!RovInImage(mountTarget) && mountTarget != RovOutside()) ? StubTarget(mountTarget) : nullptr;
-	const bool archiveHooked = FnStart(F_OPENARCHIVE)[0] == 0xE9;
-	wprintf(L"newmods hooks %d/2", (mountHook ? 1 : 0) + (archiveHooked ? 1 : 0));
-	if (mountHook && archiveHooked)
-	{
-		reinterpret_cast<void (*)()>(const_cast<void*>(mountHook))();
-		alignas(16) unsigned char packfile[0x120] = {};
-		reinterpret_cast<char (*)(void*, const char*, char, int32_t, int64_t)>(FnStart(F_OPENARCHIVE))(packfile, "dlcpacks:/test/", 0, 1, 0);
-		wprintf(L", original mount %d, mounts: %hs, paths: %hs, archive: %hs", g_initialMountCalls, Joined(g_mountCalls).c_str(),
-			Joined(g_setPathCalls).c_str(), Joined(g_archiveCalls).c_str());
-		if (g_deviceProbe && g_device)
-			wprintf(L" | %ls", ProbeDevice(g_device).c_str());
 	}
 	wprintf(L" | ");
 }

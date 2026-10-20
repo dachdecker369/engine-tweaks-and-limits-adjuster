@@ -35,7 +35,7 @@ namespace TweaksV
 		std::wstring g_path;					// the log file in use
 		bool g_cleared = false;					// ClearLogFile() ran
 		bool g_started = false;					// the header is written
-		bool g_toFile = true;					// LOG_TO_FILE
+		bool g_toFile = true;					// LOG
 		bool g_console = false;					// OpenConsole() succeeded
 		std::vector<std::string> g_pending;
 		uint64_t g_logLimit = kMaxLogBytes;		// test builds can lower it (TEST_LOG_LIMIT_KB)
@@ -239,7 +239,7 @@ namespace TweaksV
 
 	void ClearLogFile()
 	{
-		const bool toFile = IsOn(kLogToFile);
+		const bool toFile = IsOn(kLog);
 		const std::wstring primaryPath = GetGameFolder() + L"\\TweaksV.log";
 
 #ifdef TWEAKSV_TEST_BUILD
@@ -324,7 +324,6 @@ namespace TweaksV
 		header.push_back("TweaksV.ini: " + DescribeIniLocation());
 		header.push_back("TweaksV.log: " + ToUtf8(GetLogPathW()));
 		header.push_back("mods folder: " + FolderState(game + L"\\mods"));
-		header.push_back("newmods folder: " + FolderState(game + L"\\newmods"));
 		for (std::string& line : DescribeSettings())	// which parts are on, then every setting's value
 			header.push_back(std::move(line));
 
@@ -384,7 +383,7 @@ namespace TweaksV
 		ReleaseSRWLockShared(&g_lock);
 		if (!cleared)
 			return GetGameFolder() + L"\\TweaksV.log";
-		return toFile ? path : std::wstring(L"(off - LOG_TO_FILE=0)");
+		return toFile ? path : std::wstring(L"(off - LOG=0)");
 	}
 
 	std::string ToUtf8(std::wstring_view text)

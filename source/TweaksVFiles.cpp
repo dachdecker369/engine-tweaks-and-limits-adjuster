@@ -3,7 +3,11 @@
 
 #include "TweaksVFiles.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <cwchar>
+#include <vector>
 
 #include "TweaksVLog.h"
 
@@ -138,6 +142,63 @@ namespace TweaksV
 			CloseHandle(result.handle);
 			result.handle = INVALID_HANDLE_VALUE;
 		}
+		return result;
+	}
+
+	OwnFile RenameOwnFile(const std::wstring& folder, const wchar_t* name, const wchar_t* newName, FileFolder where)
+	{
+		OwnFile result;
+		const std::wstring target = folder + L"\\" + newName;
+
+		// A file already at the new name is replaced - but only one that is what its path says: a link
+		// there is left alone, and nothing is renamed.
+		const HANDLE existing = CreateFileW(target.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+			nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+		if (existing == INVALID_HANDLE_VALUE)
+		{
+			const DWORD error = GetLastError();
+			if (error != ERROR_FILE_NOT_FOUND)
+			{
+				result.error = error;
+				return result;
+			}
+		}
+		else
+		{
+			const std::string unsafe = Check(existing, folder, newName, where);
+			CloseHandle(existing);
+			if (!unsafe.empty())
+			{
+				result.unsafe = "the " + ToUtf8(newName) + " already there is not replaced: " + unsafe;
+				return result;
+			}
+		}
+
+		// The file itself: opened for its name to change, checked, then renamed through the handle
+		const std::wstring path = folder + L"\\" + name;
+		result.handle = CreateFileW(path.c_str(), DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+		if (result.handle == INVALID_HANDLE_VALUE)
+		{
+			result.error = GetLastError();
+			return result;
+		}
+		result.unsafe = Check(result.handle, folder, name, where);
+		if (result.unsafe.empty())
+		{
+			// FILE_RENAME_INFO ends in the new name, so it is sized for it here
+			const size_t nameBytes = target.size() * sizeof(wchar_t);
+			std::vector<uint8_t> buffer(offsetof(FILE_RENAME_INFO, FileName) + nameBytes + sizeof(wchar_t), 0);
+			const auto info = reinterpret_cast<FILE_RENAME_INFO*>(buffer.data());
+			info->ReplaceIfExists = TRUE;
+			info->RootDirectory = nullptr;
+			info->FileNameLength = static_cast<DWORD>(nameBytes);
+			memcpy(info->FileName, target.c_str(), nameBytes + sizeof(wchar_t));
+			if (!SetFileInformationByHandle(result.handle, FileRenameInfo, info, static_cast<DWORD>(buffer.size())))
+				result.error = GetLastError();
+		}
+		CloseHandle(result.handle);
+		result.handle = INVALID_HANDLE_VALUE;
 		return result;
 	}
 }

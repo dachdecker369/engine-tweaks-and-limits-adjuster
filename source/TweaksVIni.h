@@ -8,7 +8,7 @@
 namespace TweaksV
 {
 	// Folder of GTA5_Enhanced.exe, without a trailing backslash. TweaksV.ini,
-	// TweaksV.log, mods\ and newmods\ live there, wherever TweaksV.asi itself sits.
+	// TweaksV.log and mods\ live there, wherever TweaksV.asi itself sits.
 	const std::wstring& GetGameFolder();
 
 	// %LOCALAPPDATA%\TweaksV - where TweaksV.ini and TweaksV.log go when the game
@@ -22,8 +22,10 @@ namespace TweaksV
 	const wchar_t* GetIniPathW();
 
 	// Picks the TweaksV.ini to use (see GetIniPathW) and writes the full default file
-	// (DefaultIniText) if there is none. For an existing file, only adds keys that are
-	// missing - never changes a value. The file is used only if it is what its path says
+	// (DefaultIniText) if there is none. An existing file with the layout of TweaksV 1.x - no VERSION
+	// under [TWEAKSV] - is renamed to TweaksV.old.ini and the default file written in its place; any
+	// other existing file only gets the keys it is missing, and a value is never changed. The file is
+	// used only if it is what its path says
 	// (TweaksVFiles.h), and is then held until ReleaseIniFile(); a file that fails the check
 	// is reported and not read at all, so every setting keeps its default.
 	void CreateOrUpdateIni();

@@ -6,7 +6,6 @@
 #include <Windows.h>
 // TweaksV: <algorithm>, <iostream> and <thread> removed - nothing uses them
 #include <string>
-#include <filesystem>
 #include <vector>
 
 #include "log.h"

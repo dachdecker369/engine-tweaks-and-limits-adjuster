@@ -44,7 +44,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 			TweaksV::WriteLogHeader();
 			if (TweaksV::IsOn(TweaksV::kConsole))					// 6.
 				TweaksV::OpenConsole();
-			if (TweaksV::IsOn(TweaksV::kCheckForConflicts))			// 7.
+			if (TweaksV::IsOn(TweaksV::kConflictCheck))			// 7.
 				TweaksV::CheckForConflicts();
 #ifdef TWEAKSV_TEST_BUILD
 			TweaksV::StartCodeDump();								//    test builds: before anything is patched

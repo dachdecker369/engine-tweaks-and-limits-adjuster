@@ -8,8 +8,8 @@
 // files - add-on and mod content - go missing, and the decals that use them never appear.
 //   DECALDEFS_SIZE  the new limit, from the game's own 260 up to 16384 (a definition's index is a uint16
 //                   in the game's decal instances)
-//   LOG_DECALDEFS   testing: 10 seconds in and then every minute while it changes, the log says how many
-//                   definitions are registered, against the limit and the game's own 260 - the number
+//   DIAGNOSTIC_MODE the measurement: 10 seconds in and then every minute while it changes, the log says
+//                   how many definitions are registered, against the limit and the game's own 260 - the number
 //                   that says whether a load needs the larger array at all; nothing is hooked for it
 // 23 instructions carry the limit as an imm32: the parser's "full" check and 12 more compare an index
 // against N-1, 9 use N as the index that means "no such definition", and the decal manager's start-up
@@ -56,7 +56,7 @@ namespace TweaksV
 		constexpr size_t kConstantSites = 23;			// the instructions that carry the limit
 		constexpr size_t kLeaSize = 7;					// REX.W, 8D, ModRM, disp32
 		constexpr size_t kCountToArray = 16;			// the array lies this many bytes after its count
-		constexpr DWORD kFirstSummaryMs = 10000;		// LOG_DECALDEFS: the first summary, then one every minute
+		constexpr DWORD kFirstSummaryMs = 10000;		// DIAGNOSTIC_MODE: the first summary, then one every minute
 		constexpr DWORD kSummaryEveryMs = 60000;
 		constexpr DWORD kReadable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE |
 			PAGE_EXECUTE_WRITECOPY;
@@ -162,7 +162,7 @@ namespace TweaksV
 			return holds == Holds::NMinus1 ? "N-1" : holds == Holds::N ? "N" : "loop end";
 		}
 
-		// ---- LOG_DECALDEFS
+		// ---- the measurement (DIAGNOSTIC_MODE)
 
 		const volatile uint32_t* g_count = nullptr;	// the game's count of registered definitions
 		uint32_t g_capacity = 0;					// the array in use: the new one, or the game's own with DRY_RUN
@@ -170,7 +170,7 @@ namespace TweaksV
 
 		void LogSummary(uint32_t registered)
 		{
-			std::string line = "LOG_DECALDEFS: " + std::to_string(registered) + " decal definitions registered (the game's own array holds " +
+			std::string line = "DIAGNOSTIC: " + std::to_string(registered) + " decal definitions registered (the game's own array holds " +
 				std::to_string(g_vanillaSize) + (g_capacity == g_vanillaSize ? std::string(" and is in use") : ", this one " + std::to_string(g_capacity)) + ")";
 			if (registered > g_vanillaSize)
 				line += " - the game's own array would have dropped " + std::to_string(registered - g_vanillaSize) + " of them";
@@ -207,14 +207,14 @@ namespace TweaksV
 			if (thread)
 				CloseHandle(thread);
 			else
-				ReportFailure(kTag, "LOG_DECALDEFS: the summary thread could not be started (" + DescribeError(GetLastError()) +
+				ReportFailure(kTag, "DIAGNOSTIC: the summary thread could not be started (" + DescribeError(GetLastError()) +
 					") - the number of registered definitions is never logged.");
 		}
 	}
 
 	void InitDecalDefs()
 	{
-		const bool logDefs = IsOn(kLogDecalDefs);
+		const bool logDefs = IsDiagnosticMode();	// the measurement: the count is read and logged
 
 		// 1. the parser's "full" check: the count's address from the mov before it, N from its compare
 		uint8_t* const fullCheck = MemScanner::Find(Pattern("D-E-L1"));
@@ -407,7 +407,7 @@ namespace TweaksV
 				std::to_string(constants.size()) + " sites).");
 			if (logDefs)
 			{
-				WriteLog(kTag, "LOG_DECALDEFS: the number of registered decal definitions is logged after 10 seconds, then every minute "
+				WriteLog(kTag, "DIAGNOSTIC: the number of registered decal definitions is logged after 10 seconds, then every minute "
 					"while it changes (DRY_RUN: the game's own array is in use).");
 				StartSummaryThread();
 			}
@@ -453,7 +453,7 @@ namespace TweaksV
 			" entries.");
 		if (logDefs)
 		{
-			WriteLog(kTag, "LOG_DECALDEFS: the number of registered decal definitions is logged after 10 seconds, then every minute while it changes.");
+			WriteLog(kTag, "DIAGNOSTIC: the number of registered decal definitions is logged after 10 seconds, then every minute while it changes.");
 			StartSummaryThread();
 		}
 	}

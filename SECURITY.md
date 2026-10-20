@@ -1,6 +1,6 @@
 # Security
 
-TweaksV runs inside GTA V Enhanced on players' PCs, so it treats every file and setting it reads as possibly hostile. A way to make it do harm all the same - with a crafted `TweaksV.ini`, a file in the game, `mods` or `newmods` folder, or a link where its own files go - is a security problem.
+TweaksV runs inside GTA V Enhanced on players' PCs, so it treats every file and setting it reads as possibly hostile. A way to make it do harm all the same - with a crafted `TweaksV.ini`, a file in the game or `mods` folder, or a link where its own files go - is a security problem.
 
 ## Reporting a Problem
 

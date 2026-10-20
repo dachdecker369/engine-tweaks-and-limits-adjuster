@@ -38,4 +38,10 @@ namespace TweaksV
 	// the file nor a folder above it can be renamed, deleted or replaced, so the functions that open
 	// it by its path (GetPrivateProfileStringW, WritePrivateProfileStringW) reach this very file.
 	OwnFile HoldOwnFile(const std::wstring& folder, const wchar_t* name, FileFolder where);
+
+	// Renames folder\name to folder\newName through a handle on the file, after the same check: a link
+	// is never renamed. A file already at the new name is replaced, when it passes the check itself;
+	// otherwise nothing is renamed and unsafe says why. Comes back without a handle: error is
+	// ERROR_SUCCESS once the file has its new name.
+	OwnFile RenameOwnFile(const std::wstring& folder, const wchar_t* name, const wchar_t* newName, FileFolder where);
 }

@@ -9,7 +9,7 @@ namespace TweaksV
 	// Records a problem for the start-up summary and logs it. Thread-safe.
 	void ReportFailure(const char* plugin, const std::string& what);
 
-	// One message box listing everything reported so far - only if SHOW_ERROR_POPUPS=1
+	// One message box listing everything reported so far - only if ERROR_POPUP=1
 	// and there is something to report. Shown at most once. Never call it from DllMain.
 	void ShowStartupSummary();
 

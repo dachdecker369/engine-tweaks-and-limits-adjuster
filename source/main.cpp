@@ -19,7 +19,7 @@ static std::atomic<bool> bInited{ false };
 void (*origGetSystemTimeAsFileTime)(LPFILETIME lpSystemTimeAsFileTime);
 static PVOID g_timeHookTarget = nullptr; // TweaksV: GetSystemTimeAsFileTime itself, to unhook it after the start-up
 
-// TweaksV: RageOpenV looks for mods\ and newmods\ in the current directory, as the original did;
+// TweaksV: RageOpenV looks for the mods folder in the current directory, as the original did;
 // says so in the log when that is not the game folder
 static void LogCurrentDirectory()
 {
@@ -35,7 +35,7 @@ static void LogCurrentDirectory()
 		here.pop_back();
 	if (_wcsicmp(game.c_str(), here.c_str()) != 0)
 		TweaksV::WriteLog("RageOpenV", "The current directory is " + TweaksV::ToUtf8(here) +
-			", not the game folder - the mods and newmods folders are looked for there, as in the original.");
+			", not the game folder - the mods folder is looked for there, as in the original.");
 }
 
 void HookGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
@@ -133,7 +133,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  dwReason, LPVOID lpReserved)
 
 		if (!memory::init()) { // TweaksV: checked
 			TweaksV::ReportFailure("RageOpenV", "RageOpenV could not start: MinHook could not be initialised (details "
-				"in TweaksV.log). The mods folder, OPEN archives and newmods are off this session.");
+				"in TweaksV.log). The mods folder and OPEN archives are off this session.");
 			return FALSE;
 		}
 
@@ -148,7 +148,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  dwReason, LPVOID lpReserved)
 			&g_timeHookTarget)) { // TweaksV: + the target, to unhook it after the start-up
 			logger::write("error", "Hooking failed error (%ld)", GetLastError()); // TweaksV: "error" - was "info"
 			TweaksV::ReportFailure("RageOpenV", "RageOpenV could not start: the GetSystemTimeAsFileTime hook failed "
-				"(details in TweaksV.log). The mods folder, OPEN archives and newmods are off this session.");
+				"(details in TweaksV.log). The mods folder and OPEN archives are off this session.");
 			return FALSE; // TweaksV: TweaksV's DllMain shows the start-up summary instead
 		}
 	}

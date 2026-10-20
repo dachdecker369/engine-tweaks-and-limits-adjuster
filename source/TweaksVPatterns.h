@@ -108,8 +108,8 @@ namespace TweaksV
 		{ "D-E-L15", "E8 ? ? ? ? 3D 03 01 00 00 7F" },
 		{ "D-E-L16", "89 C3 31 C0 81 FB 03 01 00 00 0F 8F" },
 
-		// RageOpenV: the console, the RPF cache check, the 8 file functions, the 5 encryption calls, the
-		// newmods mount call and archive function, and the game functions the newmods devices call
+		// RageOpenV: the console, the RPF cache check, the 8 file functions and the 5 encryption calls (the
+		// five newmods patterns went with the newmods folder; PATTERNS.md keeps their rows as removed)
 		{ "R-E-C1", "ff 15 ? ? ? ? 48 85 c0 74 ? 48 89 c1 31 d2" },
 		{ "R-E-K1", "e8 ? ? ? ? 48 8d 0d ? ? ? ? 48 8d 15 ? ? ? ? 48 8d 35" },
 		{ "R-E-F1", "41 56 56 57 53 48 81 ec ? ? ? ? 4c 89 c7 66 c7 ? ? ? ? ? 4c 8d 74 24" },
@@ -125,11 +125,6 @@ namespace TweaksV
 		{ "R-E-E3", "e8 ? ? ? ? 48 8b 46 ? 66 c7 00 00 ? eb" },
 		{ "R-E-E4", "e8 ? ? ? ? 48 8b 46 ? 8b 4c 24 ? 48 8d 14 08" },
 		{ "R-E-E5", "c6 86 ? ? ? ? ? 48 89 f1 4c 89 fa 45 89 f0 45 31 c9" },
-		{ "R-E-M0", "41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec ? ? ? ? 89 d6 49 89 ce" },
-		{ "R-E-M1", "e8 ? ? ? ? 48 8d 05 ? ? ? ? 66 c7 44 58 02 00 00 66 89 3d" },
-		{ "R-E-M2", "41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec ? ? ? ? 45 89 cd 45 89 c6 49 89 d7 48 89 ce 8b 05" },
-		{ "R-E-D1", "56 57 53 48 81 ec ? ? ? ? 48 83 79 ? ? 0f 84 ? ? ? ? 48 89 d7" },
-		{ "R-E-D2", "56 57 53 48 81 ec ? ? ? ? 4c 89 cf 44 89 c3" },
 
 		// StraightToStoryMode: the splash screen, the legal screen, the landing page
 		{ "S-E1", "0F 85 A9 00 00 00 48 8D 54" },

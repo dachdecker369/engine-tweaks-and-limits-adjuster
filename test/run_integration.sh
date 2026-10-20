@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # TweaksV as a whole, in the fake game: old plugins present, one pattern deliberately broken per
 # plugin with the TEST build, another game exe, no C runtime DLLs, a renamed .asi, no code changes
-# allowed, DIAGNOSTIC_MODE without a newmods folder.
+# allowed, the user name kept out of the log, the log's limit, links, a read-only game folder, a held log, the code dump.
 # Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" TweaksV.asi
 cp "$R/object/Test/Release/TweaksV.asi" TweaksV_test.asi
-mkdir -p appdata mods/test newmods scripts plugins
+mkdir -p appdata mods/test scripts plugins
 echo hi > mods/test/file.txt
 
 ALL_ON_HEAP='heap: 1024 MB'
@@ -22,9 +22,9 @@ BOX_ON='box refs: 8 new 0 game 0 other (RW, 784 KB) | box caps: 10000 10000 1000
 BOX_OFF='box refs: 0 new 8 game 0 other | box caps: 1000 1000 1000 1000'
 DECAL_ON='decal refs: 31 new 0 game 0 other (RW, 1280 KB) | decal limits: 2047 2048 0x28198, 23 agree'
 DECAL_OFF='decal refs: 0 new 31 game 0 other | decal limits: 259 260 0x5918, 23 agree'
-ROV_ON='file hooks 8/8, redirect 8/8, pass 8/8, spellings ok, folder ok, outside ok | open calls 5/5, behaviour ok | newmods hooks 2/2'
+ROV_ON='file hooks 8/8, redirect 8/8, pass 8/8, spellings ok, folder ok, outside ok | open calls 5/5, behaviour ok'
 ROV_OFF='rov api hook: no'
-summary_once() { [ "$(count 'Start-up summary not shown (SHOW_ERROR_POPUPS=0)')" -eq 1 ]; }
+summary_once() { [ "$(count 'Start-up summary not shown (ERROR_POPUP=0)')" -eq 1 ]; }
 
 echo "== I1 each old plugin on its own: only its part is skipped"
 for old in HeapAdjuster.asi ZHeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi PackfileLimitAdjusterEnhanced.asi DecalPatch.asi RageOpenV.asi OpenRPF.asi OpenIV.asi StraightToStoryMode.asi DirectStorageFix.asi; do
@@ -47,7 +47,7 @@ touch HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdju
 out=$(game full_game.exe); echo "      $out"
 rm -f HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdjusterEnhanced.asi scripts/OpenRPF.asi StraightToStoryMode.asi scripts/DecalPatch.asi
 check "nothing applied: the six old plugins switch every part off" "has '$GAME_HEAP' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$ROV_OFF' && has '$STORY_OFF' && has '$BOX_OFF' && has '$DECAL_OFF'"
-check "all six reported (DecalPatch.asi for two parts), one summary with 7 problems, no crash" "[ \$(count 'PROBLEM: Old plugin found') -eq 7 ] && log_has 'Start-up summary not shown (SHOW_ERROR_POPUPS=0): 7 problem' && summary_once"
+check "all six reported (DecalPatch.asi for two parts), one summary with 7 problems, no crash" "[ \$(count 'PROBLEM: Old plugin found') -eq 7 ] && log_has 'Start-up summary not shown (ERROR_POPUP=0): 7 problem' && summary_once"
 
 echo "== I3 TEST build, one pattern broken per plugin: only that part is skipped, one summary"
 breaktest() {	# description, the pattern's label, expected-output check
@@ -70,12 +70,10 @@ breaktest "D-E-L3 (a decal definitions site): array untouched, the rest applied"
 	"has '$DECAL_OFF' && has '$BOX_ON' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'"
 breaktest "D-E-L12 (the shared 'add decal' check, needed 7 times): array untouched, the rest applied" "D-E-L12" \
 	"has '$DECAL_OFF' && has '$BOX_ON' && has '$ROV_ON' && log_has 'A site of the decal definitions limit was not found in the game code: D-E-L12'"
-breaktest "R-E-F5 (a file function): no file hooks, OPEN and newmods on" "R-E-F5" \
-	"has 'file hooks 0/8 | open calls 5/5, behaviour ok | newmods hooks 2/2' && has '$PACK_ON'"
-breaktest "R-E-E3 (an encryption call): no OPEN calls, files and newmods on" "R-E-E3" \
-	"has 'file hooks 8/8, redirect 8/8, pass 8/8, spellings ok, folder ok, outside ok | open calls 0/5 | newmods hooks 2/2'"
-breaktest "R-E-M1 (the mount call): no newmods hooks, files and OPEN on" "R-E-M1" \
-	"has 'file hooks 8/8, redirect 8/8, pass 8/8, spellings ok, folder ok, outside ok | open calls 5/5, behaviour ok | newmods hooks 0/2'"
+breaktest "R-E-F5 (a file function): no file hooks, OPEN on" "R-E-F5" \
+	"has 'file hooks 0/8 | open calls 5/5, behaviour ok' && has '$PACK_ON'"
+breaktest "R-E-E3 (an encryption call): no OPEN calls, files on" "R-E-E3" \
+	"has 'file hooks 8/8, redirect 8/8, pass 8/8, spellings ok, folder ok, outside ok | open calls 0/5'"
 breaktest "S-E2 (the legal screen): only that screen is left, the others skipped" "S-E2" \
 	"has 'splash: E9 86 01 00 00 90 | legal: 0F 84 07 05 00 00 | landing: 31 C0 C3 24 08' && has '$ROV_ON'"
 breaktest "a label in small letters works too" "h-e1" \
@@ -108,11 +106,6 @@ check "nothing written: game code, protection and call targets as they were" "ha
 check "every part reported" "log_has 'PROBLEM: The heap size could not be changed' && [ \$(count 'PROBLEM: The .* could not be patched') -eq 3 ] && log_has 'PROBLEM: .*modkit' && log_has 'PROBLEM: The packfile limit is not changed' && log_has 'PROBLEM: The box streamer.s traversal list is not enlarged' && log_has 'PROBLEM: The decal definitions limit is not raised' && log_has 'PROBLEM: RageOpenV could not start'"
 check "one start-up summary" "summary_once"
 
-echo "== I8 DIAGNOSTIC_MODE without a newmods folder: the newmods patterns are still checked, nothing mounted"
-fresh_ini; setkey DIAGNOSTIC_MODE 1; rmdir newmods; out=$(game full_game.exe); mkdir -p newmods
-check "newmods not hooked, the rest applied" "has 'newmods hooks 0/2' && has 'file hooks 8/8' && has 'open calls 5/5'"
-check "its 5 patterns found once each and logged, no problem" "[ \$(grep -c -E 'Pattern R-E-(M[0-2]|D[12]) found: .* 1 match,' TweaksV.log) -eq 5 ] && log_has 'the patterns were checked (DIAGNOSTIC_MODE), nothing is mounted' && ! log_has 'PROBLEM'"
-
 echo "== I9 the Windows user name stays out of the log: the profile folder is written as %USERPROFILE%, in both its forms"
 bw=$(cygpath -w "$B")	# the game folder, here the profile folder too
 fresh_ini; out=$(USERPROFILE="$bw" game full_game.exe)
@@ -143,7 +136,7 @@ check "the log goes to %LOCALAPPDATA%\\TweaksV and says why; the game is patched
 rm -f TweaksV.log victim.txt; rm -rf appdata/TweaksV
 
 echo "== I12 TweaksV.ini in the game folder is a hard link to another file: neither read nor written"
-fresh_ini; setkey SKIP_SPLASH_SCREEN 0 STRAIGHTTOSTORYMODE_SETTINGS; sed -b -i '/^HEAP_SIZE=/d' TweaksV.ini
+fresh_ini; setkey SKIP_SPLASH_SCREEN 0 STRAIGHTTOSTORYMODE; sed -b -i '/^HEAP_SIZE=/d' TweaksV.ini
 mv TweaksV.ini victim.ini; cp victim.ini victim.before; ln victim.ini TweaksV.ini
 out=$(ASI=TweaksV_test.asi game full_game.exe)
 check "the other file is unchanged - its missing key was not added" "cmp -s victim.ini victim.before"
@@ -174,7 +167,7 @@ check "TweaksV.ini is read (its HEAP_SIZE, not the default), TweaksV.log rewritt
 rm -f TweaksV.log
 
 # Read-only as under C:\Program Files: a deny entry for this user on the folder alone (not on the files
-# in it) lets nothing be added to it. The test build, as TweaksV.ini starts out with SHOW_ERROR_POPUPS=1.
+# in it) lets nothing be added to it. The test build, as TweaksV.ini starts out with ERROR_POPUP=1.
 echo "== I15 a read-only game folder (as under C:\\Program Files): both files in %LOCALAPPDATA%\\TweaksV, only logged"
 rm -rf ro appdata/TweaksV; mkdir -p ro; cp full_game.exe ro/GTA5_Enhanced.exe; cp TweaksV_test.asi ro/TweaksV.asi
 sid=$(MSYS_NO_PATHCONV=1 "$(cygpath -S)/whoami.exe" /user /fo csv /nh | tr -d '\r' | sed -n 's/.*,"\(S-[0-9-]*\)"$/\1/p')
@@ -185,7 +178,7 @@ check "the folder is read-only (a check of the test itself)" "[ -n '$sid' ] && !
 ro_run
 check "TweaksV.ini created there with the defaults, TweaksV.log written there: logged, no problem" "[ -f $fb/TweaksV.ini ] && grep -q 'The game folder is read-only (Windows error 5, access denied), so TweaksV.ini was created with the default settings in ' $fb/TweaksV.log && grep -q 'The game folder is read-only (Windows error 5, access denied), so TweaksV.log is written to ' $fb/TweaksV.log && ! grep -q 'PROBLEM' $fb/TweaksV.log"
 check "nothing in the game folder; the game is patched with the defaults" "[ ! -e ro/TweaksV.ini ] && [ ! -e ro/TweaksV.log ] && has 'heap: 2000 MB' && has 'splash: E9 86 01 00 00 90'"
-sed -b -i 's/^HEAP_SIZE=.*\r$/HEAP_SIZE=1500\r/; s/^SHOW_ERROR_POPUPS=.*\r$/SHOW_ERROR_POPUPS=0\r/' $fb/TweaksV.ini
+sed -b -i 's/^HEAP_SIZE=.*\r$/HEAP_SIZE=1500\r/; s/^ERROR_POPUP=.*\r$/ERROR_POPUP=0\r/' $fb/TweaksV.ini
 ro_run
 check "the next start reads that TweaksV.ini (HEAP_SIZE=1500) and says where it is" "has 'heap: 1500 MB' && grep -q 'TweaksV.ini: .*TweaksV.ini (the game folder has no TweaksV.ini)' $fb/TweaksV.log && ! grep -q 'PROBLEM' $fb/TweaksV.log"
 MSYS_NO_PATHCONV=1 icacls "$(cygpath -w ro)" /remove:d "*$sid" > /dev/null
@@ -196,7 +189,7 @@ echo "== I16 another program holds TweaksV.log in the game folder open: the log 
 fresh_ini; rm -rf appdata/TweaksV; echo "an older log" > TweaksV.log
 link_run lockedlog
 check "the log was held, and is left as it was" "has 'log held' && [ \"\$(cat TweaksV.log)\" = 'an older log' ]"
-check "the log is written to %LOCALAPPDATA%\\TweaksV, and the start-up summary says why; the game is patched" "grep -q 'PROBLEM: The TweaksV.log in the game folder is not used: Windows error 32, file in use. TweaksV.log is written to ' appdata/TweaksV/TweaksV.log && grep -q 'Start-up summary not shown (SHOW_ERROR_POPUPS=0): 1 problem' appdata/TweaksV/TweaksV.log && has '$ALL_ON_HEAP'"
+check "the log is written to %LOCALAPPDATA%\\TweaksV, and the start-up summary says why; the game is patched" "grep -q 'PROBLEM: The TweaksV.log in the game folder is not used: Windows error 32, file in use. TweaksV.log is written to ' appdata/TweaksV/TweaksV.log && grep -q 'Start-up summary not shown (ERROR_POPUP=0): 1 problem' appdata/TweaksV/TweaksV.log && has '$ALL_ON_HEAP'"
 rm -f TweaksV.log; rm -rf appdata/TweaksV
 
 # Test builds only: the game's code as it is in memory, for finding patterns. The fake game's copies of

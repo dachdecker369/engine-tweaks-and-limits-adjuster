@@ -125,39 +125,8 @@ public:
 		MH_RemoveHook((void*)address);
 	}
 
-	template<typename RetType, typename... Args>
-	class func
-	{
-		using FuncType = RetType(__fastcall*)(Args...);
-		FuncType mainFunc;
-
-		const TweaksV::GamePattern& pattern; // TweaksV: an entry of TweaksVPatterns.h - was std::string sig
-	public:
-		// TweaksV: no longer registers an init function of its own - the init function of the
-		// group that uses it calls run() after checking its switch, and skips the group if the
-		// function was not found
-		func(const TweaksV::GamePattern& _pattern) : mainFunc(nullptr), pattern(_pattern)
-		{
-		}
-
-		// TweaksV: returns whether the function was found
-		bool run()
-		{
-			mainFunc = memory::scan(pattern).as<FuncType>();
-			return mainFunc != nullptr;
-		}
-
-		// TweaksV: the function's address, for checks and the log
-		void* get() const
-		{
-			return (void*)mainFunc;
-		}
-
-		RetType operator()(Args...args)
-		{
-			return this->mainFunc(args...);
-		}
-	};
+	// TweaksV: the func template - a game function called through its pattern - went with the newmods
+	// device, the only code that used it
 
 	// TweaksV: HookIAT() removed - import hooking cannot work on GTA V Enhanced (its imports are
 	// obfuscated, as the note in main.cpp says) and nothing called it

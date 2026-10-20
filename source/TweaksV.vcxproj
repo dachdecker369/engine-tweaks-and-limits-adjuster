@@ -143,8 +143,6 @@
     <ClCompile Include="ModkitLimitAdjusterEnhanced_Logging.cpp" />
     <ClCompile Include="PackfileLimitAdjusterEnhanced_Game.cpp" />
     <ClCompile Include="PackfileLimitAdjusterEnhanced_Logging.cpp" />
-    <ClCompile Include="CustomDevice.cpp" />
-    <ClCompile Include="fiDevice.cpp" />
     <ClCompile Include="FileReadHooks.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
