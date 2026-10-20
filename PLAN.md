@@ -40,8 +40,8 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 
 ### 2. The template: HeapAdjuster and StraightToStoryMode
 
-- [ ] `TweaksVHeapAdjuster.cpp`, `.h` and `TweaksVStraightToStoryMode.cpp`, `.h` written on the pattern table, `TweaksVPatch` and the settings; the originals' files deleted; the feature table entries renamed; the log wording of section 5.4.
-- [ ] The `story` suite and the integration checks on the new lines.
+- [x] `TweaksVHeapAdjuster.cpp`, `.h` and `TweaksVStraightToStoryMode.cpp`, `.h` written on the pattern table, `TweaksVPatch` and the settings; the originals' files deleted; the feature table entries renamed; the log wording of section 5.4.
+- [x] The `story` suite and the integration checks on the new lines.
 - Checkpoint: suites green; my boot with `DIAGNOSTIC_MODE=1` (the three screens skipped, the heap at 2000 MB, the lines in the new wording).
 
 ### 3. The relocation core and the four array parts
@@ -82,6 +82,6 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 
 ## Next steps
 
-1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phase 1 is built and committed, the suites green with 421 checks; my checkpoint boot of it is next, then phase 2.
+1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phases 1 and 2 are built, committed and booted (phase 2's checkpoint boot is next), the suites green with 423 checks; then phase 3.
 2. Phase 6: the 2.0.0 commit, my boots of SPECIFICATIONS.md section 8, then push and tag on my word, then Nexus, then the removal of these two files.
 3. Open: nothing; the session asks me again whenever something new comes up.

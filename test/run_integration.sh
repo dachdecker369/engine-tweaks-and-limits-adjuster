@@ -103,7 +103,7 @@ echo "== I7 no code may be changed (Windows' dynamic code policy): every write f
 fresh_ini; out=$(game full_game.exe nodyncode); echo "      $out"
 check "harness survived to its report, the policy was set" "has 'protect: ' && ! has 'dynamic code policy not set'"
 check "nothing written: game code, protection and call targets as they were" "has '$GAME_HEAP' && has '$STORY_OFF' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$BOX_OFF' && has '$DECAL_OFF' && has 'stubs: 0, all RX' && has 'protect: all restored (RX)'"
-check "every part reported" "log_has 'PROBLEM: The heap size could not be changed' && [ \$(count 'PROBLEM: The .* could not be patched') -eq 3 ] && log_has 'PROBLEM: .*modkit' && log_has 'PROBLEM: The packfile limit is not changed' && log_has 'PROBLEM: The box streamer.s traversal list is not enlarged' && log_has 'PROBLEM: The decal definitions limit is not raised' && log_has 'PROBLEM: RageOpenV could not start'"
+check "every part reported" "log_has 'PROBLEM: The heap size is not changed this session: the game code could not be made writable' && [ \$(count 'is not skipped this session: the game code could not be made writable') -eq 3 ] && log_has 'PROBLEM: .*modkit' && log_has 'PROBLEM: The packfile limit is not changed' && log_has 'PROBLEM: The box streamer.s traversal list is not enlarged' && log_has 'PROBLEM: The decal definitions limit is not raised' && log_has 'PROBLEM: RageOpenV could not start'"
 check "one start-up summary" "summary_once"
 
 echo "== I9 the Windows user name stays out of the log: the profile folder is written as %USERPROFILE%, in both its forms"

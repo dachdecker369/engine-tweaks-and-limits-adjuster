@@ -58,8 +58,6 @@ namespace TweaksV
 		constexpr size_t kCountToArray = 16;			// the array lies this many bytes after its count
 		constexpr DWORD kFirstSummaryMs = 10000;		// DIAGNOSTIC_MODE: the first summary, then one every minute
 		constexpr DWORD kSummaryEveryMs = 60000;
-		constexpr DWORD kReadable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE |
-			PAGE_EXECUTE_WRITECOPY;
 
 		// What a constant site holds: N-1 (the last valid index, which an index is compared against), N (the
 		// index that means "no such definition") or the end of the start-up loop (its start offset + N x 80).
@@ -135,26 +133,6 @@ namespace TweaksV
 			uint32_t value = 0;
 			memcpy(&value, address, sizeof(value));
 			return value;
-		}
-
-		// True if the size bytes at address are committed, readable memory. A site that lies past the end
-		// of a pattern's match is read only after this check: the match's own bytes were read by the scan,
-		// the bytes after it were not.
-		bool IsReadable(const void* address, size_t size)
-		{
-			const auto begin = reinterpret_cast<uintptr_t>(address);
-			for (uintptr_t at = begin; at < begin + size;)
-			{
-				MEMORY_BASIC_INFORMATION info{};
-				if (VirtualQuery(reinterpret_cast<const void*>(at), &info, sizeof(info)) != sizeof(info) || info.State != MEM_COMMIT ||
-					(info.Protect & (PAGE_GUARD | PAGE_NOACCESS)) || !(info.Protect & kReadable))
-					return false;
-				const uintptr_t next = reinterpret_cast<uintptr_t>(info.BaseAddress) + info.RegionSize;
-				if (next <= at)
-					return false;
-				at = next;
-			}
-			return true;
 		}
 
 		const char* Describe(Holds holds)

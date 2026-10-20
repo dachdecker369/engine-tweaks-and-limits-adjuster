@@ -16,7 +16,7 @@ check "splash: jz +0x185 -> jmp +0x186 / nop (computed, same as upstream's bytes
 check "legal: 6 NOPs" "[[ \"\$out\" == *\"$NEW_LEGAL\"* ]]"
 check "landing page: xor eax,eax / ret" "[[ \"\$out\" == *\"$NEW_LANDING\"* ]]"
 check "heap 1024 MB" "[[ \"\$out\" == *'heap: 1024 MB'* ]]"
-check "'Patch successful!' logged" "log_has '\[StraightToStoryMode\] Patch successful!'"
+check "the three patch lines, old -> new bytes" "log_has 'Splash screen patched: 0F 84 85 01 00 00 -> E9 86 01 00 00 90.' && log_has 'Legal screen patched: 0F 84 07 05 00 00 -> 90 90 90 90 90 90.' && log_has 'Landing page patched: 48 89 5C -> 31 C0 C3.'"
 check "no problems" "! log_has 'PROBLEM'"
 
 echo "== S2 the three switches off: nothing changed"
@@ -37,8 +37,8 @@ check "no StraightToStoryMode lines" "! log_has '\[StraightToStoryMode\]'"
 echo "== S5 DRY_RUN=1: found and checked, nothing written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
 check "nothing changed" "[[ \"\$out\" == *\"$ORIG_SPLASH\"* && \"\$out\" == *\"$ORIG_LEGAL\"* && \"\$out\" == *\"$ORIG_LANDING\"* ]]"
-check "three 'would patch' lines with old -> new bytes" "[ \$(count 'DRY_RUN: would patch the') -eq 3 ] && log_has 'would patch the splash screen: 0F 84 85 01 00 00 -> E9 86 01 00 00 90'"
-check "no 'Patch successful!'" "! log_has 'Patch successful!'"
+check "four 'would patch' lines, the three screens and the heap, with old -> new bytes" "[ \$(count 'DRY_RUN: would patch the') -eq 4 ] && log_has 'would patch the splash screen: 0F 84 85 01 00 00 -> E9 86 01 00 00 90' && log_has 'would patch the heap size (648 MB -> 1024 MB): 00 00 80 28 -> 00 00 00 40'"
+check "no 'patched' line" "! log_has ' patched: '"
 
 echo "== S6 DIAGNOSTIC_MODE=1: every pattern and write logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
@@ -54,19 +54,19 @@ check "three 'already patched - skipped' lines, no problems" "[ \$(count 'alread
 echo "== S8 unexpected bytes at the splash site: refused, the others still applied"
 fresh_ini; out=$(game full_game.exe badsplash); echo "      $out"
 check "splash left alone" "[[ \"\$out\" == *'splash: 48 89 85 01 00 00'* ]]"
-check "refusal logged with the bytes found" "log_has 'The splash screen cannot be skipped: the game code found is not the expected instruction (48 89 85 01 00 00)'"
+check "refusal logged with the bytes found" "log_has 'The splash screen is not skipped this session: the game code found is not the expected instruction (48 89 85 01 00 00).'"
 check "legal and landing still patched" "[[ \"\$out\" == *\"$NEW_LEGAL\"* && \"\$out\" == *\"$NEW_LANDING\"* ]]"
 
 echo "== S9 unexpected bytes at the legal site: refused with the bytes logged"
 fresh_ini; out=$(game full_game.exe badlegal); echo "      $out"
 check "legal left alone" "[[ \"\$out\" == *'legal: 48 89 07 05 00 00'* ]]"
-check "refusal logged with the bytes found" "log_has 'The legal screen cannot be skipped: the game code found is not the expected instruction (48 89 07 05 00 00)'"
+check "refusal logged with the bytes found" "log_has 'The legal screen is not skipped this session: the game code found is not the expected instruction (48 89 07 05 00 00).'"
 
 echo "== S9b a jnz instead of the game's jz at the legal site: refused, the others still applied"
 fresh_ini; out=$(game full_game.exe jnzlegal); echo "      $out"
 check "legal left alone" "[[ \"\$out\" == *'legal: 0F 85 07 05 00 00'* ]]"
-check "refusal logged with the bytes found" "log_has 'The legal screen cannot be skipped: the game code found is not the expected instruction (0F 85 07 05 00 00)'"
-check "splash and landing still patched, no 'Patch successful!'" "[[ \"\$out\" == *\"$NEW_SPLASH\"* && \"\$out\" == *\"$NEW_LANDING\"* ]] && ! log_has 'Patch successful!'"
+check "refusal logged with the bytes found" "log_has 'The legal screen is not skipped this session: the game code found is not the expected instruction (0F 85 07 05 00 00).'"
+check "splash and landing still patched, the legal screen not" "[[ \"\$out\" == *\"$NEW_SPLASH\"* && \"\$out\" == *\"$NEW_LANDING\"* ]] && ! log_has 'Legal screen patched'"
 
 echo "== S10 the landing page function is hooked by another mod: left alone"
 fresh_ini; out=$(game full_game.exe hookedlanding); echo "      $out"
@@ -81,7 +81,13 @@ check "old plugin reported" "log_has 'Old plugin found: .*StraightToStoryMode.as
 echo "== S12 none of the game code present (plain fake game): each screen reported, no crash"
 fresh_ini; out=$(game plain_game.exe); echo "      $out"
 check "harness survived" "grep -q 'loaded' harness.out"
-check "three 'not found' problems" "log_has 'The splash screen cannot be skipped: its game code was not found' && log_has 'The legal screen cannot be skipped: its game code was not found' && log_has 'The landing page cannot be skipped: its game code was not found'"
+check "three 'not found' problems" "log_has 'The splash screen is not skipped this session: S-E1 was not found.' && log_has 'The legal screen is not skipped this session: S-E2 was not found.' && log_has 'The landing page is not skipped this session: S-E3 was not found.'"
+
+echo "== S13 another heap adjuster ran first (the site holds 2000 MB): logged, HEAP_SIZE applied on top of it"
+fresh_ini; out=$(game full_game.exe heapraised); echo "      $out"
+check "HEAP_SIZE=1024 is below the 2000 found: raised to it, nothing to patch, no problem" "[[ \"\$out\" == *'heap: 2000 MB'* ]] && log_has 'Another heap adjuster already ran: the heap is 2000 MB, not the game.s own' && log_has 'HEAP_SIZE=1024 is outside 2000..2047 - using 2000' && log_has 'Heap size is 2000 MB already (HEAP_SIZE=1024) - nothing to patch' && ! log_has 'PROBLEM'"
+fresh_ini; setkey HEAP_SIZE 2047; out=$(game full_game.exe heapraised)
+check "HEAP_SIZE=2047 is applied on top: 2000 -> 2047 MB" "[[ \"\$out\" == *'heap: 2047 MB'* ]] && log_has 'Heap size patched: 2000 MB -> 2047 MB.' && ! log_has 'PROBLEM'"
 
 echo
 echo "STORY SCENARIOS: $pass passed, $fail failed"

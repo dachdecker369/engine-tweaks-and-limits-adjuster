@@ -8,9 +8,6 @@
     <Filter Include="Shared">
       <UniqueIdentifier>{82CD2E76-CA21-4C93-940E-10F7C0B761D4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="HeapAdjusterEnhanced">
-      <UniqueIdentifier>{ED71B1E3-B9D5-4F9C-9CBA-8C6595F3B2C1}</UniqueIdentifier>
-    </Filter>
     <Filter Include="ModkitLimitAdjusterEnhanced">
       <UniqueIdentifier>{39AADB46-A54B-4023-A199-B2DF08B9504F}</UniqueIdentifier>
     </Filter>
@@ -19,9 +16,6 @@
     </Filter>
     <Filter Include="RageOpenV">
       <UniqueIdentifier>{B51F24F7-CBC4-49B5-913E-097F5C136CD4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="StraightToStoryMode">
-      <UniqueIdentifier>{9D4CF5F3-5EA7-455E-9C2C-9F51CC921EC8}</UniqueIdentifier>
     </Filter>
     <Filter Include="MinHook">
       <UniqueIdentifier>{F39B3B09-5489-40B0-B40A-92558779CAF3}</UniqueIdentifier>
@@ -52,6 +46,9 @@
     <ClCompile Include="TweaksVFiles.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVHeapAdjuster.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVIni.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -62,6 +59,9 @@
       <Filter>TweaksV</Filter>
     </ClCompile>
     <ClCompile Include="TweaksVSettings.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
+    <ClCompile Include="TweaksVStraightToStoryMode.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
     <ClCompile Include="TweaksVSummary.cpp">
@@ -75,9 +75,6 @@
     </ClCompile>
     <ClCompile Include="StubMemory.cpp">
       <Filter>Shared</Filter>
-    </ClCompile>
-    <ClCompile Include="HeapAdjusterEnhanced_Game.cpp">
-      <Filter>HeapAdjusterEnhanced</Filter>
     </ClCompile>
     <ClCompile Include="ModkitLimitAdjusterEnhanced_Game.cpp">
       <Filter>ModkitLimitAdjusterEnhanced</Filter>
@@ -102,12 +99,6 @@
     </ClCompile>
     <ClCompile Include="PackfileEncryptionHooks.cpp">
       <Filter>RageOpenV</Filter>
-    </ClCompile>
-    <ClCompile Include="StraightToStoryMode_Game.cpp">
-      <Filter>StraightToStoryMode</Filter>
-    </ClCompile>
-    <ClCompile Include="StraightToStoryMode_Logging.cpp">
-      <Filter>StraightToStoryMode</Filter>
     </ClCompile>
     <ClCompile Include="..\vendor\MinHook\src\buffer.c">
       <Filter>MinHook</Filter>
@@ -144,6 +135,9 @@
     <ClInclude Include="TweaksVFiles.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <ClInclude Include="TweaksVHeapAdjuster.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVIni.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
@@ -157,6 +151,9 @@
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVSettings.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVStraightToStoryMode.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVSummary.h">
@@ -176,9 +173,6 @@
     </ClInclude>
     <ClInclude Include="StubMemory.h">
       <Filter>Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="HeapAdjusterEnhanced_Game.h">
-      <Filter>HeapAdjusterEnhanced</Filter>
     </ClInclude>
     <ClInclude Include="ModkitLimitAdjusterEnhanced_Game.h">
       <Filter>ModkitLimitAdjusterEnhanced</Filter>
@@ -212,12 +206,6 @@
     </ClInclude>
     <ClInclude Include="rpf.h">
       <Filter>RageOpenV</Filter>
-    </ClInclude>
-    <ClInclude Include="StraightToStoryMode_Game.h">
-      <Filter>StraightToStoryMode</Filter>
-    </ClInclude>
-    <ClInclude Include="StraightToStoryMode_Logging.h">
-      <Filter>StraightToStoryMode</Filter>
     </ClInclude>
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h">
       <Filter>MinHook</Filter>

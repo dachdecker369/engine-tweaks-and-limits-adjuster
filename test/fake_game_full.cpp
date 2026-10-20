@@ -1,5 +1,5 @@
 // Test harness for TweaksV: pretends to be GTA5_Enhanced.exe and contains copies of the game
-// code TweaksV patches: HeapAdjusterEnhanced's, StraightToStoryMode's, ModkitLimitAdjusterEnhanced's,
+// code TweaksV patches: HeapAdjuster's, StraightToStoryMode's, ModkitLimitAdjusterEnhanced's,
 // PackfileLimitAdjusterEnhanced's, the BoxStreamer part's and the DecalDefs part's here, RageOpenV's in
 // fake_game_rov.cpp.
 // Prints every patch site after TweaksV.asi has loaded.
@@ -10,6 +10,7 @@
 //   badlegal       unexpected bytes at the legal site
 //   jnzlegal       a jnz instead of the game's jz at the legal site
 //   hookedlanding  the landing page function starts with a jmp (another mod's hook)
+//   heapraised     the heap site already holds 2000 MB (another heap adjuster ran first)
 //   modkitmoved / modkitsplit / modkitmismatch   see main()
 //   packmoved      one packfile array reference points outside the game (another mod moved it)
 //   packhooked     the streaming configuration call already leads outside the game
@@ -56,7 +57,7 @@ void RovForEachCallTarget(void (*fn)(const unsigned char*));
 // the game's code (build.cmd links this section as ERW).
 #pragma data_seg(".fakesit")
 
-// HeapAdjusterEnhanced: mov edx, 648 MiB / xor r8d,r8d / mov r9b,1 / call ... / lea rcx,...
+// HeapAdjuster: mov edx, 648 MiB / xor r8d,r8d / mov r9b,1 / call ... / lea rcx,...
 volatile unsigned char g_heapSite[] = { 0xBA, 0x00, 0x00, 0x80, 0x28, 0x45, 0x31, 0xC0, 0x41, 0xB1, 0x01,
 	0xE8, 0x11, 0x22, 0x33, 0x44, 0x48, 0x8D, 0x0D };
 
@@ -819,6 +820,11 @@ int wmain(int argc, wchar_t** argv)
 		SetBytes(g_legalSite, "\x0F\x85", 2);
 	if (HasOption(argc, argv, L"hookedlanding"))
 		SetBytes(g_landingCallee, "\xE9\x11\x22\x33\x44", 5);
+	if (HasOption(argc, argv, L"heapraised"))	// another heap adjuster ran first
+	{
+		const Site heap = SITE(g_heapSite, 1);
+		SetImm32(heap, 2000u << 20);
+	}
 
 	// Every modkit reference points at the game's own array...
 	for (const Site& site : g_modkitRefs)

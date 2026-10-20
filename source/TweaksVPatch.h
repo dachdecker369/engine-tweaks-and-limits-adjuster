@@ -79,4 +79,8 @@ namespace TweaksV
 	// without unwind data - the byte before it is padding or a ret (CC, 90, C3). detail says which,
 	// for the log.
 	bool IsFunctionStart(const void* address, std::string& detail);
+
+	// True if the size bytes at address are committed memory that can be read. A site that lies before or
+	// after a pattern's match is read only after this check: the scan read the match alone.
+	bool IsReadable(const void* address, size_t size);
 }

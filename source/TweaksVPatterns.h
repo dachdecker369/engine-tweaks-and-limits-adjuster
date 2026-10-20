@@ -17,7 +17,7 @@ namespace TweaksV
 
 	// In the order of PATTERNS.md; what each one finds is described there.
 	inline constexpr GamePattern kPatterns[] = {
-		// HeapAdjusterEnhanced: the heap size
+		// HeapAdjuster: the heap size
 		{ "H-E1", "BA ? ? ? ? 45 31 C0 41 B1 01 E8 ? ? ? ? 48 8D 0D" },
 
 		// ModkitLimitAdjusterEnhanced: the references to the modkit array, then its hard-coded limits

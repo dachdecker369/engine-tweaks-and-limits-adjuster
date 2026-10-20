@@ -16,11 +16,11 @@ namespace TweaksV
 	struct SettingsSection
 	{
 		const char* name;		// "HEAP_ADJUSTER"
-		const char* feature;	// "HeapAdjusterEnhanced" - for the log and the start-up summary
+		const char* feature;	// "HeapAdjuster" - for the log and the start-up summary
 	};
 
 	inline constexpr SettingsSection kTweaksVSection{ "TWEAKSV", "TweaksV" };
-	inline constexpr SettingsSection kHeapSection{ "HEAP_ADJUSTER", "HeapAdjusterEnhanced" };
+	inline constexpr SettingsSection kHeapSection{ "HEAP_ADJUSTER", "HeapAdjuster" };
 	inline constexpr SettingsSection kModkitSection{ "MODKIT_LIMIT", "ModkitLimitAdjusterEnhanced" };
 	inline constexpr SettingsSection kPackfileSection{ "PACKFILE_LIMIT", "PackfileLimitAdjusterEnhanced" };
 	inline constexpr SettingsSection kBoxStreamerSection{ "BOXSTREAMER", "BoxStreamer" };

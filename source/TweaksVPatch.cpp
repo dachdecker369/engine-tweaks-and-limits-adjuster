@@ -269,4 +269,25 @@ namespace TweaksV
 		detail = text;
 		return before == 0xCC || before == 0x90 || before == 0xC3;
 	}
+
+	bool IsReadable(const void* address, size_t size)
+	{
+		constexpr DWORD kReadable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE |
+			PAGE_EXECUTE_WRITECOPY;
+		const auto begin = reinterpret_cast<uintptr_t>(address);
+		if (!address || size == 0 || begin + size < begin)
+			return false;
+		for (uintptr_t at = begin; at < begin + size;)
+		{
+			MEMORY_BASIC_INFORMATION info{};
+			if (VirtualQuery(reinterpret_cast<const void*>(at), &info, sizeof(info)) != sizeof(info) || info.State != MEM_COMMIT ||
+				(info.Protect & (PAGE_GUARD | PAGE_NOACCESS)) || !(info.Protect & kReadable))
+				return false;
+			const uintptr_t next = reinterpret_cast<uintptr_t>(info.BaseAddress) + info.RegionSize;
+			if (next <= at)
+				return false;
+			at = next;
+		}
+		return true;
+	}
 }

@@ -44,18 +44,17 @@
 
 - **One feature table:** `TweaksVFeatures.cpp` lists each feature once: its section of `TweaksV.ini`, the old stand-alone plugins that do its job and the function that starts it. DllMain starts the features from it and the conflict check takes their old plugins from it, so a new feature is one entry there, plus its settings.
 
-- **HeapAdjusterEnhanced merged:** `[HEAP_ADJUSTER] HEAP_SIZE` (default 2000 MB) is read from `TweaksV.ini`, and its original code is kept in its own namespace. Fixes:
-  - A missing pattern no longer crashes the game;
-  - The target instruction is checked before writing;
-  - `HEAP_SIZE` is clamped to the game's own size..2047 MB, with no integer overflow;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE;
-  - It warns if another heap adjuster already ran.
+- **HeapAdjuster (TweaksV's own part since 2.0.0; the merged HeapAdjusterEnhanced before):** `[HEAP_ADJUSTER] HEAP_SIZE` (default 2000 MB) sets the game's memory heap, one immediate in its start-up code (`H-E1`):
+  - The instruction is checked before the write, and the size it holds must be a whole number of MB up to 2047;
+  - `HEAP_SIZE` is clamped to the size found..2047 MB, with 64-bit arithmetic; a heap that has the size asked for already is left as it is;
+  - A heap of 1024 MB or more is not the game's own: another heap adjuster ran first, which is logged, and `HEAP_SIZE` is applied on top of it - the load order decides (README, "Other mods");
+  - A missing pattern, a wrong instruction or a page that cannot be written is reported in the start-up summary;
+  - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
-- **StraightToStoryMode merged:** one `TweaksV.ini` switch per screen (`SKIP_SPLASH_SCREEN`, `SKIP_LEGAL_SCREEN`, `SKIP_LANDING_PAGE`). Fixes:
-  - A missing pattern skips only that screen instead of quitting the game;
-  - The bytes are checked before writing (the splash and legal screens must still hold the game's own `jz`), and already-patched screens are skipped quietly;
-  - The splash jump is computed from the game's own instruction;
-  - A landing-page function hooked by another mod is left alone;
+- **StraightToStoryMode (TweaksV's own part since 2.0.0):** one switch per screen in `[STRAIGHTTOSTORYMODE]` (`SKIP_SPLASH_SCREEN`, `SKIP_LEGAL_SCREEN`, `SKIP_LANDING_PAGE`):
+  - The splash screen's `jz` (0x0D before `S-E1`) becomes a `jmp` to the same target, computed from the game's own instruction; the legal screen's 6-byte `jz` (0x0F before `S-E2`) becomes NOPs; the function the landing page's call (`S-E3`) leads to returns 0 at once;
+  - The bytes are checked before writing (the splash and legal sites must hold the game's `jz`, the landing page's call must lead into the game); an already-patched screen is skipped quietly; a landing-page function hooked by another mod is left alone and reported;
+  - A missing pattern skips only that screen and is reported in the start-up summary;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
 - **ModkitLimitAdjusterEnhanced merged:** `[MODKIT_LIMIT] MODKITARRAY_SIZE` (default 65536) is read from `TweaksV.ini`. Fixes:
@@ -132,7 +131,7 @@
 - **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from; the mod page carries the credits and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
   - Provenance: RageOpenV's README asks that its binaries not be redistributed - a request, not a license term (the GPL-3.0 allows redistribution and forbids further restrictions), so the credits stay prominent; martonp96's original ClosedIV repository is no longer public, and RageOpenV's README is the source of that credit.
 
-- **Tests:** `test\` holds fake-game test suites (421 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (423 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 

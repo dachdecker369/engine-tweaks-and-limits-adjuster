@@ -7,14 +7,14 @@
 
 #include <iterator>
 
-#include "HeapAdjusterEnhanced_Game.h"
 #include "ModkitLimitAdjusterEnhanced_Game.h"
 #include "PackfileLimitAdjusterEnhanced_Game.h"
 #include "main.h"
-#include "StraightToStoryMode_Game.h"
 #include "TweaksVBoxStreamer.h"
 #include "TweaksVDecalDefs.h"
 #include "TweaksVDirectStorage.h"
+#include "TweaksVHeapAdjuster.h"
+#include "TweaksVStraightToStoryMode.h"
 #include "TweaksVSummary.h"
 
 namespace TweaksV
@@ -29,7 +29,7 @@ namespace TweaksV
 		// decal definitions parts, so it switches both off.
 		constexpr Feature kFeatures[] = {
 			{ &kHeapSection, { L"HeapAdjuster.asi", L"ZHeapAdjuster.asi" },
-				[] { HeapAdjusterEnhanced::initializeGame(); return false; } },
+				[] { InitHeapAdjuster(); return false; } },
 			{ &kModkitSection, { L"ModkitLimitAdjusterEnhanced.asi" },
 				[] { ModkitLimitAdjusterEnhanced::initializeGame(); return false; } },
 			{ &kPackfileSection, { L"PackfileLimitAdjusterEnhanced.asi" },
@@ -42,7 +42,7 @@ namespace TweaksV
 			{ &kRageOpenVSection, { L"RageOpenV.asi", L"OpenRPF.asi", L"OpenIV.asi" },
 				[] { return RageOpenV::DllMain(nullptr, DLL_PROCESS_ATTACH, nullptr) != FALSE; } },
 			{ &kStoryModeSection, { L"StraightToStoryMode.asi" },
-				[] { StraightToStoryMode::initializeGame(); return false; } },
+				[] { InitStraightToStoryMode(); return false; } },
 			{ &kDirectStorageSection, { L"DirectStorageFix.asi" },
 				[] { InitDirectStorage(); return false; } },
 		};
