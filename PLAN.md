@@ -21,7 +21,7 @@ Deliverable: a findings file that fills every field of the template in SPECIFICA
 - [x] The limit is hard-coded: 260 (0x104), one compare in the `decals.dat` parser; `gameconfig.xml` has nothing to do with it.
 - [x] One static array of 260 x 80 bytes in zero-initialised `.data`, the count a dword 16 bytes before it; nothing else is sized by N; no entry holds a pointer into the array; no pointer to it in `.rdata`.
 - [x] Exactly 31 references, all `lea r64, [rip+disp32]` of the array's first byte - the address scan finds every one, nothing else addresses the array.
-- [x] 23 uses of N, all imm32: 12 x N-1, 10 x N (also the "no such definition" index value), 1 x the end of an init loop that zeroes 26 entries per pass (0x7D8 + N x 0x50).
+- [x] 23 uses of N, all imm32: 13 x N-1, 9 x N (the "no such definition" index value), 1 x the end of an init loop that zeroes 26 entries per pass (0x7D8 + N x 0x50).
 - [x] The index is a uint16 in decal instances and a uint32 in the helpers: N can go far beyond 260.
 - [x] The count global is the measuring site; the parser's compare is where definitions are dropped; no hook is needed.
 - [x] Registration happens during the game's start-up on the loading thread, long after the DllMains; the game's self-modifying code regions touch none of the sites.
