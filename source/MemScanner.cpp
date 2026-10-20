@@ -321,7 +321,7 @@ namespace MemScanner
                     continue;
                 const uint8_t* from = match - in->begin >= 16 ? match - 16 : in->begin;
                 const uint8_t* to = in->end - match >= 48 ? match + 48 : in->end;
-                snprintf(text, sizeof(text), "  match %d of %d%s at RVA 0x%llX:", m + 1, matches,
+                snprintf(text, sizeof(text), "  %s match %d of %d%s at RVA 0x%llX:", gamePattern.label, m + 1, matches,
                     matches >= maxCount ? "+" : "", rva(match));
                 line = text;
                 for (const uint8_t* at = from; at < to; at++)
@@ -348,31 +348,40 @@ namespace MemScanner
 
     uint8_t* Find(const TweaksV::GamePattern& gamePattern)
     {
+        const std::vector<uint8_t*> found = FindAll(gamePattern, 1);
+        return found.empty() ? nullptr : found[0];
+    }
+
+    // TweaksV: the search behind Find, carried on from each match until limit matches are found
+    std::vector<uint8_t*> FindAll(const TweaksV::GamePattern& gamePattern, size_t limit)
+    {
+        std::vector<uint8_t*> found;
         const std::string label = gamePattern.label;
 #ifdef TWEAKSV_TEST_BUILD
         if (IsBrokenForTest(gamePattern)) {
             TweaksV::WriteLog("MemScanner", "TEST BUILD: pattern " + label + " is treated as not found (TEST_BREAK_PATTERN).");
-            return nullptr;
+            return found;
         }
 #endif
         Pattern pattern;
         if (!Compile(gamePattern.text, pattern)) { // TweaksV: not for a pattern of kPatterns, which are checked when TweaksV is compiled
             TweaksV::WriteLog("MemScanner", "Pattern " + label + " is not valid (treated as not found): " + gamePattern.text);
-            return nullptr;
+            return found;
         }
 
         const std::vector<Range> code = ReadableCode();
-        uint8_t* address = FindInCode(pattern, code, nullptr);
-        if (!address) {
+        for (uint8_t* at = FindInCode(pattern, code, nullptr); at && found.size() < limit; at = FindInCode(pattern, code, at + 1))
+            found.push_back(at);
+        if (found.empty()) {
             // TweaksV: was Logging(...) + FatalErrorExit(); the calling plugin now decides
             TweaksV::WriteLog("MemScanner", "Pattern " + label + " not found: " + gamePattern.text);
-            return nullptr;
+            return found;
         }
 
         if (TweaksV::IsDiagnosticMode()) // TweaksV
-            LogPatternDiagnostics(gamePattern, pattern, code, address);
+            LogPatternDiagnostics(gamePattern, pattern, code, found[0]);
 
-        return address;
+        return found;
     }
 
     // TweaksV: the loads are looked for the way Find looks for a pattern: the opcode and the ModRM at 16

@@ -1,6 +1,6 @@
 # TweaksV
 
-TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.com/Chiheb-Bacha) into one plugin, `TweaksV.asi`, and adds two parts of its own: a DirectStorage fix and a larger traversal list for the game's box streamer.
+TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.com/Chiheb-Bacha) into one plugin, `TweaksV.asi`, and adds three parts of its own: a DirectStorage fix, a larger traversal list for the game's box streamer and a larger array of decal definitions.
 
 ## Plugins Merged
 
@@ -33,13 +33,21 @@ The game's box streamer finds the map boxes to stream for the area around the pl
 
 For testing, `LOG_SEARCHES=1` logs every minute how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all.
 
+## Decal definitions
+
+The game reads its decal definitions - the kinds of bullet holes, blood, scorch and tyre marks, liquids, graffiti and so on - from the `decals.dat` files into an array of 260 entries. Once 260 are registered, every further definition is dropped silently; the files are read in order, so it is the definitions of the last files - add-on and mod content - that go missing, and the decals that use them never appear. This is a limit on the kinds of decal, not on the decals on screen.
+
+`DECALDEFS_SIZE` under `[DECALDEFS_SETTINGS]` in `TweaksV.ini` (default 2048, up to 16384) moves the array to a larger one and raises the limit everywhere the game uses it. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own, written from TweaksV's own findings about the game. The published patches were known as the idea and as a guide to what to look for; no line of their code was read for the build or went into TweaksV.
+
+For testing, `LOG_DECALDEFS=1` logs how many decal definitions are registered - 10 seconds in and then every minute while the number changes - and whether the game's own array of 260 would have dropped some, so you can see whether your load needs the larger array at all. With `DRY_RUN=1` it measures the game as it is.
+
 ## Design
 
 - **GTA V Enhanced Only:** TweaksV does nothing in Legacy.
 - **Generated Files:** `TweaksV.ini` and `TweaksV.log` are created on the first boot. Every feature can be switched off or on.
   - They go in the game folder, or in `%LOCALAPPDATA%\TweaksV` if the game folder is read-only.
   - The files in the game folder have priority.
-- **Merged Code:** Every original function keeps its name, each plugin lives in its own C++ namespace, and every change is marked `// TweaksV:`. Files keep their names, except each plugin's `Game` and `Logging` files, which get the plugin's name in front (`StraightToStoryMode_Game.cpp`). TweaksV's own code, the DirectStorage and box streamer parts included, is in the `TweaksV*` files and `dllmain.cpp`.
+- **Merged Code:** Every original function keeps its name, each plugin lives in its own C++ namespace, and every change is marked `// TweaksV:`. Files keep their names, except each plugin's `Game` and `Logging` files, which get the plugin's name in front (`StraightToStoryMode_Game.cpp`). TweaksV's own code, the DirectStorage, box streamer and decal definitions parts included, is in the `TweaksV*` files and `dllmain.cpp`.
 - **Shared Code:** Each setting is one entry in the table in `TweaksVSettings.h`, each byte pattern one in `TweaksVPatterns.h` (listed in [PATTERNS.md](PATTERNS.md)), and each feature one in `TweaksVFeatures.cpp`. Patches to the game's code go through `TweaksVPatch`, hooks on its functions through MinHook. A new feature is an entry in these tables, plus its own code.
 - **Upstream:** `upstream/` folder holds the original code as zip archives - makes future updates easier to compare.
 
@@ -74,7 +82,7 @@ Add these switches to the `msbuild` line above:
 ## Testing
 
 1. Use GTA V Enhanced in Story Mode with BattlEye disabled. Never go online with mods.
-2. Remove the standalone versions of the five original plugins and alloc8or's `DirectStorageFix.asi`. Otherwise standalone modules take priority and disable the respective portions of `TweaksV.asi`.
+2. Remove the standalone versions of the five original plugins, alloc8or's `DirectStorageFix.asi` and `DecalPatch.asi`. Otherwise standalone modules take priority and disable the respective portions of `TweaksV.asi`.
 3. `TweaksV.asi` goes in the game folder next to `GTA5_Enhanced.exe`.
 4. Add the ASI loader file `xinput1_4.dll` from the [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) download. It is the only file needed; Script Hook V itself is not.
 5. Settings from the old plugins carry over by name: `HEAP_SIZE`, `MODKITARRAY_SIZE` and `PACKFILEARRAY_SIZE` keep their sections and keys. `RageOpenV.ini`'s `[config] console` is `CONSOLE` under `[TWEAKSV]`; its `[log] info`, `mods` and `device` are `LOG_INFO`, `LOG_MODS` and `LOG_DEVICE` under `[RAGEOPENV_SETTINGS]`; its `[log] rpf` is gone, nothing ever read it.
@@ -84,6 +92,7 @@ Add these switches to the `msbuild` line above:
 - **NaturalVision Enhanced** sets the heap size as well. ASI loaders load alphabetically and the last one to set it wins; TweaksV's files keep their names, so you can rename `TweaksV.asi` to `zTweaksV.asi` to load it last.
 - **gameconfig.xml:** a gameconfig that raises the archive count has no effect while the Packfile part is on - TweaksV replaces that count with `PACKFILEARRAY_SIZE` when the game reads its configuration. Everything else in a gameconfig works as usual.
 - **Zolika Patch:** the ModkitLimit Extender's author warned that its modkit patch may not be compatible with Zolika Patch's; the same goes for TweaksV's Modkit part.
+- **DecalPatch.asi**, a closed-source plugin that raises the box streamer list and the decal definitions limit for GTA V Enhanced, is detected as an old plugin: TweaksV switches its decal definitions part and its box streamer part off while it is installed, so nothing is patched twice. Delete it - TweaksV replaces both halves.
 - **Script Hook V, ScriptHookVDotNet, OpenIV:** neither needed nor touched. Only the ASI loader file from the Script Hook V download is used, and OpenIV's `OpenIV.asi` must not be installed next to TweaksV (its job is TweaksV's RageOpenV part).
 
 ## Reporting a problem

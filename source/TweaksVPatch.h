@@ -67,6 +67,10 @@ namespace TweaksV
 	// The target of the 5-byte relative call (E8 rel32) at site, or nullptr if site is not one.
 	const uint8_t* CallTarget(const void* site);
 
+	// Where the rel32 at address leads - a jump's or call's rel32, or the disp32 of a rip-relative
+	// operand that ends the instruction: the address right after it, plus the rel32.
+	const uint8_t* Rel32Target(const void* address);
+
 	// True if the code at address starts with a jump (E9, EB or FF 25) - the usual sign that
 	// another mod has already hooked that function.
 	bool StartsWithJump(const void* address);

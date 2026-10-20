@@ -233,6 +233,14 @@ namespace TweaksV
 		return code + 5 + rel;
 	}
 
+	const uint8_t* Rel32Target(const void* address)
+	{
+		const auto field = static_cast<const uint8_t*>(address);
+		int32_t rel = 0;
+		memcpy(&rel, field, sizeof(rel));
+		return field + sizeof(rel) + rel;
+	}
+
 	bool StartsWithJump(const void* address)
 	{
 		const auto code = static_cast<const uint8_t*>(address);

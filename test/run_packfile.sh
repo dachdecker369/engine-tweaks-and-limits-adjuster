@@ -53,19 +53,19 @@ check "the 34 packfile patterns of this build each found exactly once" "[ \$(gre
 check "31 references logged" "[ \$(count 'PackfileLimitAdjusterEnhanced\] DIAGNOSTIC: reference at RVA') -eq 31 ]"
 check "direct size, indirect variable and call logged" "log_has 'DIAGNOSTIC: direct size at RVA .* holds 4500' && log_has 'DIAGNOSTIC: indirect size variable at RVA .* holds 4500' && log_has 'DIAGNOSTIC: streaming configuration call at RVA .* -> RVA'"
 check "still applied" "has 'D3=12000 D2=4500 D1=4500 I=12000'"
-check "patterns found once get no per-match lines" "! log_has ' match 1 of '"
+check "patterns found once get no per-match lines (only D-E-L12, which matches 7 times, gets them)" "[ \$(count ' match 1 of ') -eq 1 ] && log_has 'D-E-L12 match 1 of 7 at RVA'"
 
 echo "== P7b DIAGNOSTIC_MODE=1, a second identical copy of the 1158.13+ reference: each match logged with its bytes"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe twor31a)
 check "its line counts 2 matches" "log_has 'Pattern P-E-R31a found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 2 matches, bytes: BF '"
-check "one line per match: 16 bytes before it, | at its start, 48 bytes from it" "[ \$(tr -d '\r' < TweaksV.log | grep -c -E '\[MemScanner\]   match [12] of 2 at RVA 0x[0-9A-F]+:( [0-9A-F]{2}){16} \| BF( [0-9A-F]{2}){47}\$') -eq 2 ]"
+check "one line per match, naming the pattern: 16 bytes before it, | at its start, 48 bytes from it" "[ \$(tr -d '\r' < TweaksV.log | grep -c -E '\[MemScanner\]   P-E-R31a match [12] of 2 at RVA 0x[0-9A-F]+:( [0-9A-F]{2}){16} \| BF( [0-9A-F]{2}){47}\$') -eq 2 ]"
 check "both copies' bytes shown" "[ \$(count '| BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 ') -eq 2 ]"
-check "no other pattern gets per-match lines" "[ \$(count ' match 1 of ') -eq 1 ]"
+check "no other pattern gets per-match lines (but D-E-L12, which matches 7 times)" "[ \$(count ' match 1 of ') -eq 2 ] && log_has 'D-E-L12 match 1 of 7 at RVA'"
 check "the array still moved, no problem" "has 'pack refs: 30 new 0 game 0 other' && ! log_has 'PROBLEM'"
 
 echo "== P7c the game's obfuscated code that the old 1158.13+ pattern also matched (RVA 0x582A227): not matched now"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe junkr31a)
-check "found exactly once, no per-match lines" "log_has 'Pattern P-E-R31a found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 1 match,' && ! log_has ' match 1 of '"
+check "found exactly once, no per-match lines of its own" "log_has 'Pattern P-E-R31a found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 1 match,' && ! log_has 'P-E-R31a match 1 of '"
 check "the array moved, no problem" "has '$MOVED' && ! log_has 'PROBLEM'"
 
 echo "== P8 [PACKFILE_SETTINGS] ENABLED=0"

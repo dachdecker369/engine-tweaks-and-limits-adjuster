@@ -37,16 +37,16 @@ Deliverable: a findings file that fills every field of the template in SPECIFICA
 
 ### 2. Implementation
 
-- [ ] `source\TweaksVDecalDefs.h` and `.cpp`, the entries in `TweaksVSettings.h`, `TweaksVPatterns.h` and `TweaksVFeatures.cpp`, the project and filters.
-- [ ] No new scan helper: `MemScanner::FindRipRelativeLeas` covers the 31 references.
-- [ ] The conflict entries for `DecalPatch.asi`, under this part and the box streamer part.
-- [ ] The fake-game sites in `test\fake_game_full.cpp`, `test\run_decaldefs.sh`, the ini and integration suites, the suite list in `test\run_all.sh`, the check count in NOTES.md.
-- [ ] README (a section like "Box streamer", the "Other mods" lines, the install list), NOTES (the feature bullet, the measurement once there is one), PATTERNS.md (a section, the status counts), CREDITS.md and UPSTREAM.md (the idea's origin, extended from the box streamer entries).
-- [ ] Version 1.5.0 -> 1.6.0 in `source\TweaksV.vcxproj`.
+- [x] `source\TweaksVDecalDefs.h` and `.cpp`, the entries in `TweaksVSettings.h`, `TweaksVPatterns.h` (16 patterns, `D-E-L1..L16`) and `TweaksVFeatures.cpp`, the project and filters.
+- [x] No new scan helper for the references: `MemScanner::FindRipRelativeLeas` covers the 31. One small addition, `MemScanner::FindAll`, gives every match of a pattern, for the "add decal" check that must match exactly 7 times (`Find` is now its first-match case); `Rel32Target` moved from the box streamer part into `TweaksVPatch` for both parts.
+- [x] The conflict entries for `DecalPatch.asi`, under this part and the box streamer part.
+- [x] The fake-game sites in `test\fake_game_full.cpp`, `test\run_decaldefs.sh` (20 scenarios), the ini and integration suites, the suite list in `test\run_all.sh`, the check count in NOTES.md.
+- [x] README (a section like "Box streamer", the "Other mods" lines, the install list), NOTES (the feature bullet; the measurement waits for the owner's boot), PATTERNS.md (a section, the status counts), CREDITS.md and UPSTREAM.md (the idea's origin, extended from the box streamer entries).
+- [x] Version 1.5.0 -> 1.6.0 in `source\TweaksV.vcxproj`.
 
 ### 3. Verification
 
-- [ ] Release, the test build and the analysis build at /W4 without a warning; `bash test/run_all.sh` green.
+- [x] Release, the test build and the analysis build at /W4 without a warning; `bash test/run_all.sh` green (418 checks).
 - [ ] A boot with `DIAGNOSTIC_MODE=1`: every new pattern found once at the RVAs of the findings, the array's address, 31 references, 23 constants, every write; no `PROBLEM`.
 - [ ] A boot with `LOG_DECALDEFS=1` and a decal-heavy load: the count passes 260 without a crash or missing decals; with the part off, the same load shows the failure it is meant to cure (or the number says the load never reaches 260 - then the test load is too small, not the part wrong).
 - [ ] A ten-minute session: no crash dump, no Windows error.
@@ -65,6 +65,6 @@ Deliverable: a findings file that fills every field of the template in SPECIFICA
 
 ## Next steps
 
-1. Build the part as phases 2 and 3 say, from SPECIFICATIONS.md and the findings file, as TweaksV 1.6.0: committed locally, the Release build rebuilt from that commit, handed to the owner for the boots.
-2. The owner boots it (`DIAGNOSTIC_MODE=1`, then `LOG_DECALDEFS=1` with a decal-heavy load), reads the log, then says push and tag.
-3. Phase 4: Nexus, and the removal of this file and SPECIFICATIONS.md.
+1. Done here: the part is built to SPECIFICATIONS.md and passes phase 3's own checks (three clean builds, 418 checks green); it is committed locally as TweaksV 1.6.0, with `x64\Release\TweaksV.asi` rebuilt from that commit.
+2. The owner boots it. First with `DIAGNOSTIC_MODE=1`: every `D-E-L` pattern found once (`D-E-L12` 7 times) at the RVAs in PATTERNS.md, 31 "the array is loaded at" lines, 23 "limit at ... holds" lines, 54 writes, the line "Decal definitions array moved and its limit raised from 260 to 2048 entries.", no `PROBLEM`. Then with `LOG_DECALDEFS=1` and the decal-heavy mods: the count passes 260 without a crash or missing decals (with `DRY_RUN=1` and the same load, the game's own array shows as full at 260). Then a ten-minute session without a crash dump. Then push `main` and the tag `1.6.0`.
+3. Phase 4: the measurement into NOTES.md, Nexus, and the removal of this file and SPECIFICATIONS.md.

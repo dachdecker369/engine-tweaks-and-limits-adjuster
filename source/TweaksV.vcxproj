@@ -32,7 +32,7 @@
   <PropertyGroup>
     <!-- TweaksV's version: in BuildInfo.h (the log header) and version.rc (the file's version info) -->
     <TweaksVVersionMajor>1</TweaksVVersionMajor>
-    <TweaksVVersionMinor>5</TweaksVVersionMinor>
+    <TweaksVVersionMinor>6</TweaksVVersionMinor>
     <TweaksVVersionPatch>0</TweaksVVersionPatch>
     <TweaksVRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..'))</TweaksVRoot>
     <TargetName>TweaksV</TargetName>
@@ -125,6 +125,7 @@
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="TweaksVBoxStreamer.cpp" />
     <ClCompile Include="TweaksVConflicts.cpp" />
+    <ClCompile Include="TweaksVDecalDefs.cpp" />
     <ClCompile Include="TweaksVDirectStorage.cpp" />
     <ClCompile Include="TweaksVDump.cpp" />
     <ClCompile Include="TweaksVFeatures.cpp" />
@@ -169,6 +170,7 @@
   <ItemGroup>
     <ClInclude Include="TweaksVBoxStreamer.h" />
     <ClInclude Include="TweaksVConflicts.h" />
+    <ClInclude Include="TweaksVDecalDefs.h" />
     <ClInclude Include="TweaksVDirectStorage.h" />
     <ClInclude Include="TweaksVDump.h" />
     <ClInclude Include="TweaksVFeatures.h" />

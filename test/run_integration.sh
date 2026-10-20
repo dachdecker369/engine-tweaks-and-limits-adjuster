@@ -20,15 +20,18 @@ PACK_ON='pack refs: 30 new 0 game 0 other, R31a new, R31b game (RW, 512 KB) | pa
 PACK_OFF='pack refs: 0 new 30 game 0 other, R31a game, R31b game | pack sizes: D3=4500 D2=4500 D1=4500 I=4500 | hook: not set'
 BOX_ON='box refs: 8 new 0 game 0 other (RW, 784 KB) | box caps: 10000 10000 10000 10000'
 BOX_OFF='box refs: 0 new 8 game 0 other | box caps: 1000 1000 1000 1000'
+DECAL_ON='decal refs: 31 new 0 game 0 other (RW, 1280 KB) | decal limits: 2047 2048 0x28198, 23 agree'
+DECAL_OFF='decal refs: 0 new 31 game 0 other | decal limits: 259 260 0x5918, 23 agree'
 ROV_ON='file hooks 8/8, redirect 8/8, pass 8/8, spellings ok, folder ok, outside ok | open calls 5/5, behaviour ok | newmods hooks 2/2'
 ROV_OFF='rov api hook: no'
 summary_once() { [ "$(count 'Start-up summary not shown (SHOW_ERROR_POPUPS=0)')" -eq 1 ]; }
 
 echo "== I1 each old plugin on its own: only its part is skipped"
-for old in HeapAdjuster.asi ZHeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi PackfileLimitAdjusterEnhanced.asi RageOpenV.asi OpenRPF.asi OpenIV.asi StraightToStoryMode.asi DirectStorageFix.asi; do
+for old in HeapAdjuster.asi ZHeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi PackfileLimitAdjusterEnhanced.asi DecalPatch.asi RageOpenV.asi OpenRPF.asi OpenIV.asi StraightToStoryMode.asi DirectStorageFix.asi; do
 	fresh_ini; touch "$old"; out=$(game full_game.exe); rm -f "$old"
 	case "$old" in
-		*HeapAdjuster.asi) ok="has '$GAME_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'" ;;
+		*HeapAdjuster.asi) ok="has '$GAME_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && has '$ROV_ON' && has '$STORY_ON'" ;;
+		DecalPatch.asi) ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_OFF' && has '$DECAL_OFF' && has '$ROV_ON' && has '$STORY_ON' && [ \$(count 'Old plugin found: .*DecalPatch.asi') -eq 2 ]" ;;
 		Modkit*) ok="has '$ALL_ON_HEAP' && has '$MODKIT_OFF' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'" ;;
 		Packfile*) ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_OFF' && has '$ROV_ON' && has '$STORY_ON'" ;;
 		RageOpenV.asi|OpenRPF.asi|OpenIV.asi) ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_OFF' && has '$STORY_ON'" ;;
@@ -40,11 +43,11 @@ done
 
 echo "== I2 all old plugins at once, in the game folder, scripts\\ and plugins\\: everything skipped"
 fresh_ini
-touch HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdjusterEnhanced.asi scripts/OpenRPF.asi StraightToStoryMode.asi
+touch HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdjusterEnhanced.asi scripts/OpenRPF.asi StraightToStoryMode.asi scripts/DecalPatch.asi
 out=$(game full_game.exe); echo "      $out"
-rm -f HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdjusterEnhanced.asi scripts/OpenRPF.asi StraightToStoryMode.asi
-check "nothing of theirs applied; the box streamer part, which no old plugin replaces, still is" "has '$GAME_HEAP' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$ROV_OFF' && has '$STORY_OFF' && has '$BOX_ON'"
-check "all five reported, one summary with 5 problems, no crash" "[ \$(count 'PROBLEM: Old plugin found') -eq 5 ] && log_has 'Start-up summary not shown (SHOW_ERROR_POPUPS=0): 5 problem' && summary_once"
+rm -f HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdjusterEnhanced.asi scripts/OpenRPF.asi StraightToStoryMode.asi scripts/DecalPatch.asi
+check "nothing applied: the six old plugins switch every part off" "has '$GAME_HEAP' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$ROV_OFF' && has '$STORY_OFF' && has '$BOX_OFF' && has '$DECAL_OFF'"
+check "all six reported (DecalPatch.asi for two parts), one summary with 7 problems, no crash" "[ \$(count 'PROBLEM: Old plugin found') -eq 7 ] && log_has 'Start-up summary not shown (SHOW_ERROR_POPUPS=0): 7 problem' && summary_once"
 
 echo "== I3 TEST build, one pattern broken per plugin: only that part is skipped, one summary"
 breaktest() {	# description, the pattern's label, expected-output check
@@ -62,7 +65,11 @@ breaktest "P-E-R12 (a packfile reference): packfile untouched, the rest applied"
 breaktest "P-E-H1 (the hooked call): array moved, limits as in the game, no hook - harmless" "P-E-H1" \
 	"has 'pack refs: 30 new 0 game 0 other' && has 'pack sizes: D3=4500 D2=4500 D1=4500 I=4500 | hook: not set' && has '$ROV_ON'"
 breaktest "B-E-L2 (a box streamer capacity): list untouched, the rest applied" "B-E-L2" \
-	"has '$BOX_OFF' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'"
+	"has '$BOX_OFF' && has '$DECAL_ON' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'"
+breaktest "D-E-L3 (a decal definitions site): array untouched, the rest applied" "D-E-L3" \
+	"has '$DECAL_OFF' && has '$BOX_ON' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'"
+breaktest "D-E-L12 (the shared 'add decal' check, needed 7 times): array untouched, the rest applied" "D-E-L12" \
+	"has '$DECAL_OFF' && has '$BOX_ON' && has '$ROV_ON' && log_has 'A site of the decal definitions limit was not found in the game code: D-E-L12'"
 breaktest "R-E-F5 (a file function): no file hooks, OPEN and newmods on" "R-E-F5" \
 	"has 'file hooks 0/8 | open calls 5/5, behaviour ok | newmods hooks 2/2' && has '$PACK_ON'"
 breaktest "R-E-E3 (an encryption call): no OPEN calls, files and newmods on" "R-E-E3" \
@@ -79,7 +86,7 @@ check "the release build ignores TEST_BREAK_PATTERN" "has '$ALL_ON_HEAP' && ! lo
 echo "== I4 loaded by another exe (GTA5.exe): TweaksV does nothing and creates nothing"
 rm -f TweaksV.ini TweaksV.log; rm -rf appdata/TweaksV
 cp full_game.exe GTA5.exe; LOCALAPPDATA="$AW" timeout 60 ./GTA5.exe TweaksV.asi > harness.out 2>&1; out=$(tr -d '\r' < harness.out); rm -f GTA5.exe
-check "nothing applied" "has '$GAME_HEAP' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$BOX_OFF' && has '$ROV_OFF' && has '$STORY_OFF'"
+check "nothing applied" "has '$GAME_HEAP' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$BOX_OFF' && has '$DECAL_OFF' && has '$ROV_OFF' && has '$STORY_OFF'"
 check "no TweaksV.ini or TweaksV.log anywhere" "[ ! -e TweaksV.ini ] && [ ! -e TweaksV.log ] && [ ! -e appdata/TweaksV ]"
 
 echo "== I5 the build: no Visual C++ runtime needed (/MT), only system DLLs imported, the exploit mitigations on"
@@ -91,14 +98,14 @@ check "ASLR with high entropy, DEP, Control Flow Guard and CET" "grep -q 'High E
 
 echo "== I6 renamed to zTweaksV.asi: the same TweaksV.ini and TweaksV.log, everything works"
 fresh_ini; cp TweaksV.asi zTweaksV.asi; out=$(ASI=zTweaksV.asi game full_game.exe); rm -f zTweaksV.asi
-check "everything applied" "has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$ROV_ON' && has '$STORY_ON'"
+check "everything applied" "has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && has '$ROV_ON' && has '$STORY_ON'"
 check "TweaksV.log names zTweaksV.asi, no problems" "log_has 'TweaksV.asi: .*zTweaksV.asi' && ! log_has 'PROBLEM'"
 
 echo "== I7 no code may be changed (Windows' dynamic code policy): every write fails whole, each part reported"
 fresh_ini; out=$(game full_game.exe nodyncode); echo "      $out"
 check "harness survived to its report, the policy was set" "has 'protect: ' && ! has 'dynamic code policy not set'"
-check "nothing written: game code, protection and call targets as they were" "has '$GAME_HEAP' && has '$STORY_OFF' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$BOX_OFF' && has 'stubs: 0, all RX' && has 'protect: all restored (RX)'"
-check "every part reported" "log_has 'PROBLEM: The heap size could not be changed' && [ \$(count 'PROBLEM: The .* could not be patched') -eq 3 ] && log_has 'PROBLEM: .*modkit' && log_has 'PROBLEM: The packfile limit is not changed' && log_has 'PROBLEM: The box streamer.s traversal list is not enlarged' && log_has 'PROBLEM: RageOpenV could not start'"
+check "nothing written: game code, protection and call targets as they were" "has '$GAME_HEAP' && has '$STORY_OFF' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$BOX_OFF' && has '$DECAL_OFF' && has 'stubs: 0, all RX' && has 'protect: all restored (RX)'"
+check "every part reported" "log_has 'PROBLEM: The heap size could not be changed' && [ \$(count 'PROBLEM: The .* could not be patched') -eq 3 ] && log_has 'PROBLEM: .*modkit' && log_has 'PROBLEM: The packfile limit is not changed' && log_has 'PROBLEM: The box streamer.s traversal list is not enlarged' && log_has 'PROBLEM: The decal definitions limit is not raised' && log_has 'PROBLEM: RageOpenV could not start'"
 check "one start-up summary" "summary_once"
 
 echo "== I8 DIAGNOSTIC_MODE without a newmods folder: the newmods patterns are still checked, nothing mounted"

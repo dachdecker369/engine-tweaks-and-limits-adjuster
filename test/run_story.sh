@@ -44,7 +44,7 @@ echo "== S6 DIAGNOSTIC_MODE=1: every pattern and write logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
 check "three story patterns found once each" "log_has 'Pattern S-E1 found: 0F 85 A9 00 00 00 48 8D 54 -> RVA 0x.*, 1 match' && log_has 'Pattern S-E2 found: 00 E9 ? 05 00 00 E8 ? 07 -> RVA 0x.*, 1 match' && log_has 'Pattern S-E3 found: E8 ? ? ? ? 8B 0D ? ? ? ? 83 C1 ? 84 C0 -> RVA 0x.*, 1 match'"
 check "three writes logged with old -> new bytes" "log_has 'DIAGNOSTIC: splash screen at RVA 0x.*: 0F 84 85 01 00 00 -> E9 86 01 00 00 90' && log_has 'DIAGNOSTIC: legal screen at RVA' && log_has 'DIAGNOSTIC: landing page at RVA 0x.*: 48 89 5C -> 31 C0 C3'"
-check "patterns found once get no per-match lines" "! log_has ' match 1 of '"
+check "patterns found once get no per-match lines (only D-E-L12, which matches 7 times, gets them)" "[ \$(count ' match 1 of ') -eq 1 ] && log_has 'D-E-L12 match 1 of 7 at RVA'"
 
 echo "== S7 already patched (an old StraightToStoryMode ran first under another name): skipped quietly"
 fresh_ini; out=$(game full_game.exe prepatched); echo "      $out"

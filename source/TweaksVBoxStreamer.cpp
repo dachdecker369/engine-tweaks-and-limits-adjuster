@@ -82,14 +82,6 @@ namespace TweaksV
 				"(details in TweaksV.log).");
 		}
 
-		// Where the rel32 at address leads: the address right after it, plus the rel32.
-		const uint8_t* Rel32Target(const uint8_t* address)
-		{
-			int32_t rel = 0;
-			memcpy(&rel, address, sizeof(rel));
-			return address + sizeof(rel) + rel;
-		}
-
 		// ---- LOG_SEARCHES
 
 		// The tree searches' arguments: the tree, the area's two corners, the list and its capacity; the

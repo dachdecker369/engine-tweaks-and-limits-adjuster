@@ -11,7 +11,7 @@ namespace TweaksV
 {
 	struct GamePattern
 	{
-		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, R- RageOpenV, S- StraightToStoryMode
+		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, D- DecalDefs, R- RageOpenV, S- StraightToStoryMode
 		const char* text;	// the bytes in hex, one space apart; ? matches any byte
 	};
 
@@ -84,6 +84,29 @@ namespace TweaksV
 		{ "B-E-L2", "48 8B 81 08 01 00 00 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D" },
 		{ "B-E-L3", "0F 29 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D" },
 		{ "B-E-L4", "48 8B 01 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D" },
+
+		// DecalDefs: the parser's "full" check (the count's address and N) and its lea of the array (L1, L2);
+		// FindById's head (three constant sites and a lea), PickVariant's head (two sites) and the texture
+		// override's five sites (L3..L9); the decal manager's start-up loop, its start (with a lea) and its
+		// end (L10, L11); the "add decal" check that seven decal-placing functions share (L12, which matches
+		// 7 times) and the four that differ (L13..L16). The array's other loads are found by their address
+		// (TweaksVDecalDefs.cpp)
+		{ "D-E-L1", "8B 35 ? ? ? ? 48 81 FE ? ? ? ? 77 ? 48 89 F9 FF 15" },
+		{ "D-E-L2", "4C 8D 2D ? ? ? ? F3 44 0F 10 0D ? ? ? ? F3 44 0F 10 15" },
+		{ "D-E-L3", "56 85 C9 74 ? C7 02 04 01 00 00 41 C7 00 00 00 00 00 44 8B 1D" },
+		{ "D-E-L4", "B8 04 01 00 00 81 F9 03 01 00 00 77 ? 41 89 D0 8B 05" },
+		{ "D-E-L5", "45 31 C9 41 BB 04 01 00 00 31 C0 45 31 D2 EB" },
+		{ "D-E-L6", "41 BB 04 01 00 00 48 8D 3D ? ? ? ? 31 C0 45 31 D2" },
+		{ "D-E-L7", "41 81 FB 04 01 00 00 89 C3 41 0F 44 D9" },
+		{ "D-E-L8", "81 FD 04 01 00 00 89 D8 41 0F 44 C1" },
+		{ "D-E-L9", "41 81 FB 04 01 00 00 41 0F 44 C1 48 8D 3D" },
+		{ "D-E-L10", "B8 D8 07 00 00 48 8D 0D ? ? ? ? 0F 57 C0" },
+		{ "D-E-L11", "48 05 20 08 00 00 48 3D 18 59 00 00 0F 85" },
+		{ "D-E-L12", "E8 ? ? ? ? 3D 03 01 00 00 0F 8F" },
+		{ "D-E-L13", "44 89 C3 41 81 F8 03 01 00 00 77" },
+		{ "D-E-L14", "89 C6 81 FE 03 01 00 00 0F 87" },
+		{ "D-E-L15", "E8 ? ? ? ? 3D 03 01 00 00 7F" },
+		{ "D-E-L16", "89 C3 31 C0 81 FB 03 01 00 00 0F 8F" },
 
 		// RageOpenV: the console, the RPF cache check, the 8 file functions, the 5 encryption calls, the
 		// newmods mount call and archive function, and the game functions the newmods devices call

@@ -7,11 +7,11 @@ Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game bui
 | | |
 |---|---|
 | **Game Build** | 1.0.1158.16 |
-| **Found** | 76 of the 76 patterns this build uses |
+| **Found** | 92 of the 92 patterns this build uses |
 | **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-F1..F8` run only with a mods folder in the game directory (with `DIAGNOSTIC_MODE=1`, also without one). `R-E-M0..M2` and `R-E-D1..D2` run only with `NEWMODS=1` and a newmods folder in the game directory (with `NEWMODS=1` and `DIAGNOSTIC_MODE=1`, also without the folder). |
-| **Matches** | All match exactly once. To check: boot once with `DIAGNOSTIC_MODE=1`, `CONSOLE=1` and `NEWMODS=1` enabled. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once. |
+| **Matches** | All match exactly once, except `D-E-L12`, which matches exactly 7 times (the check seven decal-placing functions share). To check: boot once with `DIAGNOSTIC_MODE=1`, `CONSOLE=1` and `NEWMODS=1` enabled. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once (`D-E-L12`: exactly 7 times). |
 
-Build uses 76 of 80 patterns:
+Build uses 92 of 96 patterns:
 - Packfile picks one of three direct size patterns and one of two references by game build.
 - `R-E-D3` belonged to code that was never used. Removed.
 
@@ -115,6 +115,29 @@ The four sites that hand the traversal list's capacity to the tree search (`mov 
 | B-E-L2 | `48 8B 81 08 01 00 00 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 15, 22, 34 | found | 0x92C7C0 |
 | B-E-L3 | `0F 29 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 13, 20, 42 | found | 0x92DDBC |
 | B-E-L4 | `48 8B 01 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 11, 18, 30 | found | 0x92E07A |
+
+## DecalDefs
+
+The decal definitions array (260 entries of 80 bytes, at RVA 0x42EC8A0 on the current build) and the number of registered definitions, a dword 16 bytes before it (0x42EC890). The parser's "full" check `D-E-L1` gives the count's address (the disp32 of its `mov`) and N (its imm32 is N-1: 259, so N = 260, on the current build); the parser's `lea` `D-E-L2` gives the array's address, which MUST lie 16 bytes after the count, both inside the game. Every other site that carries the limit is found by its own pattern, MUST be the expected instruction and MUST hold N-1 or N: `D-E-L3` (FindById: three sites, two of them past the pattern's end, and a `lea` of the array), `D-E-L4` (PickVariant), `D-E-L5..L9` (the texture override; `L6` and `L9` also hold a `lea`), `D-E-L13..L16` (four decal-placing functions) and `D-E-L12`, the check seven more decal-placing functions share, which MUST match exactly 7 times. The decal manager's start-up loop, which zeroes the texture pointers of 26 entries per pass, gives its start offset and a `lea` of the array (`D-E-L10`) and the bytes one pass clears and its end (`D-E-L11`), which MUST be the start offset + N x 80. The array's loads have no pattern of their own: the game's code is scanned for every `lea r64, [rip+disp32]` that loads it, which MUST find exactly 31 - on the current build at RVAs 0xB195A8, 0xB3187E, 0xB31AD6, 0xB31FA7, 0xB324CA, 0xB326EF, 0xB32C71, 0xB32F2B, 0xB33423, 0xB338F6, 0xB33EF5, 0xB34892, 0xB34CF7, 0xB34F96, 0xCA0A1F, 0xCA11CE, 0xCA323B, 0xCA6DD5, 0xCA756C, 0xCA960E, 0xCAA2F7, 0xCAD859, 0xCADE17, 0xCB30C9, 0xCB386D, 0xCB3A4F, 0xCBEAE2, 0xCBF181, 0xCBF251, 0xCBF2D0 and 0xCD2B60. `DIAGNOSTIC_MODE=1` logs every one of them and every constant site.
+
+| Label | Pattern | Offset: what | 1.0.1158.16 | RVA |
+|---|---|---|---|---|
+| D-E-L1 | `8B 35 ? ? ? ? 48 81 FE ? ? ? ? 77 ? 48 89 F9 FF 15` | 2: the count's disp32; 9: N-1 (the parser's "full" check) | found | 0xCBEB8A |
+| D-E-L2 | `4C 8D 2D ? ? ? ? F3 44 0F 10 0D ? ? ? ? F3 44 0F 10 15` | 3: the array's rel32 (the parser's lea) | found | 0xCBEAE2 |
+| D-E-L3 | `56 85 C9 74 ? C7 02 04 01 00 00 41 C7 00 00 00 00 00 44 8B 1D` | 7, 0x53, 0x62: N (FindById); 0x21: a lea of the array | found | 0xCBF160 |
+| D-E-L4 | `B8 04 01 00 00 81 F9 03 01 00 00 77 ? 41 89 D0 8B 05` | 1: N, 7: N-1 (PickVariant) | found | 0xCBF1D0 |
+| D-E-L5 | `45 31 C9 41 BB 04 01 00 00 31 C0 45 31 D2 EB` | 5: N (the texture override, one definition) | found | 0xCBF232 |
+| D-E-L6 | `41 BB 04 01 00 00 48 8D 3D ? ? ? ? 31 C0 45 31 D2` | 2: N (the texture override, its loop); 6: a lea of the array | found | 0xCBF24B |
+| D-E-L7 | `41 81 FB 04 01 00 00 89 C3 41 0F 44 D9` | 3: N (the texture override) | found | 0xCBF260 |
+| D-E-L8 | `81 FD 04 01 00 00 89 D8 41 0F 44 C1` | 2: N (the texture override) | found | 0xCBF283 |
+| D-E-L9 | `41 81 FB 04 01 00 00 41 0F 44 C1 48 8D 3D` | 3: N (the texture override, its odd tail); 11: a lea of the array | found | 0xCBF2C5 |
+| D-E-L10 | `B8 D8 07 00 00 48 8D 0D ? ? ? ? 0F 57 C0` | 1: the start-up loop's start offset (0x7D8); 5: a lea of the array | found | 0xCD2B5B |
+| D-E-L11 | `48 05 20 08 00 00 48 3D 18 59 00 00 0F 85` | 2: the bytes one pass clears (0x820 = 26 x 80); 8: the loop's end, the start offset + N x 80 (0x5918) | found | 0xCD2D6B |
+| D-E-L12 | `E8 ? ? ? ? 3D 03 01 00 00 0F 8F` | 6: N-1 (the check after the call to PickVariant in 7 decal-placing functions - matches 7 times) | found, 7 matches | 0xB31856, 0xB31F7D, 0xB326C5, 0xB32C49, 0xB32F03, 0xB333FB, 0xB34880 |
+| D-E-L13 | `44 89 C3 41 81 F8 03 01 00 00 77` | 6: N-1 (the decal-placing function that takes the index as a parameter) | found | 0xB338A8 |
+| D-E-L14 | `89 C6 81 FE 03 01 00 00 0F 87` | 4: N-1 | found | 0xB33ED1 |
+| D-E-L15 | `E8 ? ? ? ? 3D 03 01 00 00 7F` | 6: N-1 (the one with a short jump) | found | 0xB34CD5 |
+| D-E-L16 | `89 C3 31 C0 81 FB 03 01 00 00 0F 8F` | 6: N-1 | found | 0xB34F70 |
 
 ## RageOpenV
 

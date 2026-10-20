@@ -4,8 +4,8 @@
 // Chiheb-Bacha) into one ASI plugin for GTA V Enhanced.
 // License: GPL-3.0-only (see LICENSE).
 //
-// The one real DllMain. The features - the five plugins and TweaksV's own DirectStorage part, in
-// TweaksVFeatures.cpp - are started at step 8 below.
+// The one real DllMain. The features - the five plugins and TweaksV's own parts, in TweaksVFeatures.cpp -
+// are started at step 8 below.
 
 #include <windows.h>
 

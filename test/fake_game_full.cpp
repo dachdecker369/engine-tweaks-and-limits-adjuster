@@ -1,6 +1,7 @@
 // Test harness for TweaksV: pretends to be GTA5_Enhanced.exe and contains copies of the game
 // code TweaksV patches: HeapAdjusterEnhanced's, StraightToStoryMode's, ModkitLimitAdjusterEnhanced's,
-// PackfileLimitAdjusterEnhanced's and the BoxStreamer part's here, RageOpenV's in fake_game_rov.cpp.
+// PackfileLimitAdjusterEnhanced's, the BoxStreamer part's and the DecalDefs part's here, RageOpenV's in
+// fake_game_rov.cpp.
 // Prints every patch site after TweaksV.asi has loaded.
 // Link it with a version resource (fake_game_version.rc) for the game build to pretend to be.
 // Usage: GTA5_Enhanced.exe [TweaksV.asi] [options...]
@@ -22,6 +23,15 @@
 //   boxbadsize     every capacity of the list holds an implausible 200000
 //   boxcallhooked  the second tree-search call of the box streamer already leads outside the game (another mod's hook)
 //   boxcallsplit   the third tree-search call leads to the other tree search than the first
+//   decalmoved     every reference to the decal definitions array points outside the game (another mod moved it)
+//   decalsplit     one reference to the array points somewhere else in the game
+//   decalextra     a 32nd lea loads the array (a changed game)
+//   decalprefix    one lea of the array has a 49 prefix instead of 48
+//   decalmismatch  FindById's second compare of the limit holds 261 instead of 260
+//   decaloffbyone  the parser's check of the limit holds 260 instead of 259
+//   decalbadsize   the parser's check of the limit holds an implausible 131071
+//   decalfull      260 decal definitions are registered (the game's own array is full)
+//   decalmany      300 decal definitions are registered
 //   dstorage       loads the stand-in dstorage.dll (fake_dstorage.cpp) before TweaksV, calls it after
 //   dsotherinterface  with dstorage: first asks for a DirectStorage interface TweaksV does not know
 //   fileopens      opens files in its folder (and one outside) after TweaksV has started
@@ -198,6 +208,65 @@ static Site g_boxRefs[] = { SITE(g_boxRef1, 5), SITE(g_boxRef2, 14), SITE(g_boxC
 	SITE(g_boxRef6, 9), SITE(g_boxCap4, 18), SITE(g_boxRef8, 9) };
 static Site g_boxRef9Site = SITE(g_boxRef9, 3);
 static Site g_boxCalls[] = { SITE(g_boxCap1, 31), SITE(g_boxCap2, 35), SITE(g_boxCap3, 43), SITE(g_boxCap4, 31) };	// the rel32 of each call
+
+// DecalDefs: the game's code that carries the decal definitions limit and loads the array (the array
+// itself, with its count 16 bytes before it, is below, outside this section, as the game's is): the
+// parser's "full" check, whose mov reads the count; the parser's lea; FindById's head, with three constant
+// sites and a lea beyond the pattern; PickVariant's head; the texture override's five sites, two of them
+// with a lea; the start-up loop's start (with a lea) and end; the seven identical "add decal" checks and
+// the four that differ; and the other 26 leas of the array, which only the scan for its address finds.
+// Every site ends in CC.
+#define NOP8 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+volatile unsigned char g_decalFull[] = { 0x8B, 0x35, 0, 0, 0, 0, 0x48, 0x81, 0xFE, 0x03, 0x01, 0x00, 0x00, 0x77, 0xAF, 0x48, 0x89, 0xF9, 0xFF, 0x15, 0xCC };	// disp32 at +2 (the count), imm32 at +9
+volatile unsigned char g_decalParserLea[] = { 0x4C, 0x8D, 0x2D, 0, 0, 0, 0, 0xF3, 0x44, 0x0F, 0x10, 0x0D, 0, 0, 0, 0, 0xF3, 0x44, 0x0F, 0x10, 0x15, 0xCC };	// rel32 at +3
+volatile unsigned char g_decalFindById[] = {
+	0x56, 0x85, 0xC9, 0x74, 0x66, 0xC7, 0x02, 0x04, 0x01, 0x00, 0x00, 0x41, 0xC7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x8B, 0x1D,	// 0: the pattern, imm32 at +7
+	0, 0, 0, 0, NOP8,																													// 21: the mov's disp32, then filler
+	0x4C, 0x8D, 0x15, 0, 0, 0, 0,																										// 33 (+0x21): lea r10, rel32 at +36
+	NOP8, NOP8, NOP8, NOP8, NOP8, 0x90,																									// 40: filler
+	0x81, 0x3A, 0x04, 0x01, 0x00, 0x00,																									// 81 (+0x51): cmp dword ptr [rdx], imm32 at +0x53
+	NOP8, 0x90,																															// 87: filler
+	0x81, 0x3A, 0x04, 0x01, 0x00, 0x00,																									// 96 (+0x60): imm32 at +0x62
+	0x0F, 0x92, 0xC0, 0x5E, 0xC3, 0xCC };																								// 102: setc al / pop rsi / ret
+volatile unsigned char g_decalPickVariant[] = { 0xB8, 0x04, 0x01, 0x00, 0x00, 0x81, 0xF9, 0x03, 0x01, 0x00, 0x00, 0x77, 0x2E, 0x41, 0x89, 0xD0, 0x8B, 0x05, 0, 0, 0, 0, 0xCC };	// imm32 at +1 (N) and +7 (N-1)
+volatile unsigned char g_decalOverrideOne[] = { 0x45, 0x31, 0xC9, 0x41, 0xBB, 0x04, 0x01, 0x00, 0x00, 0x31, 0xC0, 0x45, 0x31, 0xD2, 0xEB, 0x75, 0xCC };	// imm32 at +5
+volatile unsigned char g_decalOverrideLoop[] = { 0x41, 0xBB, 0x04, 0x01, 0x00, 0x00, 0x48, 0x8D, 0x3D, 0, 0, 0, 0, 0x31, 0xC0, 0x45, 0x31, 0xD2, 0xCC };	// imm32 at +2, lea rel32 at +9
+volatile unsigned char g_decalOverrideCmp1[] = { 0x41, 0x81, 0xFB, 0x04, 0x01, 0x00, 0x00, 0x89, 0xC3, 0x41, 0x0F, 0x44, 0xD9, 0xCC };	// imm32 at +3
+volatile unsigned char g_decalOverrideCmpEbp[] = { 0x81, 0xFD, 0x04, 0x01, 0x00, 0x00, 0x89, 0xD8, 0x41, 0x0F, 0x44, 0xC1, 0xCC };	// imm32 at +2
+volatile unsigned char g_decalOverrideCmp2[] = { 0x41, 0x81, 0xFB, 0x04, 0x01, 0x00, 0x00, 0x41, 0x0F, 0x44, 0xC1, 0x48, 0x8D, 0x3D, 0, 0, 0, 0, 0xCC };	// imm32 at +3, lea rel32 at +14
+volatile unsigned char g_decalLoopStart[] = { 0xB8, 0xD8, 0x07, 0x00, 0x00, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0x0F, 0x57, 0xC0, 0xCC };	// the start offset at +1, lea rel32 at +8
+volatile unsigned char g_decalLoopEnd[] = { 0x48, 0x05, 0x20, 0x08, 0x00, 0x00, 0x48, 0x3D, 0x18, 0x59, 0x00, 0x00, 0x0F, 0x85, 0xF3, 0xFD, 0xFF, 0xFF, 0xCC };	// the pass at +2, the end at +8
+#define DECAL_ADD_SITE { 0xE8, 0, 0, 0, 0, 0x3D, 0x03, 0x01, 0x00, 0x00, 0x0F, 0x8F, 0x58, 0x01, 0x00, 0x00, 0xCC }	// imm32 at +6
+volatile unsigned char g_decalAdd[7][17] = { DECAL_ADD_SITE, DECAL_ADD_SITE, DECAL_ADD_SITE, DECAL_ADD_SITE, DECAL_ADD_SITE, DECAL_ADD_SITE, DECAL_ADD_SITE };
+volatile unsigned char g_decalAddR8d[] = { 0x44, 0x89, 0xC3, 0x41, 0x81, 0xF8, 0x03, 0x01, 0x00, 0x00, 0x77, 0x95, 0xCC };	// imm32 at +6
+volatile unsigned char g_decalAddEsi[] = { 0x89, 0xC6, 0x81, 0xFE, 0x03, 0x01, 0x00, 0x00, 0x0F, 0x87, 0xE6, 0x04, 0x00, 0x00, 0xCC };	// imm32 at +4
+volatile unsigned char g_decalAddRel8[] = { 0xE8, 0, 0, 0, 0, 0x3D, 0x03, 0x01, 0x00, 0x00, 0x7F, 0x32, 0xCC };	// imm32 at +6
+volatile unsigned char g_decalAddEbx[] = { 0x89, 0xC3, 0x31, 0xC0, 0x81, 0xFB, 0x03, 0x01, 0x00, 0x00, 0x0F, 0x8F, 0x60, 0x01, 0x00, 0x00, 0xCC };	// imm32 at +6
+// the other 26 leas of the array, with the registers the game uses (rel32 at +3 of each)
+#define DECAL_LEA(rex, modrm) { rex, 0x8D, modrm, 0, 0, 0, 0, 0xCC }
+volatile unsigned char g_decalLeas[26][8] = {
+	DECAL_LEA(0x48, 0x0D), DECAL_LEA(0x48, 0x05), DECAL_LEA(0x48, 0x0D), DECAL_LEA(0x48, 0x05), DECAL_LEA(0x48, 0x1D), DECAL_LEA(0x48, 0x05),
+	DECAL_LEA(0x48, 0x05), DECAL_LEA(0x48, 0x05), DECAL_LEA(0x48, 0x05), DECAL_LEA(0x48, 0x0D), DECAL_LEA(0x48, 0x05), DECAL_LEA(0x48, 0x0D),
+	DECAL_LEA(0x48, 0x15), DECAL_LEA(0x48, 0x0D), DECAL_LEA(0x48, 0x35), DECAL_LEA(0x48, 0x1D), DECAL_LEA(0x4C, 0x2D), DECAL_LEA(0x48, 0x1D),
+	DECAL_LEA(0x48, 0x15), DECAL_LEA(0x48, 0x15), DECAL_LEA(0x48, 0x05), DECAL_LEA(0x48, 0x05), DECAL_LEA(0x4C, 0x3D), DECAL_LEA(0x48, 0x05),
+	DECAL_LEA(0x4C, 0x25), DECAL_LEA(0x4C, 0x1D) };
+// a 32nd lea, which the game does not have: its first byte becomes 48 only with the option "decalextra"
+volatile unsigned char g_decalLeaExtra[] = { 0xCC, 0x8D, 0x05, 0, 0, 0, 0, 0xCC };	// rel32 at +3
+static Site g_decalCountSite = SITE(g_decalFull, 2);
+// the 31 leas of the array: the five inside the sites above, then the 26 others (filled in main)
+static Site g_decalRefs[31] = { SITE(g_decalParserLea, 3), SITE(g_decalFindById, 36), SITE(g_decalOverrideLoop, 9), SITE(g_decalOverrideCmp2, 14),
+	SITE(g_decalLoopStart, 8) };
+static Site g_decalLeaExtraSite = SITE(g_decalLeaExtra, 3);
+// the 23 sites that carry the limit: 'L' holds N-1, 'N' holds N, 'E' the end of the start-up loop
+struct DecalLimit { Site site; char holds; };
+static DecalLimit g_decalLimits[23] = {
+	{ SITE(g_decalFull, 9), 'L' }, { SITE(g_decalFindById, 7), 'N' }, { SITE(g_decalFindById, 0x53), 'N' }, { SITE(g_decalFindById, 0x62), 'N' },
+	{ SITE(g_decalPickVariant, 1), 'N' }, { SITE(g_decalPickVariant, 7), 'L' }, { SITE(g_decalOverrideOne, 5), 'N' },
+	{ SITE(g_decalOverrideLoop, 2), 'N' }, { SITE(g_decalOverrideCmp1, 3), 'N' }, { SITE(g_decalOverrideCmpEbp, 2), 'N' },
+	{ SITE(g_decalOverrideCmp2, 3), 'N' }, { SITE(g_decalLoopEnd, 8), 'E' },
+	{ SITE(g_decalAdd[0], 6), 'L' }, { SITE(g_decalAdd[1], 6), 'L' }, { SITE(g_decalAdd[2], 6), 'L' }, { SITE(g_decalAdd[3], 6), 'L' },
+	{ SITE(g_decalAdd[4], 6), 'L' }, { SITE(g_decalAdd[5], 6), 'L' }, { SITE(g_decalAdd[6], 6), 'L' },
+	{ SITE(g_decalAddR8d, 6), 'L' }, { SITE(g_decalAddEsi, 4), 'L' }, { SITE(g_decalAddRel8, 6), 'L' }, { SITE(g_decalAddEbx, 6), 'L' } };
 #pragma data_seg()
 
 // The game's own traversal list (1000 entries of 8 bytes). The harness reaches it only through this
@@ -205,6 +274,13 @@ static Site g_boxCalls[] = { SITE(g_boxCap1, 31), SITE(g_boxCap2, 35), SITE(g_bo
 // TweaksV's scan for the game's loads of the list would count.
 static uint64_t g_oldBoxListStorage[1000];
 static uint64_t* volatile g_oldBoxList = g_oldBoxListStorage;
+
+// The game's own decal definitions array (260 entries of 80 bytes) with its count 16 bytes before it. The
+// harness reaches it only through this pointer, set when the program is loaded: none of its own code may
+// load the array with a lea, which TweaksV's scan for the game's loads of it would count.
+struct DecalStore { uint32_t count; uint32_t unused[3]; unsigned char entries[260 * 80]; };
+alignas(32) static DecalStore g_oldDecalStoreStorage;
+static DecalStore* volatile g_oldDecalStore = &g_oldDecalStoreStorage;
 
 // The game's two tree searches behind the box streamer's four calls: the first and the third call lead
 // to the first search, the second and the fourth to the second. Each writes the number of entries the
@@ -479,6 +555,57 @@ static void PrintBoxStreamer()
 		g_boxCallsResult);
 }
 
+// "decal refs: 31 new 0 game 0 other (RW, 1280 KB) | decal limits: 2047 2048 0x28198, 23 agree | decal count: 0 | " -
+// "new" is the common target of the first reference when that is outside the game and not the other
+// mod's address (option "decalmoved"); the limits are what the first site of each kind holds (N-1, N,
+// the end of the start-up loop) and how many sites differ from the first of their kind
+static void PrintDecalDefs()
+{
+	const unsigned char* const oldArray = g_oldDecalStore->entries;
+	const unsigned char* const otherMod = ImageEnd() + 0x50000;
+	const unsigned char* first = Rel32Target(g_decalRefs[0]);
+	const unsigned char* newArray = InImage(first) || first == otherMod ? nullptr : first;
+	int moved = 0, game = 0, other = 0;
+	for (const Site& site : g_decalRefs)
+	{
+		const unsigned char* target = Rel32Target(site);
+		if (target == oldArray)
+			game++;
+		else if (newArray && target == newArray)
+			moved++;
+		else
+			other++;
+	}
+	wprintf(L"decal refs: %d new %d game %d other", moved, game, other);
+	if (newArray)
+	{
+		wprintf(L" (");
+		PrintNewArray(newArray);
+		wprintf(L")");
+	}
+	uint32_t firstOf[3] = {};
+	bool seen[3] = {};
+	int differ = 0;
+	for (const DecalLimit& limit : g_decalLimits)
+	{
+		const int kind = limit.holds == 'L' ? 0 : limit.holds == 'N' ? 1 : 2;
+		const uint32_t value = Imm32(limit.site);
+		if (!seen[kind])
+		{
+			seen[kind] = true;
+			firstOf[kind] = value;
+		}
+		else if (value != firstOf[kind])
+			differ++;
+	}
+	wprintf(L" | decal limits: %u %u 0x%X, ", firstOf[0], firstOf[1], firstOf[2]);
+	if (differ == 0)
+		wprintf(L"23 agree");
+	else
+		wprintf(L"%d differ", differ);
+	wprintf(L" | decal count: %u | ", g_oldDecalStore->count);
+}
+
 // Every site is written once before TweaksV loads, so all their pages are private copies alike; then
 // the whole section is made read+execute, as the game's code is (MakeSitesReadExecute). TweaksV must
 // make each page it patches writable and give it its own protection back.
@@ -492,8 +619,13 @@ static void ForEachSite(void (*fn)(const Site&))
 {
 	static Site singles[] = { SITE(g_heapSite, 0), SITE(g_splashSite, 0), SITE(g_legalSite, 0), SITE(g_landingSite, 0),
 		SITE(g_landingCallee, 0), SITE(g_packI1, 0), SITE(g_packH1, 0), SITE(g_packR31a, 0), SITE(g_packR31b, 0),
-		SITE(g_packR31aCopy, 0), SITE(g_boxRef9, 0) };
+		SITE(g_packR31aCopy, 0), SITE(g_boxRef9, 0), SITE(g_decalFull, 0), SITE(g_decalParserLea, 0), SITE(g_decalFindById, 0),
+		SITE(g_decalPickVariant, 0), SITE(g_decalOverrideOne, 0), SITE(g_decalOverrideLoop, 0), SITE(g_decalOverrideCmp1, 0),
+		SITE(g_decalOverrideCmpEbp, 0), SITE(g_decalOverrideCmp2, 0), SITE(g_decalLoopStart, 0), SITE(g_decalLoopEnd, 0),
+		SITE(g_decalAddR8d, 0), SITE(g_decalAddEsi, 0), SITE(g_decalAddRel8, 0), SITE(g_decalAddEbx, 0), SITE(g_decalLeaExtra, 0) };
 	for (const Site& site : singles) fn(site);
+	for (auto& row : g_decalAdd) { Site site = { row, 0, sizeof(row) }; fn(site); }
+	for (auto& row : g_decalLeas) { Site site = { row, 0, sizeof(row) }; fn(site); }
 	for (const Site& site : g_modkitRefs) fn(site);
 	for (const Site& site : g_modkitLimits) fn(site);
 	for (const Site& site : g_packDirect) fn(site);
@@ -746,6 +878,38 @@ int wmain(int argc, wchar_t** argv)
 	if (HasOption(argc, argv, L"boxcallsplit"))	// ...or a pair leads to two different functions
 		SetRel32(g_boxCalls[2], reinterpret_cast<const void*>(&FakeTreeSearchB));
 
+	// Every reference to the decal definitions array points at the game's own array, 16 bytes after its
+	// count, and every site that carries the limit holds the game's 260...
+	for (size_t i = 0; i < 26; i++)
+	{
+		Site lea = { g_decalLeas[i], 3, sizeof(g_decalLeas[i]) };
+		g_decalRefs[5 + i] = lea;
+	}
+	unsigned char* const decalArray = g_oldDecalStore->entries;
+	for (const Site& site : g_decalRefs)
+		SetRel32(site, decalArray);
+	SetRel32(g_decalLeaExtraSite, decalArray);
+	SetRel32(g_decalCountSite, &g_oldDecalStore->count);
+	if (HasOption(argc, argv, L"decalmoved"))		// ...unless another mod moved the array already
+		for (const Site& site : g_decalRefs)
+			SetRel32(site, ImageEnd() + 0x50000);
+	if (HasOption(argc, argv, L"decalsplit"))		// ...or one lea points somewhere else in the game
+		SetRel32(g_decalRefs[6], decalArray + 80);
+	if (HasOption(argc, argv, L"decalextra"))		// ...or a 32nd lea loads it
+		g_decalLeaExtra[0] = 0x48;
+	if (HasOption(argc, argv, L"decalprefix"))		// ...or one lea has a prefix the game's never have
+		g_decalLeas[0][0] = 0x49;
+	if (HasOption(argc, argv, L"decalmismatch"))	// FindById's second compare holds 261 instead of 260
+		SetImm32(g_decalLimits[2].site, 261);
+	if (HasOption(argc, argv, L"decaloffbyone"))	// the parser's check holds 260 instead of 259: N would be 261
+		SetImm32(g_decalLimits[0].site, 260);
+	if (HasOption(argc, argv, L"decalbadsize"))		// the parser's check implies an implausible 131072
+		SetImm32(g_decalLimits[0].site, 131071);
+	if (HasOption(argc, argv, L"decalfull"))		// the game's own array is full
+		g_oldDecalStore->count = 260;
+	if (HasOption(argc, argv, L"decalmany"))		// more than the game's own array holds
+		g_oldDecalStore->count = 300;
+
 	RovSetup(argc, argv);
 	ForEachSite(TouchSite);
 	RovForEachDataSite(TouchData);
@@ -798,6 +962,7 @@ int wmain(int argc, wchar_t** argv)
 	RovForEachDataSite(CheckData);
 	PrintPackfile(argc, argv);
 	PrintBoxStreamer();
+	PrintDecalDefs();
 	RovReport();
 	wprintf(L"%ls%ls", g_dstorageResult, g_fileOpensResult);
 	CheckStub(Rel32Target(g_packCallSite));

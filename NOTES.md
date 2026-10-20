@@ -27,7 +27,8 @@
   - Malformed patterns no longer throw;
   - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match;
   - A new search: only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. It compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than the original search, which went through the whole image almost byte by byte;
-  - A second search, built the same way, finds every `lea` that loads one address - for a static list the game loads in places no pattern can tell apart (the box streamer's).
+  - A second search, built the same way, finds every `lea` that loads one address - for a static list the game loads in places no pattern can tell apart (the box streamer's);
+  - A pattern can be asked for every match instead of the first, for a site the game repeats - the check seven decal-placing functions share (the decal definitions part).
 
 - **One patch module:** every patch to the game's code goes through `TweaksVPatch`, one writer for bytes and one for redirected calls (a hook on a function's start - RageOpenV's file and archive functions, DirectStorage's - is MinHook's, see T-HARDEN):
   - A group of writes is all or nothing: every page is made writable first, so a page that cannot be changed leaves the game as it was;
@@ -90,6 +91,16 @@
   - A failure is reported in the start-up summary and leaves the game as it was;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
+- **DecalDefs (TweaksV's own part):** `[DECALDEFS_SETTINGS] DECALDEFS_SIZE` (default 2048) is read from `TweaksV.ini`. The game keeps its decal definitions - the kinds of decal it reads from the `decals.dat` files - in a static array of 260 entries, with the number registered so far in a dword 16 bytes before it; once 260 are registered the parser drops every further definition silently, and add-on content, which comes last, loses its decals. TweaksV moves the array to a larger one and raises the limit at every site that carries it:
+  - The idea is the CitizenFX Collective's fix for FiveM, as 0x-FADED ported it to GTA V Legacy. TweaksV's code is its own, written from TweaksV's own findings about the game's code; the published patches were known as the idea and as a guide to what to look for, and no line of their code was read for the build;
+  - The parser's "full" check gives the count's address and N (260), its `lea` the array's address, which must lie 16 bytes after the count, both inside the game. Every other site that carries the limit - 21 instructions, one pattern matching the 7 identical checks of the decal-placing functions - is found by pattern, must be the expected instruction and must hold N-1 or N; the decal manager's start-up loop must clear a whole number of entries per pass and end at its start offset + N x 80. The game's code is then scanned for every `lea` that loads the array: exactly 31 must be found, each with a 48 or 4C prefix, so an array another mod has moved, or a game that has changed, is left alone;
+  - The new array always has the full 16384 entries (1.3 MB), as read/write data, zeroed - the array's initial state; the limit is clamped to the game's own size..16384 (a definition's index is a uint16 in the game's decal instances);
+  - The 31 references and the 23 constants are written together, all or nothing; the loop end becomes a whole number of passes below the new size (the entries it leaves are zero anyway); the count stays where it is, since nothing reaches it through the array or the array through it;
+  - `LOG_DECALDEFS=1` (testing) reads the count 10 seconds in and then every minute while it changes, and logs it against the limit and the game's own 260, with how many the game's own array would have dropped - nothing is hooked; with `DRY_RUN=1` it measures the unpatched game;
+  - `DecalPatch.asi` counts as an old plugin for this part and the box streamer part: with it installed, both are switched off;
+  - A failure is reported in the start-up summary and leaves the game as it was;
+  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+
 - **RageOpenV:** the mods folder, unencrypted (OPEN) RPF archives, the RPF cache check skip and the experimental newmods folder each have a switch in `[RAGEOPENV_SETTINGS]`, read from `TweaksV.ini` (no more `RageOpenV.ini`). Fixes:
   - Every hook group finds and checks all of its addresses first, and installs all of its hooks or none; a missing pattern no longer crashes the game;
   - Function starts worked out from a pattern are checked, and calls that another mod has already redirected are left alone;
@@ -123,7 +134,7 @@
 - **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from; the mod page carries the credits and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
   - Provenance: RageOpenV's README asks that its binaries not be redistributed - a request, not a license term (the GPL-3.0 allows redistribution and forbids further restrictions), so the credits stay prominent; martonp96's original ClosedIV repository is no longer public, and RageOpenV's README is the source of that credit.
 
-- **Tests:** `test\` holds fake-game test suites (363 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (418 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 
