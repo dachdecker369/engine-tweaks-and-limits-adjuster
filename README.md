@@ -35,7 +35,7 @@ For testing, `LOG_SEARCHES=1` logs every minute how many map boxes the largest s
 
 ## Decal definitions
 
-The game reads its decal definitions - the kinds of bullet holes, blood, scorch and tyre marks, liquids, graffiti and so on - from the `decals.dat` files into an array of 260 entries. Once 260 are registered, every further definition is dropped silently; the files are read in order, so it is the definitions of the last files - add-on and mod content - that go missing, and the decals that use them never appear. This is a limit on the kinds of decal, not on the decals on screen.
+The game reads its decal definitions - the kinds of bullet holes, blood, scorch and tyre marks, liquids, graffiti and so on - from the `decals.dat` files into an array of 260 entries. Once 260 are registered, every further definition is dropped silently; the files are read in order, so it is the definitions of the last files - add-on and mod content - that go missing, and the decals that use them never appear. This is a limit on the kinds of decal, not on the decals on screen. Vanilla 1.0.1158.16 already registers 259 of the 260, so a mod that adds two definitions is one too many for the game's own array.
 
 `DECALDEFS_SIZE` under `[DECALDEFS_SETTINGS]` in `TweaksV.ini` (default 2048, up to 16384) moves the array to a larger one and raises the limit everywhere the game uses it. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own, written from TweaksV's own findings about the game. The published patches were known as the idea and as a guide to what to look for; no line of their code was read for the build or went into TweaksV.
 

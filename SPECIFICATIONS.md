@@ -102,6 +102,6 @@ Checks that skip the part, each with a `ReportFailure`: a missing pattern; an un
 
 ## Next steps
 
-1. Done: the part is built to sections 4 to 6 and passes section 7's build and test lines (three clean builds, 418 checks green); committed locally as TweaksV 1.6.0, with the Release build rebuilt from that commit.
-2. The owner's boots, section 7's in-game lines: `DIAGNOSTIC_MODE=1` first, then `LOG_DECALDEFS=1` with a decal-heavy load; then push and the tag (the details are in PLAN.md, "Next steps").
+1. Done: the part is built to sections 4 to 6 and accepted by section 7 - three clean builds, 418 checks green, and the owner's boots (every pattern at its RVA, vanilla's 259 definitions measured, a test `decals.dat` of 659 held with every decal visible, and the failure shown with the part off). PLAN.md, phase 3, has the details.
+2. Open: a ten-minute session, then the owner's push and tag (PLAN.md, "Next steps").
 3. Nexus and the removal of PLAN.md and this file follow (PLAN.md, phase 4).

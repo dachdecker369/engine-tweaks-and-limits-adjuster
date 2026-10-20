@@ -47,9 +47,9 @@ Deliverable: a findings file that fills every field of the template in SPECIFICA
 ### 3. Verification
 
 - [x] Release, the test build and the analysis build at /W4 without a warning; `bash test/run_all.sh` green (418 checks).
-- [ ] A boot with `DIAGNOSTIC_MODE=1`: every new pattern found once at the RVAs of the findings, the array's address, 31 references, 23 constants, every write; no `PROBLEM`.
-- [ ] A boot with `LOG_DECALDEFS=1` and a decal-heavy load: the count passes 260 without a crash or missing decals; with the part off, the same load shows the failure it is meant to cure (or the number says the load never reaches 260 - then the test load is too small, not the part wrong).
-- [ ] A ten-minute session: no crash dump, no Windows error.
+- [x] A boot with `DIAGNOSTIC_MODE=1`: every new pattern found once at the RVAs of the findings (`D-E-L12` exactly 7 times), the array at 0x42EC8A0 with its count at 0x42EC890, 31 references, 23 constants, 54 writes; no `PROBLEM`; vanilla decals visible.
+- [x] A boot with `LOG_DECALDEFS=1` on vanilla files: 259 definitions registered - one short of the game's own 260. Then a test `decals.dat` (400 copies of the scripted scuff 7800 placed first, then vanilla's 259; in `mods\update\update.rpf`): with the part on, 659 registered, "the game's own array would have dropped 399 of them", every decal type visible; with the part off (`ENABLED=0` - `DRY_RUN` cannot be used, RageOpenV serves no mods folder in a dry run), no bullet hole, blood or tyre mark at all: the failure the part cures, seen directly.
+- [ ] A ten-minute session: no crash dump, no Windows error. The four boots so far were one to two minutes each, with no crash dump and no Application-log error.
 
 ### 4. Release
 
@@ -59,12 +59,12 @@ Deliverable: a findings file that fills every field of the template in SPECIFICA
 
 ## Risks
 
-- A pointer variable in `.data` holding the array's address (see phase 1, last point): accepted, caught by the first in-game test beyond 260 definitions.
+- A pointer variable in `.data` holding the array's address (see phase 1, last point): accepted, caught by the first in-game test beyond 260 definitions - and retired by it: with 659 definitions in the moved array every decal type appeared, so nothing reaches the array through a stale pointer.
 - A game update moves the sites: the findings file's anchors (section 3.8) are the way to find them again from a new dump; the RVAs themselves are not to be trusted after an update.
 - The init loop's end must stay a multiple of 26 entries from its start; the rounding rule in SPECIFICATIONS.md, section 4, keeps it so for any setting value.
 
 ## Next steps
 
-1. Done here: the part is built to SPECIFICATIONS.md and passes phase 3's own checks (three clean builds, 418 checks green); it is committed locally as TweaksV 1.6.0, with `x64\Release\TweaksV.asi` rebuilt from that commit.
-2. The owner boots it. First with `DIAGNOSTIC_MODE=1`: every `D-E-L` pattern found once (`D-E-L12` 7 times) at the RVAs in PATTERNS.md, 31 "the array is loaded at" lines, 23 "limit at ... holds" lines, 54 writes, the line "Decal definitions array moved and its limit raised from 260 to 2048 entries.", no `PROBLEM`. Then with `LOG_DECALDEFS=1` and the decal-heavy mods: the count passes 260 without a crash or missing decals (with `DRY_RUN=1` and the same load, the game's own array shows as full at 260). Then a ten-minute session without a crash dump. Then push `main` and the tag `1.6.0`.
-3. Phase 4: the measurement into NOTES.md, Nexus, and the removal of this file and SPECIFICATIONS.md.
+1. Done: built, committed as TweaksV 1.6.0 (a4c691e), and booted four times by the owner - the DIAGNOSTIC boot, the vanilla count (259), the test `decals.dat` with the part on (659, every decal visible) and with the part off (no decals at all). The measurements are in NOTES.md and README.md.
+2. Open: a ten-minute session with the part on and the normal files, for the crash-dump and Application-log check. Then the owner says push and tag: `main` and the annotated tag `1.6.0` on a4c691e go up together, this docs commit with them.
+3. Phase 4: Nexus, and the removal of this file and SPECIFICATIONS.md.
