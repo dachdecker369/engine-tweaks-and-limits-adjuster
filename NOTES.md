@@ -47,7 +47,7 @@
 - **HeapAdjuster (TweaksV's own part since 2.0.0; the merged HeapAdjusterEnhanced before):** `[HEAP_ADJUSTER] HEAP_SIZE` (default 2000 MB) sets the game's memory heap, one immediate in its start-up code (`H-E1`):
   - The instruction is checked before the write, and the size it holds must be a whole number of MB up to 2047;
   - `HEAP_SIZE` is clamped to the size found..2047 MB, with 64-bit arithmetic; a heap that has the size asked for already is left as it is;
-  - A heap of 1024 MB or more is not the game's own: another heap adjuster ran first, which is logged, and `HEAP_SIZE` is applied on top of it - the load order decides (README, "Other mods");
+  - A heap of 1024 MB or more is not the game's own: another heap adjuster set it, so it is left as it is and the log says so - what another mod has already changed, TweaksV does not change again (with NaturalVision Enhanced its heap size wins, README's "Other mods");
   - A missing pattern, a wrong instruction or a page that cannot be written is reported in the start-up summary;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 

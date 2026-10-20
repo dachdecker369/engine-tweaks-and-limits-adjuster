@@ -118,7 +118,7 @@ Add these switches to the `msbuild` line above:
 
 ## Other mods
 
-- **NaturalVision Enhanced** sets the heap size as well. ASI loaders load alphabetically and the last one to set it wins; TweaksV's files keep their names, so you can rename `TweaksV.asi` to `zTweaksV.asi` to load it last.
+- **NaturalVision Enhanced** sets the heap size as well. TweaksV leaves a heap another mod has already set alone and says so in the log, so with NVE installed its heap size wins, whatever the load order.
 - **gameconfig.xml:** a gameconfig that raises the archive count has no effect while the Packfile part is on - TweaksV replaces that count with `PACKFILEARRAY_SIZE` when the game reads its configuration. Everything else in a gameconfig works as usual.
 - **Zolika Patch:** the ModkitLimit Extender's author warned that its modkit patch may not be compatible with Zolika Patch's; the same goes for TweaksV's Modkit part.
 - **DecalPatch.asi**, a closed-source plugin that raises the box streamer list and the decal definitions limit for GTA V Enhanced, is detected as an old plugin: TweaksV switches its decal definitions part and its box streamer part off while it is installed, so nothing is patched twice. Delete it - TweaksV replaces both halves.

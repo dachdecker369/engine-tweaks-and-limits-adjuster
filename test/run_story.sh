@@ -83,11 +83,11 @@ fresh_ini; out=$(game plain_game.exe); echo "      $out"
 check "harness survived" "grep -q 'loaded' harness.out"
 check "three 'not found' problems" "log_has 'The splash screen is not skipped this session: S-E1 was not found.' && log_has 'The legal screen is not skipped this session: S-E2 was not found.' && log_has 'The landing page is not skipped this session: S-E3 was not found.'"
 
-echo "== S13 another heap adjuster ran first (the site holds 2000 MB): logged, HEAP_SIZE applied on top of it"
+echo "== S13 another heap adjuster ran first (the site holds 2000 MB): left as it is, logged, not a problem"
 fresh_ini; out=$(game full_game.exe heapraised); echo "      $out"
-check "HEAP_SIZE=1024 is below the 2000 found: raised to it, nothing to patch, no problem" "[[ \"\$out\" == *'heap: 2000 MB'* ]] && log_has 'Another heap adjuster already ran: the heap is 2000 MB, not the game.s own' && log_has 'HEAP_SIZE=1024 is outside 2000..2047 - using 2000' && log_has 'Heap size is 2000 MB already (HEAP_SIZE=1024) - nothing to patch' && ! log_has 'PROBLEM'"
+check "the heap stays at the 2000 MB found, HEAP_SIZE=1024 not applied, logged, no problem" "[[ \"\$out\" == *'heap: 2000 MB'* ]] && log_has 'The heap size is not changed this session: another heap adjuster already set it to 2000 MB - left as it is.' && ! log_has 'Heap size patched' && ! log_has 'PROBLEM'"
 fresh_ini; setkey HEAP_SIZE 2047; out=$(game full_game.exe heapraised)
-check "HEAP_SIZE=2047 is applied on top: 2000 -> 2047 MB" "[[ \"\$out\" == *'heap: 2047 MB'* ]] && log_has 'Heap size patched: 2000 MB -> 2047 MB.' && ! log_has 'PROBLEM'"
+check "nor is HEAP_SIZE=2047: what another mod changed is not changed again" "[[ \"\$out\" == *'heap: 2000 MB'* ]] && ! log_has 'Heap size patched' && ! log_has 'PROBLEM'"
 
 echo
 echo "STORY SCENARIOS: $pass passed, $fail failed"

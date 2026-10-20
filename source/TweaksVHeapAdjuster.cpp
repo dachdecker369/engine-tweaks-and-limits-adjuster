@@ -4,9 +4,9 @@
 // The game sizes its memory heap with one immediate in its start-up code: the imm32 of a "mov edx,
 // imm32" (H-E1 matches the instruction; the size, in bytes, is at +1). HEAP_SIZE in [HEAP_ADJUSTER]
 // sets it in MB, from the size the game holds up to 2047, the most a whole number of MB fits in that
-// imm32. The instruction and the value it holds are checked before the one write; a heap that is
-// not the game's own - 1024 MB or more - means another heap adjuster ran first, which is logged, and
-// HEAP_SIZE is applied on top of it, so the load order decides (README, "Other mods").
+// imm32. The instruction and the value it holds are checked before the one write. A heap that is not
+// the game's own - 1024 MB or more - was set by another heap adjuster and is left as it is, logged:
+// what another mod has already changed, TweaksV does not change again (README, "Other mods").
 // Written for TweaksV; the pattern and the idea come from HeapAdjusterEnhanced by Chiheb-Bacha, which
 // builds on the CitizenFX Collective's heap adjuster as updated by Dilapidated (CREDITS.md).
 
@@ -73,8 +73,11 @@ namespace TweaksV
 		if (IsDiagnosticMode())
 			WriteLog(kTag, "DIAGNOSTIC: heap size at " + DescribeAddress(site) + " holds " + std::to_string(found) + " MB");
 		if (found >= kAdjustedFromMb)
-			WriteLog(kTag, "Another heap adjuster already ran: the heap is " + std::to_string(found) + " MB, not the game's own - "
-				"HEAP_SIZE is applied on top of it.");
+		{
+			WriteLog(kTag, "The heap size is not changed this session: another heap adjuster already set it to " + std::to_string(found) +
+				" MB - left as it is.");
+			return;
+		}
 
 		// 3. the size to use: [the size found, 2047 MB] - smaller would shrink the heap
 		const int requested = GetNumber(kHeapSize);

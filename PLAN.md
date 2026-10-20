@@ -26,6 +26,7 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 - [x] A 1.x `TweaksV.ini` is not migrated: a file without `VERSION` under `[TWEAKSV]`, whatever else it holds, is renamed to `TweaksV.old.ini` (an existing `TweaksV.old.ini` is replaced when it passes the own-file checks), a fresh default file is written, the start-up summary says so, and README tells people they can also delete the old file. A 1.x file TweaksV cannot rename is reported every boot and not read (section 3.4).
 - [x] The names of SPECIFICATIONS.md, section 2: section, feature name, log tag and file per part; the "Enhanced" suffixes go; the pattern labels stay. Phase 1 changes the sections and keys; the feature names and log tags change with each part, in phases 2 to 4.
 - [x] The suites' `base.ini` keeps the values it has (`HEAP_SIZE=1024`, `PACKFILEARRAY_SIZE=12000`): every suite asserts them, which proves the file is read.
+- [x] What another mod has already changed, TweaksV does not change again: that job stays off for the session, as every part does with a moved array, a redirected call or a hooked function - the heap included (a heap another adjuster set is left as it is, logged, not a problem).
 - [x] The release is 2.0.0, once, with everything in it. The INI comes first inside the work, as phase 1.
 
 ### 1. INI layout 2

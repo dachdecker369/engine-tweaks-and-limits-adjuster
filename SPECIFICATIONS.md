@@ -156,7 +156,7 @@ Each part: what it does (unchanged from 1.6.0 unless said), what the rewrite mus
 
 ### 4.1 HeapAdjuster
 
-- Finds `H-E1` and raises the game's heap size (the imm32 of a `mov edx` at +1, in bytes) to `HEAP_SIZE` MB. The instruction is checked before the write; the vanilla size is read from it and logged; `HEAP_SIZE` is clamped to the game's own size..2047 with no integer overflow; a heap size that is not the vanilla one is logged as "another heap adjuster already ran" and left alone (NaturalVision Enhanced sets it too; README's "Other mods" keeps the rename advice `zTweaksV.asi`).
+- Finds `H-E1` and raises the game's heap size (the imm32 of a `mov edx` at +1, in bytes) to `HEAP_SIZE` MB. The instruction is checked before the write; the vanilla size is read from it and logged; `HEAP_SIZE` is clamped to the game's own size..2047 with no integer overflow; a heap size that is not the vanilla one - 1024 MB or more - was set by another heap adjuster and is left alone, logged, not a problem: what another mod has already changed, TweaksV does not change again (NaturalVision Enhanced sets it too, so its size wins whatever the load order; README's "Other mods" says so, and the rename advice goes).
 - One `WriteCode`, `DRY_RUN`, `DIAGNOSTIC_MODE`, the failure line in the summary. Old plugins: `HeapAdjuster.asi`, `ZHeapAdjuster.asi`.
 - Pinned by the `ini_default`, `story` (the heap line of every scenario) and `integration` suites: the fake site's "heap: 2000 MB".
 
