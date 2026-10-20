@@ -83,6 +83,6 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 
 ## Next steps
 
-1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phases 1 to 3 are built and committed, phases 1 and 2 booted (phase 3's checkpoint boots are next), the suites green with 425 checks; then phase 4.
+1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phases 1 to 3 are built and committed, phases 1 and 2 booted (phase 3's checkpoint boots are next), the suites green with 427 checks; then phase 4.
 2. Phase 6: the 2.0.0 commit, my boots of SPECIFICATIONS.md section 8, then push and tag on my word, then Nexus, then the removal of these two files.
 3. Open: nothing; the session asks me again whenever something new comes up.

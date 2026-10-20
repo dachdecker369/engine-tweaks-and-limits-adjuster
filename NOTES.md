@@ -70,7 +70,7 @@
   - A failure is reported in the start-up summary and leaves the game as it was;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
-- **PackfileLimit (TweaksV's own part since 2.0.0; the merged PackfileLimitAdjusterEnhanced before):** `[PACKFILE_LIMIT] PACKFILEARRAY_SIZE` (default 13000) enlarges the game's array of RPF archives - 7260 entries of 8 bytes on the current build, referenced by 31 instructions (`P-E-R01..R30` and, by game build, `R31a` or `R31b`) and sized by an immediate (`P-E-D3`, `D2` or `D1` by game build) and a variable the game compares against (`P-E-I1`) - on the relocation core, and replaces the archive count of the game's configuration:
+- **PackfileLimit (TweaksV's own part since 2.0.0; the merged PackfileLimitAdjusterEnhanced before):** `[PACKFILE_LIMIT] PACKFILEARRAY_SIZE` (default 13000) enlarges the game's array of RPF archives - 7260 entries of 8 bytes on the current build, referenced by 31 instructions (`P-E-R01..R30` and, by game build, `R31a` or `R31b`) and sized by an immediate (`P-E-D3`, `D2` or `D1` by game build) and a variable the game compares an archive index against, which holds four less than the array's size (`P-E-I1`; 1.x and the originals wrote the full size over it, 2.0.0 keeps the margin) - on the relocation core, and replaces the archive count of the game's configuration:
   - Every reference, both limits and the streaming configuration call (`P-E-H1`) are found and checked before anything is written: all references must point at one array inside the game, the limits must agree on a plausible size, and the call must lead into the game - one another mod has already redirected is left alone;
   - The call goes through a read+execute call stub to TweaksV's function, which replaces the archive count read from `gameconfig.xml` with the new size and calls the game's own function; the log says what it replaced;
   - The new array always has the full 65535 entries, as read/write data; the limits are clamped to the game's own size..65535;
@@ -131,7 +131,7 @@
 - **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from; the mod page carries the credits and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
   - Provenance: RageOpenV's README asks that its binaries not be redistributed - a request, not a license term (the GPL-3.0 allows redistribution and forbids further restrictions), so the credits stay prominent; martonp96's original ClosedIV repository is no longer public, and RageOpenV's README is the source of that credit.
 
-- **Tests:** `test\` holds fake-game test suites (425 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (427 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 

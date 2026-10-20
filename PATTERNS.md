@@ -66,7 +66,7 @@ Sizes and the streaming configuration call (the two limit sites and the call the
 | P-E-D3 | `48 83 C6 ? 48 81 F9` | +7: direct size (builds 1.0.1158.13 and later); 7260 on current build | found | 0x10F1BF |
 | P-E-D2 | `49 83 c3 ? 48 81 f9 ? ? ? ? 75 ? eb` | +7: direct size (builds 1.0.1013.17 to 1158.12) | not used on current build | - |
 | P-E-D1 | `48 81 f9 ? ? ? ? 74 ? 48 83 3c ca 00` | +3: direct size (older builds) | not used on current build | - |
-| P-E-I1 | `3b 05 ? ? ? ? 0f 8d ? ? ? ? 89 c0` | +2: rel32 to the indirect size variable | found | 0x1279156 |
+| P-E-I1 | `3b 05 ? ? ? ? 0f 8d ? ? ? ? 89 c0` | +2: rel32 to the indirect size variable, which holds N-4 (7256 on the current build) | found | 0x1279156 |
 | P-E-H1 | `89 48 ? 48 8d 0d ? ? ? ? 48 89 08 48 89 c1 e8` | +0x10: the streaming configuration call; 8512 archive count on current build | found | 0x5093D5 |
 
 References to the packfile array (rel32 moved to the new array):

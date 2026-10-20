@@ -25,7 +25,7 @@ check "the log says it was created" 'grep -q "Created TweaksV.ini with the defau
 check "log header: HEAP_SIZE=2000, PACKFILEARRAY_SIZE=13000, TRAVERSAL_LIST_SIZE=10000, DECALDEFS_SIZE=2048, the [TWEAKSV] line with VERSION=2" 'grep -q "HeapAdjuster: HEAP_SIZE=2000" TweaksV.log && grep -q "PackfileLimit: PACKFILEARRAY_SIZE=13000" TweaksV.log && grep -q "BoxStreamer: TRAVERSAL_LIST_SIZE=10000" TweaksV.log && grep -q "Decals: DECALDEFS_SIZE=2048" TweaksV.log && grep -q "TweaksV: LOG=1 DIAGNOSTIC_MODE=0 DRY_RUN=0 CONSOLE=0 ERROR_POPUP=1 CONFLICT_CHECK=1 VERSION=2" TweaksV.log'
 check "log header: no newmods line, no testing switch of a part" '! grep -qi "newmods" TweaksV.log && ! grep -q "LOG_DUMP\|LOG_SEARCHES\|LOG_DECALDEFS\|LOG_CALLS\|LOG_FILE_OPENS\|LOG_INFO\|LOG_MODS" TweaksV.log'
 check "the heap is set to 2000 MB" 'grep -q "heap: 2000 MB" harness.out'
-check "the packfile limit is 13000" 'grep -q "I=13000" harness.out'
+check "the packfile limit is 13000" 'grep -q "I=12996" harness.out'
 check "the box streamer list capacity is 10000" 'grep -q "box caps: 10000 10000 10000 10000" harness.out'
 check "the decal definitions limit is 2048" 'grep -q "decal limits: 2047 2048 0x28198, 23 agree" harness.out'
 check "no message box was needed (harness finished), no problem" 'grep -q "heap:" harness.out && ! grep -q "PROBLEM" TweaksV.log'
@@ -52,7 +52,7 @@ setkey SKIP_SPLASH_SCREEN '  TRUE  '; setkey UNLOCK_FILES 'Off'	# spaces and cap
 out=$(game full_game.exe); echo "      ${out:0:160}"
 check "HEAP_SIZE=5000: outside 1..2047, 2047 used" "grep -q 'PROBLEM: TweaksV.ini: \[HEAP_ADJUSTER\] HEAP_SIZE=5000 is outside 1..2047 - using 2047.' TweaksV.log && grep -q 'heap: 2047 MB' harness.out"
 check "MODKITARRAY_SIZE of 300 digits: not a number, the default used" "grep -q 'PROBLEM: TweaksV.ini: \[MODKIT_LIMIT\] MODKITARRAY_SIZE=9* is not a number - using 65536.' TweaksV.log"
-check "PACKFILEARRAY_SIZE=-5: outside, raised to the game's own size" "grep -q 'PACKFILEARRAY_SIZE=-5 is outside 1..65535 - using 1.' TweaksV.log && grep -q 'I=4500' harness.out"
+check "PACKFILEARRAY_SIZE=-5: outside, raised to the game's own size" "grep -q 'PACKFILEARRAY_SIZE=-5 is outside 1..65535 - using 1.' TweaksV.log && grep -q 'I=4496' harness.out"
 check "CONSOLE=maybe: not on/off, off" "grep -q 'PROBLEM: TweaksV.ini: \[TWEAKSV\] CONSOLE=maybe is not a valid on/off value - using 0.' TweaksV.log"
 check "VERSION=3: a newer layout is reported" "grep -q 'PROBLEM: TweaksV.ini comes from a newer TweaksV (layout 3; this TweaksV knows layout 2)' TweaksV.log"
 check "'  TRUE  ' and 'Off' are read, not reported" "grep -q 'SKIP_SPLASH_SCREEN=1' TweaksV.log && grep -q 'UNLOCK_FILES=0' TweaksV.log && ! grep -q 'PROBLEM: .*SKIP_SPLASH_SCREEN\|PROBLEM: .*UNLOCK_FILES' TweaksV.log"

@@ -3,7 +3,8 @@
 //
 // The game keeps its RPF archives in one static array - 7260 entries of 8 bytes on the current build -
 // that 31 instructions reference (P-E-R01..R30, and R31a or R31b by game build) and two limits size: an
-// immediate (P-E-D3, D2 or D1 by game build) and a variable the game compares against (P-E-I1).
+// immediate (P-E-D3, D2 or D1 by game build) and a variable the game compares an archive index against,
+// which holds four less than the array's size (P-E-I1; 1.x wrote the full size over it, this keeps the margin).
 // PACKFILEARRAY_SIZE in [PACKFILE_LIMIT] moves the array to one of 65535 entries, always allocated in
 // full, and raises both limits to that size, clamped to the game's own size..65535, on the relocation
 // core. The third limit lies in the game's configuration: the call that reads it (P-E-H1) is
@@ -62,12 +63,13 @@ namespace TweaksV
 		// the reference that depends on the build
 		constexpr Anchor kReference31a = Reference(Pattern("P-E-R31a"), Rel32(13));
 		constexpr Anchor kReference31b = Reference(Pattern("P-E-R31b"), Rel32(20));
-		// the direct size, one pattern per range of builds; the indirect size, a variable; the call that
-		// reads the streaming configuration (the part reads its site itself)
+		// the direct size, one pattern per range of builds; the indirect size, a variable that holds N-4 (7256 on
+		// 1.0.1158.16, where the array has 7260 entries); the call that reads the streaming configuration (the
+		// part reads its site itself)
 		constexpr Anchor kDirect3 = Limit(Pattern("P-E-D3"), Imm32(4, kCmpRcx, 3, 7, 1, 0));
 		constexpr Anchor kDirect2 = Limit(Pattern("P-E-D2"), Imm32(4, kCmpRcx, 3, 7, 1, 0));
 		constexpr Anchor kDirect1 = Limit(Pattern("P-E-D1"), Imm32(0, kCmpRcx, 3, 3, 1, 0));
-		constexpr Anchor kIndirect = Limit(Pattern("P-E-I1"), Variable(2));
+		constexpr Anchor kIndirect = Limit(Pattern("P-E-I1"), Variable(2, -4));
 		constexpr Anchor kCall = Site(Pattern("P-E-H1"));
 
 		constexpr RelocationSpec kSpecBase = { kTag, "packfile array", "packfile list size", "The packfile limit is not changed",

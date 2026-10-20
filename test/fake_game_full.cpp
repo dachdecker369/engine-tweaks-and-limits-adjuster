@@ -14,6 +14,7 @@
 //   packmoved      one packfile array reference points outside the game (another mod moved it)
 //   packhooked     the streaming configuration call already leads outside the game
 //   packbadsize    the direct size limit holds an implausible 70000
+//   packindirect   the indirect size variable holds the array's size itself, 4500, not 4 less (a changed margin)
 //   twor31a        a second, identical copy of the 1158.13+ packfile reference (its pattern matches twice)
 //   junkr31a       the game's obfuscated code that the old 1158.13+ reference pattern also matched
 //   boxmoved       every reference to the box streamer's traversal list points outside the game (another mod moved it)
@@ -106,7 +107,7 @@ static Site g_modkitLimits[] = { SITE(g_modkitLimit1, 8), SITE(g_modkitLimit2, 1
 // limits, the call that reads the streaming configuration and the references to the array. Every
 // site ends in CC so no pattern can match across two neighbouring arrays.
 void* g_oldPackfileArray[4500];
-volatile uint32_t g_packIndirectSize = 4500;	// the variable "cmp eax, [rip+X]" reads
+volatile uint32_t g_packIndirectSize = 4496;	// the variable "cmp eax, [rip+X]" reads: the array's size minus 4, as the game's own
 // direct size "cmp rcx, 4500", one per game build
 volatile unsigned char g_packD3[] = { 0x48, 0x83, 0xC6, 0x08, 0x48, 0x81, 0xF9, 0x94, 0x11, 0x00, 0x00, 0x75, 0xE0, 0xCC };			// >= 1.0.1158.13, +7
 volatile unsigned char g_packD2[] = { 0x49, 0x83, 0xC3, 0x08, 0x48, 0x81, 0xF9, 0x94, 0x11, 0x00, 0x00, 0x75, 0xE0, 0xEB, 0x05, 0xCC };	// >= 1.0.1013.17, +7
@@ -855,6 +856,8 @@ int wmain(int argc, wchar_t** argv)
 	if (HasOption(argc, argv, L"packbadsize"))		// an implausible direct size
 		for (const Site& site : g_packDirect)
 			SetImm32(site, 70000);
+	if (HasOption(argc, argv, L"packindirect"))	// the variable holds the size itself, not 4 less
+		g_packIndirectSize = 4500;
 
 	// Every reference to the box streamer's traversal list points at the game's own list, and every
 	// capacity holds its 1000 entries...

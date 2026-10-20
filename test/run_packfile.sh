@@ -8,13 +8,13 @@ mkdir -p appdata
 
 MOVED='pack refs: 30 new 0 game 0 other, R31a new, R31b game (RW, 512 KB)'
 UNMOVED='pack refs: 0 new 30 game 0 other, R31a game, R31b game |'
-GAME_SIZES='pack sizes: D3=4500 D2=4500 D1=4500 I=4500'
+GAME_SIZES='pack sizes: D3=4500 D2=4500 D1=4500 I=4496'
 NO_HOOK='hook: not set'
 
 echo "== P1 defaults (game 1.0.1158.16): array moved, limits 12000, configuration count replaced"
 fresh_ini; out=$(game full_game.exe); echo "      $out"
 check "all 30 common references + the 1158.13+ one -> one new 512 KB read/write array; the older build's one untouched" "has '$MOVED'"
-check "direct size (1158.13+ site) and indirect size 12000, the older builds' sites untouched" "has 'pack sizes: D3=12000 D2=4500 D1=4500 I=12000'"
+check "direct size (1158.13+ site) 12000 and the indirect size 11996 - the game's margin of 4 kept; the older builds' sites untouched" "has 'pack sizes: D3=12000 D2=4500 D1=4500 I=11996'"
 check "hooked call replaces the configured 3000 with 12000 and calls the game's function with it" "has 'hook: config 3000 -> 12000, original called 1x with 12000'"
 check "the hook's line" "log_has 'The archive count of the game.s configuration, 3000, is replaced by 12000.'"
 check "status lines" "log_has 'The packfile array moved and its limit raised from 4500 to 12000 entries.' && log_has 'The streaming configuration call at RVA .* is redirected: the archive count the game.s configuration holds is replaced by 12000 when the game reads it.'"
@@ -25,21 +25,21 @@ check "no problems" "! log_has 'PROBLEM'"
 
 echo "== P2 PACKFILEARRAY_SIZE=20000"
 fresh_ini; setkey PACKFILEARRAY_SIZE 20000 PACKFILE_LIMIT; out=$(game full_game.exe); echo "      $out"
-check "limits and configuration count 20000, array still full size" "has 'D3=20000 D2=4500 D1=4500 I=20000' && has 'config 3000 -> 20000' && has '$MOVED'"
+check "limits and configuration count 20000, array still full size" "has 'D3=20000 D2=4500 D1=4500 I=19996' && has 'config 3000 -> 20000' && has '$MOVED'"
 
 echo "== P3 PACKFILEARRAY_SIZE=1000 is raised to the game's own 4500"
 fresh_ini; setkey PACKFILEARRAY_SIZE 1000 PACKFILE_LIMIT; out=$(game full_game.exe)
-check "limits stay 4500, configuration count 4500" "has 'D3=4500 D2=4500 D1=4500 I=4500' && has 'config 3000 -> 4500'"
+check "limits stay 4500, configuration count 4500" "has 'D3=4500 D2=4500 D1=4500 I=4496' && has 'config 3000 -> 4500'"
 check "clamp logged" "log_has 'PACKFILEARRAY_SIZE=1000 is outside 4500..65535 - using 4500'"
 
 echo "== P4 PACKFILEARRAY_SIZE=70000 is clamped to 65535"
 fresh_ini; setkey PACKFILEARRAY_SIZE 70000 PACKFILE_LIMIT; out=$(game full_game.exe)
-check "limits 65535" "has 'D3=65535 D2=4500 D1=4500 I=65535' && has 'config 3000 -> 65535'"
+check "limits 65535" "has 'D3=65535 D2=4500 D1=4500 I=65531' && has 'config 3000 -> 65535'"
 check "clamp reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_LIMIT\] PACKFILEARRAY_SIZE=70000 is outside 1..65535 - using 65535.'"
 
 echo "== P5 PACKFILEARRAY_SIZE=abc falls back to the default 13000"
 fresh_ini; setkey PACKFILEARRAY_SIZE abc PACKFILE_LIMIT; out=$(game full_game.exe)
-check "limits 13000" "has 'D3=13000 D2=4500 D1=4500 I=13000'"
+check "limits 13000" "has 'D3=13000 D2=4500 D1=4500 I=12996'"
 check "invalid value reported for the start-up summary" "log_has 'PROBLEM: TweaksV.ini: \[PACKFILE_LIMIT\] PACKFILEARRAY_SIZE=abc is not a number - using 13000.'"
 
 echo "== P6 DRY_RUN=1: everything found and checked, nothing written"
@@ -51,9 +51,9 @@ echo "== P7 DIAGNOSTIC_MODE=1: every pattern, reference and site logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
 check "the 34 packfile patterns of this build each found exactly once" "[ \$(grep -c -E 'Pattern P-E-[A-Za-z0-9]+ found: .* 1 match,' TweaksV.log) -eq 34 ]"
 check "31 references logged" "[ \$(count 'PackfileLimit\] DIAGNOSTIC: reference at RVA') -eq 31 ]"
-check "direct size, indirect variable, array and call logged" "log_has 'PackfileLimit\] DIAGNOSTIC: limit at RVA .* holds 4500 (N, P-E-D3) -> game size 4500' && log_has 'PackfileLimit\] DIAGNOSTIC: limit variable at RVA .* holds 4500 (N, P-E-I1) -> game size 4500' && log_has 'DIAGNOSTIC: the packfile array is at RVA .* - 4500 entries of 8 bytes' && log_has 'PackfileLimit\] DIAGNOSTIC: streaming configuration call at RVA .* -> RVA'"
+check "direct size, indirect variable, array and call logged" "log_has 'PackfileLimit\] DIAGNOSTIC: limit at RVA .* holds 4500 (N, P-E-D3) -> game size 4500' && log_has 'PackfileLimit\] DIAGNOSTIC: limit variable at RVA .* holds 4496 (N-4, P-E-I1) -> game size 4500' && log_has 'DIAGNOSTIC: the packfile array is at RVA .* - 4500 entries of 8 bytes' && log_has 'PackfileLimit\] DIAGNOSTIC: streaming configuration call at RVA .* -> RVA'"
 check "the 34 writes logged" "[ \$(count 'PackfileLimit\] DIAGNOSTIC: packfile array reference at RVA') -eq 31 ] && [ \$(count 'PackfileLimit\] DIAGNOSTIC: packfile array limit at RVA') -eq 2 ] && [ \$(count 'PackfileLimit\] DIAGNOSTIC: streaming configuration call at RVA .*: E8 .* -> E8') -eq 1 ]"
-check "still applied" "has 'D3=12000 D2=4500 D1=4500 I=12000'"
+check "still applied" "has 'D3=12000 D2=4500 D1=4500 I=11996'"
 check "patterns found once get no per-match lines (only D-E-L12, which matches 7 times, gets them)" "[ \$(count ' match 1 of ') -eq 1 ] && log_has 'D-E-L12 match 1 of 7 at RVA'"
 
 echo "== P7b DIAGNOSTIC_MODE=1, a second identical copy of the 1158.13+ reference: each match logged with its bytes, nothing written"
@@ -92,8 +92,13 @@ check "reason logged and reported" "log_has 'is not a call into the game (anothe
 
 echo "== P12 implausible direct size (70000): nothing written"
 fresh_ini; out=$(game full_game.exe packbadsize); echo "      $out"
-check "references untouched, direct sizes as they were, indirect and call untouched" "has '$UNMOVED' && has 'pack sizes: D3=70000 D2=70000 D1=70000 I=4500' && has '$NO_HOOK'"
+check "references untouched, direct sizes as they were, indirect and call untouched" "has '$UNMOVED' && has 'pack sizes: D3=70000 D2=70000 D1=70000 I=4496' && has '$NO_HOOK'"
 check "reason logged" "log_has 'packfile list size, 70000, is not plausible'"
+
+echo "== P12b the indirect size variable holds the array's size itself, not 4 less (a changed margin): nothing written"
+fresh_ini; out=$(game full_game.exe packindirect); echo "      $out"
+check "references, sizes and call untouched" "has '$UNMOVED' && has 'pack sizes: D3=4500 D2=4500 D1=4500 I=4500' && has '$NO_HOOK'"
+check "reason logged and reported" "log_has 'the limits of the packfile array disagree about the game.s own size: 4500 and 4504 (P-E-I1)' && log_has 'PROBLEM: The packfile limit is not changed'"
 
 echo "== P13 no version resource: the build cannot be told, nothing done"
 fresh_ini; out=$(game full_game_nover.exe); echo "      $out"
@@ -102,18 +107,18 @@ check "reason logged and reported" "log_has 'file version could not be read' && 
 
 echo "== P14 game 1.0.1158.13 (first build with the new patterns)"
 fresh_ini; out=$(game full_game_1158_13.exe); echo "      $out"
-check "1158.13+ site and reference used" "has '$MOVED' && has 'D3=12000 D2=4500 D1=4500 I=12000' && has 'config 3000 -> 12000'"
+check "1158.13+ site and reference used" "has '$MOVED' && has 'D3=12000 D2=4500 D1=4500 I=11996' && has 'config 3000 -> 12000'"
 
 echo "== P15 game 1.0.1013.17: the Mansions-era direct size and the older build's reference"
 fresh_ini; out=$(game full_game_1013.exe); echo "      $out"
 check "older build's reference moved, the 1158.13+ one untouched" "has 'pack refs: 30 new 0 game 0 other, R31a game, R31b new (RW, 512 KB)'"
-check "1013.17+ direct size used" "has 'pack sizes: D3=4500 D2=12000 D1=4500 I=12000' && has 'config 3000 -> 12000'"
+check "1013.17+ direct size used" "has 'pack sizes: D3=4500 D2=12000 D1=4500 I=11996' && has 'config 3000 -> 12000'"
 check "no problems" "! log_has 'PROBLEM'"
 
 echo "== P16 game 1.0.889.22: the oldest direct size"
 fresh_ini; out=$(game full_game_889.exe); echo "      $out"
 check "older build's reference moved" "has 'R31a game, R31b new (RW, 512 KB)'"
-check "oldest direct size used" "has 'pack sizes: D3=4500 D2=4500 D1=12000 I=12000' && has 'config 3000 -> 12000'"
+check "oldest direct size used" "has 'pack sizes: D3=4500 D2=4500 D1=12000 I=11996' && has 'config 3000 -> 12000'"
 
 echo "== P17 none of the game code present (plain fake game): logged and skipped, no crash"
 fresh_ini; out=$(game plain_game.exe)

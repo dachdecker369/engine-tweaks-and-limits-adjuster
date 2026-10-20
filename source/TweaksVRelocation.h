@@ -32,7 +32,7 @@ namespace TweaksV
 	};
 
 	// Where a limit lies in a pattern's match. Immediate: an imm32 that holds N x mul + add, N being
-	// the array's size. Variable: the rel32 of a variable the game compares against, which holds N.
+	// the array's size. Variable: the rel32 of a variable the game compares against, which holds N + add.
 	// opcode: the bytes the instruction at offset must start with (nullptr: not checked).
 	struct LimitSite
 	{
@@ -75,9 +75,9 @@ namespace TweaksV
 		return { LimitSite::Kind::Immediate, instruction, opcode, opcodeSize, imm32, mul, add };
 	}
 
-	constexpr LimitSite Variable(size_t rel32)
+	constexpr LimitSite Variable(size_t rel32, int add = 0)
 	{
-		return { LimitSite::Kind::Variable, rel32, nullptr, 0, rel32, 1, 0 };
+		return { LimitSite::Kind::Variable, rel32, nullptr, 0, rel32, 1, add };
 	}
 
 	constexpr LimitSite kNoLimit = { LimitSite::Kind::Immediate, 0, nullptr, 0, 0, 0, 0 };
