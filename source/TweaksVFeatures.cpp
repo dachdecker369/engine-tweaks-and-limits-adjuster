@@ -7,13 +7,13 @@
 
 #include <iterator>
 
-#include "main.h"
 #include "TweaksVBoxStreamer.h"
 #include "TweaksVDecals.h"
 #include "TweaksVDirectStorage.h"
 #include "TweaksVHeapAdjuster.h"
 #include "TweaksVModkitLimit.h"
 #include "TweaksVPackfileLimit.h"
+#include "TweaksVRageOpenV.h"
 #include "TweaksVStraightToStoryMode.h"
 #include "TweaksVSummary.h"
 
@@ -40,7 +40,7 @@ namespace TweaksV
 				[] { InitDecals(); return false; } },
 			// RageOpenV's start-up runs later, in its GetSystemTimeAsFileTime hook, which then shows the summary
 			{ &kRageOpenVSection, { L"RageOpenV.asi", L"OpenRPF.asi", L"OpenIV.asi" },
-				[] { return RageOpenV::DllMain(nullptr, DLL_PROCESS_ATTACH, nullptr) != FALSE; } },
+				[] { return InitRageOpenV(); } },
 			{ &kStoryModeSection, { L"StraightToStoryMode.asi" },
 				[] { InitStraightToStoryMode(); return false; } },
 			{ &kDirectStorageSection, { L"DirectStorageFix.asi" },

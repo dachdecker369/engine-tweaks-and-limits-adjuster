@@ -136,6 +136,7 @@
     <ClCompile Include="TweaksVModkitLimit.cpp" />
     <ClCompile Include="TweaksVPackfileLimit.cpp" />
     <ClCompile Include="TweaksVPatch.cpp" />
+    <ClCompile Include="TweaksVRageOpenV.cpp" />
     <ClCompile Include="TweaksVRelocation.cpp" />
     <ClCompile Include="TweaksVSettings.cpp" />
     <ClCompile Include="TweaksVStraightToStoryMode.cpp" />
@@ -143,10 +144,6 @@
     <ClCompile Include="ClearLog.cpp" />
     <ClCompile Include="MemScanner.cpp" />
     <ClCompile Include="StubMemory.cpp" />
-    <ClCompile Include="FileReadHooks.cpp" />
-    <ClCompile Include="log.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="PackfileEncryptionHooks.cpp" />
     <!-- MinHook v1.3.4, compiled unchanged from vendor\MinHook (x64 only: hde64, not hde32), at warning
          level 3, which it builds without a warning: its code is not TweaksV's to change, and /W4 finds
          its own warnings -->
@@ -178,6 +175,7 @@
     <ClInclude Include="TweaksVPackfileLimit.h" />
     <ClInclude Include="TweaksVPatch.h" />
     <ClInclude Include="TweaksVPatterns.h" />
+    <ClInclude Include="TweaksVRageOpenV.h" />
     <ClInclude Include="TweaksVRelocation.h" />
     <ClInclude Include="TweaksVSettings.h" />
     <ClInclude Include="TweaksVStraightToStoryMode.h" />
@@ -187,13 +185,6 @@
     <ClInclude Include="IsEnhanced.h" />
     <ClInclude Include="MemScanner.h" />
     <ClInclude Include="StubMemory.h" />
-    <ClInclude Include="config.h" />
-    <ClInclude Include="fiDevice.h" />
-    <ClInclude Include="fiPackfile.h" />
-    <ClInclude Include="log.h" />
-    <ClInclude Include="main.h" />
-    <ClInclude Include="memory.h" />
-    <ClInclude Include="rpf.h" />
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h" />
   </ItemGroup>
   <ItemGroup>

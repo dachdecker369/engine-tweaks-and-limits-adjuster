@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "MinHook.h"
 #include "StubMemory.h"
 #include "TweaksVConflicts.h"
 #include "TweaksVLog.h"
@@ -289,5 +290,89 @@ namespace TweaksV
 			at = next;
 		}
 		return true;
+	}
+
+	namespace
+	{
+		// MinHook, initialised once for every hook of TweaksV; a second MH_Initialize is harmless
+		bool MinHookReady(const char* tag)
+		{
+			const MH_STATUS status = MH_Initialize();
+			if (status == MH_OK || status == MH_ERROR_ALREADY_INITIALIZED)
+				return true;
+			WriteLog(tag, std::string("MinHook could not be initialised (") + MH_StatusToString(status) + ") - nothing is hooked.");
+			return false;
+		}
+	}
+
+	bool HookFunctions(const std::vector<FunctionHook>& hooks, const char* tag)
+	{
+		if (hooks.empty() || !MinHookReady(tag))
+			return false;
+		MH_STATUS status = MH_OK;
+		std::string failed;
+		size_t made = 0;
+		for (; made < hooks.size(); made++)
+		{
+			const FunctionHook& hook = hooks[made];
+			status = MH_CreateHook(hook.function, const_cast<void*>(hook.hook), hook.original);
+			if (status == MH_OK)
+			{
+				status = MH_QueueEnableHook(hook.function);
+				if (status != MH_OK)
+					MH_RemoveHook(hook.function);
+			}
+			if (status != MH_OK)
+			{
+				failed = std::string("The ") + hook.what + " could not be hooked";
+				break;
+			}
+		}
+		if (status == MH_OK)
+		{
+			status = MH_ApplyQueued();
+			if (status != MH_OK)
+				failed = "The " + std::to_string(hooks.size()) + " hooks could not be switched on";
+		}
+		if (status != MH_OK)
+		{
+			for (size_t i = 0; i < made; i++)	// a hook that is on is switched off first
+				MH_RemoveHook(hooks[i].function);
+			WriteLog(tag, failed + " (MinHook: " + MH_StatusToString(status) + ") - none of the " + std::to_string(hooks.size()) + " hooks is on.");
+			return false;
+		}
+		return true;
+	}
+
+	bool HookExport(const wchar_t* module, const char* function, const void* hook, void** original, void** target, const char* tag)
+	{
+		if (!MinHookReady(tag))
+			return false;
+		LPVOID found = nullptr;
+		MH_STATUS status = MH_CreateHookApiEx(module, function, const_cast<void*>(hook), original, &found);
+		if (status == MH_OK)
+		{
+			status = MH_EnableHook(found);
+			if (status != MH_OK)
+				MH_RemoveHook(found);
+		}
+		if (status != MH_OK)
+		{
+			WriteLog(tag, std::string(function) + " could not be hooked (MinHook: " + MH_StatusToString(status) + ").");
+			return false;
+		}
+		if (target)
+			*target = found;
+		return true;
+	}
+
+	bool DisableHook(void* function, const char* tag)
+	{
+		const MH_STATUS status = MH_DisableHook(function);
+		if (status == MH_OK)
+			return true;
+		WriteLog(tag, "The hook on the function at " + DescribeAddress(function) + " could not be switched off (MinHook: " + MH_StatusToString(status) +
+			") - it stays and passes the calls on.");
+		return false;
 	}
 }

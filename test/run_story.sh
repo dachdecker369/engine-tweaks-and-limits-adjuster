@@ -37,7 +37,7 @@ check "no StraightToStoryMode lines" "! log_has '\[StraightToStoryMode\]'"
 echo "== S5 DRY_RUN=1: found and checked, nothing written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
 check "nothing changed" "[[ \"\$out\" == *\"$ORIG_SPLASH\"* && \"\$out\" == *\"$ORIG_LEGAL\"* && \"\$out\" == *\"$ORIG_LANDING\"* ]]"
-check "four 'would patch' lines, the three screens and the heap, with old -> new bytes" "[ \$(count 'DRY_RUN: would patch the') -eq 4 ] && log_has 'would patch the splash screen: 0F 84 85 01 00 00 -> E9 86 01 00 00 90' && log_has 'would patch the heap size (648 MB -> 1024 MB): 00 00 80 28 -> 00 00 00 40'"
+check "five 'would patch' lines - the three screens, the heap, the RPF cache check - with old -> new bytes" "[ \$(count 'DRY_RUN: would patch the') -eq 5 ] && log_has 'would patch the splash screen: 0F 84 85 01 00 00 -> E9 86 01 00 00 90' && log_has 'would patch the RPF cache check: 48 89 -> C3 90' && log_has 'would patch the heap size (648 MB -> 1024 MB): 00 00 80 28 -> 00 00 00 40'"
 check "no 'patched' line" "! log_has ' patched: '"
 
 echo "== S6 DIAGNOSTIC_MODE=1: every pattern and write logged"

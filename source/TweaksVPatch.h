@@ -2,8 +2,8 @@
 // TweaksV - the one place that patches the game's code: WriteCode writes bytes, RedirectCalls sends
 // calls to TweaksV. Both are all or nothing, give every page its own protection back and honour
 // DRY_RUN and DIAGNOSTIC_MODE, so no part of TweaksV has to. Plus small helpers for reading code.
-// A hook on a function's start - RageOpenV's file and archive functions, DirectStorage's - is
-// MinHook's (memory.h, TweaksVDirectStorage.cpp).
+// A hook on a function's start - RageOpenV's file functions, DirectStorage's OpenFile - is MinHook's,
+// through HookFunctions and HookExport below (TweaksVDirectStorage.cpp still calls MinHook itself).
 #pragma once
 
 #include <windows.h>
@@ -83,4 +83,29 @@ namespace TweaksV
 	// True if the size bytes at address are committed memory that can be read. A site that lies before or
 	// after a pattern's match is read only after this check: the scan read the match alone.
 	bool IsReadable(const void* address, size_t size);
+
+	// ---- hooks on a function's start (MinHook)
+
+	// One function to hook: its first bytes become a jump to hook, and original gets a trampoline that
+	// runs those bytes and continues in the function. what names it for the log.
+	struct FunctionHook
+	{
+		void* function;
+		const void* hook;
+		void** original;
+		const char* what;
+	};
+
+	// Hooks every function in hooks, or none: the hooks are created and queued, then switched on
+	// together, so the threads are frozen once and not once per hook. False, with the hooks made so
+	// far removed again, if any step fails - logged under tag. MinHook is initialised on first use.
+	bool HookFunctions(const std::vector<FunctionHook>& hooks, const char* tag);
+
+	// Hooks an exported function of a loaded DLL (kernel32's GetSystemTimeAsFileTime) at once; target
+	// gets the function's address, for DisableHook. False, logged under tag, if it failed.
+	bool HookExport(const wchar_t* module, const char* function, const void* hook, void** original, void** target, const char* tag);
+
+	// Switches a hook off again: the function's own bytes come back, and the trampoline stays for a
+	// thread that is inside the hook right now. False, logged under tag, if MinHook refused.
+	bool DisableHook(void* function, const char* tag);
 }

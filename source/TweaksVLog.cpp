@@ -354,7 +354,7 @@ namespace TweaksV
 
 	void OpenConsole()
 	{
-		// RageOpenV's code (main.cpp:56-64), moved here.
+		// Carried over from RageOpenV by Chiheb-Bacha (GPL-3.0): its DllMain opened the console this way.
 		if (!AllocConsole() && GetConsoleWindow() == nullptr)
 		{
 			const DWORD error = GetLastError();

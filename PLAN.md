@@ -55,7 +55,7 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 
 ### 4. RageOpenV
 
-- [ ] `TweaksVRageOpenV.cpp`, `.h` (and a second `.cpp` only if one would pass about 40 KB): the mods list and the eight file hooks, the five OPEN archive redirects, the cache check, the console patch, the start-up at the game's first time request; `HookFunction` in `TweaksVPatch` from `memory.h`'s helpers; every original file of section 2's "Replaces" column deleted; RageOpenV's per-event lines capped (section 3.3).
+- [x] `TweaksVRageOpenV.cpp`, `.h` (and a second `.cpp` only if one would pass about 40 KB): the mods list and the eight file hooks, the five OPEN archive redirects, the cache check, the console patch, the start-up at the game's first time request; `HookFunction` in `TweaksVPatch` from `memory.h`'s helpers; every original file of section 2's "Replaces" column deleted; RageOpenV's per-event lines capped (section 3.3).
 - Checkpoint: suites green; my boot with my mods folder and OPEN archives: "file hooks 8/8" in the suite, the mods served and the archives loaded in game, `DIAGNOSTIC_MODE=1` once.
 
 ### 5. Shared code and docs
@@ -83,6 +83,6 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 
 ## Next steps
 
-1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phases 1 to 3 are built, committed and booted (phase 3's dry run and its full boot with my mods folder both checked out), the suites green with 427 checks; then phase 4.
+1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phases 1 to 4 are built and committed, phases 1 to 3 booted (phase 4's checkpoint boot is next), the suites green with 429 checks; then phase 5.
 2. Phase 6: the 2.0.0 commit, my boots of SPECIFICATIONS.md section 8, then push and tag on my word, then Nexus, then the removal of these two files.
 3. Open: nothing; the session asks me again whenever something new comes up.

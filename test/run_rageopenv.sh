@@ -15,18 +15,18 @@ NOTHING='file hooks 0/8 | open calls 0/5'
 
 echo "== R1 defaults: everything hooked and working, the other plugins too"
 fresh_ini; out=$(game full_game.exe); echo "      $out"
-check "GetSystemTimeAsFileTime hooked, the one-time start-up ran" "has 'rov api hook: yes' && log_has 'The RPF cache check is skipped'"
+check "GetSystemTimeAsFileTime hooked, the one-time start-up ran" "has 'rov api hook: yes' && log_has 'RPF cache check patched: 48 89 -> C3 90.'"
 check "the time hook switches itself off after the one-time start-up" "has 'rov api hook afterwards: removed'"
 check "RPF cache check skipped (C3 90 at the callee)" "has 'rpf: C3 90 5C'"
 check "console call left alone (CONSOLE=0)" "has 'console: FF 15'"
 check "mods folder: 8 functions hooked; a file in mods\\ is used, any other passes through" "has '$FILES_OK'"
 check "mods folder read once (2 entries); other spellings and the folder found, '..' and too-long paths never redirected" "has 'spellings ok, folder ok, outside ok' && log_has 'The mods folder has 2 files and folders.'"
 check "OPEN archives: 5 calls redirected; OPEN not decrypted, others decrypted; entries marked" "has '$OPEN_OK'"
-check "status lines" "log_has 'Files in the mods folder are used (8 file functions hooked)' && log_has 'Unencrypted (OPEN) RPF archives can be loaded (5 calls redirected)'"
+check "status lines, one per hooked function" "[ \$(count 'RageOpenV\] \(OpenBulk\|GetFileTime\|GetFileSize\|GetAttributes\) [12] hooked at RVA') -eq 8 ] && log_has 'Files in the mods folder are used (8 file functions hooked)' && log_has 'Unencrypted (OPEN) RPF archives can be loaded (5 calls redirected)'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'splash: E9 86 01 00 00 90' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack sizes: D3=12000'"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
 check "the 6 redirected calls each lead to a call stub that is read+execute, never writable" "has 'stubs: 6, all RX'"
-check "no problems; DIAGNOSTIC_MODE off, so no hot-path lines; nothing of newmods" "! log_has 'PROBLEM' && ! log_has '\[mods\]' && ! log_has '\[info\]' && ! log_has 'newmods'"
+check "no problems; DIAGNOSTIC_MODE off, so no hot-path lines; nothing of newmods" "! log_has 'PROBLEM' && ! log_has ' asked for ' && ! log_has ' served ' && ! log_has 'newmods'"
 
 echo "== R2 CONSOLE=1: the call that hides the console is NOPed"
 fresh_ini; setkey CONSOLE 1; out=$(game full_game.exe)
@@ -57,15 +57,20 @@ rm -rf mods/deep "mods/test/ファイル.txt"
 echo "== R5 DRY_RUN=1: the time hook is installed so the checks run at their moment; nothing else written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
 check "time hook yes; nothing written" "has 'rov api hook: yes' && has 'rpf: 48 89 5C' && has '$NOTHING' && has 'stubs: 0,'"
-check "the three 'would' lines" "log_has 'DRY_RUN: would skip the RPF cache check' && log_has 'DRY_RUN: would hook the 8 file functions' && log_has 'DRY_RUN: would redirect the 5 RPF encryption calls'"
+check "the three 'would' lines" "log_has 'DRY_RUN: would patch the RPF cache check: 48 89 -> C3 90' && log_has 'DRY_RUN: would hook the 8 file functions' && log_has 'DRY_RUN: would redirect the 5 RPF encryption calls'"
 
 echo "== R6 DIAGNOSTIC_MODE=1: every pattern found once, every site logged, the hot-path lines on"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
 check "the 14 RageOpenV patterns each found exactly once (all but the console's), none of newmods" "[ \$(grep -c -E 'Pattern R-E-[A-Z][0-9] found: .* 1 match,' TweaksV.log) -eq 14 ] && ! log_has 'Pattern R-E-C1' && ! log_has 'Pattern R-E-[MD]'"
-check "the 8 file functions logged; the 4 computed starts checked (no unwind data, CC before)" "[ \$(count 'RageOpenV\] DIAGNOSTIC: \(OpenBulk\|GetFileTime\|GetFileSize\|GetAttributes\)') -eq 8 ] && [ \$(count 'no unwind data, byte before it CC') -eq 4 ]"
+check "the 8 file functions logged; the 4 computed starts checked (no unwind data, CC before)" "[ \$(count 'RageOpenV\] DIAGNOSTIC: \(OpenBulk\|GetFileTime\|GetFileSize\|GetAttributes\) [12] at RVA') -eq 8 ] && [ \$(count 'no unwind data, byte before it CC') -eq 4 ]"
 check "the 5 encryption calls logged" "[ \$(count 'RageOpenV\] DIAGNOSTIC: the .* call at RVA') -eq 5 ]"
 check "still all hooked" "has '$FILES_OK' && has '$OPEN_OK'"
-check "a redirected file and a file request are logged (the former LOG_MODS and LOG_INFO)" "log_has '\[mods\]\[RageOpenV::OpenBulkImpl\] Redirecting to /mods/test/file.txt' && log_has '\[info\]\[RageOpenV::OpenBulkImpl\] Called with path /test/file.txt'"
+check "a file request and a file served are logged, and what is logged is announced" "log_has 'DIAGNOSTIC: OpenBulk 1 asked for test/file.txt' && log_has 'DIAGNOSTIC: OpenBulk 1 served mods/test/file.txt' && log_has 'DIAGNOSTIC: every file request, every file served from the mods folder and every archive header read are logged'"
+
+echo "== R6b DIAGNOSTIC_MODE=1 with 20,021 file requests: the lines stop at the cap, the requests are still counted"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe rovflood)
+check "20000 request lines, then the cap line once; the served lines unaffected" "[ \$(count ' asked for ') -eq 20000 ] && [ \$(count '20000 lines of file requests written - from now on they are only counted') -eq 1 ] && [ \$(count ' served mods/') -eq 11 ]"
+check "still all hooked and working" "has '$FILES_OK' && has '$OPEN_OK'"
 
 echo "== R7 [RAGEOPENV] ENABLED=0: no hook at all"
 fresh_ini; setkey ENABLED 0 RAGEOPENV; out=$(game full_game.exe)
@@ -91,7 +96,7 @@ check "reason logged with the byte found" "log_has 'GetFileTime 2 at RVA .* is n
 echo "== R11 GetFileSize 2's pattern is missing: the file group is skipped"
 fresh_ini; out=$(game full_game.exe rovmissing)
 check "no file hooks; the others on" "has 'file hooks 0/8' && has '$OPEN_OK'"
-check "reason logged" "log_has 'GetFileSize 2 was not found in the game code'"
+check "reason logged" "log_has 'Files in the mods folder are not used this session: R-E-F7 was not found (GetFileSize 2).'"
 
 echo "== R12 the two DecryptHeader2 calls lead to different functions: nothing redirected"
 fresh_ini; out=$(game full_game.exe rovdecrypt2)
@@ -101,7 +106,7 @@ check "reason logged and reported" "log_has 'the two DecryptHeader2 calls lead t
 echo "== R13 another mod already redirected the DecryptHeader call: nothing redirected"
 fresh_ini; out=$(game full_game.exe rovredirected)
 check "no encryption call redirected" "has 'open calls 0/5' && has '$FILES_OK'"
-check "reason logged" "log_has 'the DecryptHeader call at RVA .* leads outside the game'"
+check "reason logged" "log_has 'the DecryptHeader call at RVA .* is not a call into the game (another mod may have hooked it already)'"
 
 echo "== R14 the RPF cache check is already skipped by another mod: left alone, not a problem"
 fresh_ini; out=$(game full_game.exe rovcachepatched)

@@ -101,17 +101,13 @@
   - A failure is reported in the start-up summary and leaves the game as it was;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
-- **RageOpenV:** the mods folder, unencrypted (OPEN) RPF archives and the RPF cache check skip each have a switch in `[RAGEOPENV]`, read from `TweaksV.ini` (no more `RageOpenV.ini`); the experimental newmods folder it also had is gone in 2.0.0. Fixes:
-  - Every hook group finds and checks all of its addresses first, and installs all of its hooks or none; a missing pattern no longer crashes the game;
-  - Function starts worked out from a pattern are checked, and calls that another mod has already redirected are left alone;
-  - Both DecryptHeader2 calls must lead to the same function;
-  - The archive encryption tag is kept per thread, so archives opened at the same time no longer mix up;
-  - Page protection is restored after every write, and the redirected calls go through stubs that are never writable and executable at once;
-  - The console patch is only applied when the console is on (`CONSOLE=1`);
-  - Its log lines - every file request, every file served from `mods\` and every OPEN archive - follow `DIAGNOSTIC_MODE` at runtime (1.6.0 had `LOG_INFO` and `LOG_MODS`), and cost nothing when off;
-  - The mods folder is read once at start-up, and the game's file calls look their paths up in that list: no file system call, memory allocation or lock per call. Without a mods folder, the game's file functions are not hooked at all (DIAGNOSTIC_MODE still checks their patterns). A path with `..` is never redirected, and the list holds at most 200,000 files and folders, 32 levels deep (more is reported in the start-up summary);
-  - The `GetSystemTimeAsFileTime` hook switches itself off once its one-time start-up has run;
-  - The OPEN-archive hook no longer walks the entry table of encrypted archives, which it never changes;
+- **RageOpenV (TweaksV's own part since 2.0.0; the merged RageOpenV before):** the mods folder, unencrypted (OPEN) RPF archives and the RPF cache check skip each have a switch in `[RAGEOPENV]`; the experimental newmods folder the original had is gone. The part does its work when the game first asks for the time - a hook on `GetSystemTimeAsFileTime` that runs once, shows the start-up summary and switches itself off - because the game's file system is not up in DllMain:
+  - The mods folder: the eight file functions of the game's two file devices (`R-E-F1..F8`; two per device found at their start, two by a pattern inside them, every computed start checked with the game's unwind data) are hooked together or not at all, so that a path that exists under `mods\` is served from there. The folder is read once at start-up into a list of at most 200,000 files and folders, 32 levels deep (more is reported in the start-up summary), and every call looks its path up in that list: no file system call, memory allocation or lock per call; both spellings of a path match; a path with `..` is never redirected; a file the folder does not have reaches the game's own function untouched. Without a mods folder nothing is hooked (DIAGNOSTIC_MODE still checks the patterns). A function another mod has hooked is hooked on top and chains through, said in the log;
+  - OPEN archives: the five calls of the archive code (`R-E-E1..E5`) are redirected through call stubs together or not at all; both DecryptHeader2 calls must lead to the same function, and a call another mod has redirected is left alone. The encryption tag is kept per thread, so archives opened at the same time never mix; only an OPEN archive's entry table is walked, and only a plausible one;
+  - The cache check: the function it calls (`R-E-K1`) gets `C3 90`; a check another mod already skipped is left alone and is not a problem. The console patch (`R-E-C1`) only with `CONSOLE=1`;
+  - Every write goes through `TweaksVPatch`, every hook through its MinHook helper: the threads are frozen once per group, a group that cannot be completed is removed again, every page gets its own protection back, and the call stubs are never writable and executable at once;
+  - With `DIAGNOSTIC_MODE=1` every site and write is logged, then every file request, every file served from `mods\` and every archive header read - 20,000 lines of each kind at most, then only counted (1.6.0 had `LOG_INFO` and `LOG_MODS`, uncapped: one diagnostic boot wrote 21,000 of their lines in a few minutes) - and a summary 10 seconds in, then every minute while the numbers change; off, a hook costs one comparison;
+  - A failure is reported in the start-up summary and leaves the game as it was;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
 - **DirectStorage (TweaksV's own part):** `[DIRECTSTORAGE]` in `TweaksV.ini` (`ENABLED`, `UNLOCK_FILES`):
@@ -131,7 +127,7 @@
 - **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from; the mod page carries the credits and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
   - Provenance: RageOpenV's README asks that its binaries not be redistributed - a request, not a license term (the GPL-3.0 allows redistribution and forbids further restrictions), so the credits stay prominent; martonp96's original ClosedIV repository is no longer public, and RageOpenV's README is the source of that credit.
 
-- **Tests:** `test\` holds fake-game test suites (427 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (429 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 

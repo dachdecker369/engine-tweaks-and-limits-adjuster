@@ -8,9 +8,6 @@
     <Filter Include="Shared">
       <UniqueIdentifier>{82CD2E76-CA21-4C93-940E-10F7C0B761D4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RageOpenV">
-      <UniqueIdentifier>{B51F24F7-CBC4-49B5-913E-097F5C136CD4}</UniqueIdentifier>
-    </Filter>
     <Filter Include="MinHook">
       <UniqueIdentifier>{F39B3B09-5489-40B0-B40A-92558779CAF3}</UniqueIdentifier>
     </Filter>
@@ -58,6 +55,9 @@
     <ClCompile Include="TweaksVPatch.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVRageOpenV.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVRelocation.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -78,18 +78,6 @@
     </ClCompile>
     <ClCompile Include="StubMemory.cpp">
       <Filter>Shared</Filter>
-    </ClCompile>
-    <ClCompile Include="FileReadHooks.cpp">
-      <Filter>RageOpenV</Filter>
-    </ClCompile>
-    <ClCompile Include="log.cpp">
-      <Filter>RageOpenV</Filter>
-    </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>RageOpenV</Filter>
-    </ClCompile>
-    <ClCompile Include="PackfileEncryptionHooks.cpp">
-      <Filter>RageOpenV</Filter>
     </ClCompile>
     <ClCompile Include="..\vendor\MinHook\src\buffer.c">
       <Filter>MinHook</Filter>
@@ -147,6 +135,9 @@
     <ClInclude Include="TweaksVPatterns.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <ClInclude Include="TweaksVRageOpenV.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVRelocation.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
@@ -173,27 +164,6 @@
     </ClInclude>
     <ClInclude Include="StubMemory.h">
       <Filter>Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="config.h">
-      <Filter>RageOpenV</Filter>
-    </ClInclude>
-    <ClInclude Include="fiDevice.h">
-      <Filter>RageOpenV</Filter>
-    </ClInclude>
-    <ClInclude Include="fiPackfile.h">
-      <Filter>RageOpenV</Filter>
-    </ClInclude>
-    <ClInclude Include="log.h">
-      <Filter>RageOpenV</Filter>
-    </ClInclude>
-    <ClInclude Include="main.h">
-      <Filter>RageOpenV</Filter>
-    </ClInclude>
-    <ClInclude Include="memory.h">
-      <Filter>RageOpenV</Filter>
-    </ClInclude>
-    <ClInclude Include="rpf.h">
-      <Filter>RageOpenV</Filter>
     </ClInclude>
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h">
       <Filter>MinHook</Filter>

@@ -9,6 +9,7 @@
 //   rovdecrypt2        the two DecryptHeader2 calls lead to different functions
 //   rovredirected      the DecryptHeader call already leads outside the game
 //   rovcachepatched    the RPF cache check function already starts with a ret
+//   rovflood           20,000 file requests before the usual ones: more than the diagnostic lines' cap lets through
 #include <windows.h>
 #include <cstdint>
 #include <cstdio>
@@ -187,10 +188,12 @@ static bool Has(int argc, wchar_t** argv, const wchar_t* option)
 }
 
 static unsigned char g_apiBefore[5];
+static bool g_flood = false;
 
 void RovSetup(int argc, wchar_t** argv)
 {
 	BuildFakeCode(Has(argc, argv, L"rovnotstart"), Has(argc, argv, L"rovmissing"), Has(argc, argv, L"rovjump"));
+	g_flood = Has(argc, argv, L"rovflood");
 
 	SetCallTarget(g_rovCacheSite, const_cast<unsigned char*>(g_rovCacheCallee));
 	if (Has(argc, argv, L"rovcachepatched"))
@@ -249,6 +252,12 @@ void RovReport()
 	wprintf(L"file hooks %d/8", hooked);
 	if (hooked == 8)
 	{
+		if (g_flood)	// 20,000 requests before the usual ones: more than the cap lets through as lines
+		{
+			for (int i = 0; i < 20000; i++)
+				reinterpret_cast<uint64_t (*)(void*, const char*, int64_t*)>(FnStart(F_OPENBULK1))(nullptr, "test/none.txt", nullptr);
+			g_fileCalls.clear();
+		}
 		int redirected = 0, passed = 0;
 		for (size_t i = F_OPENBULK1; i <= F_GETATTRIBS2; i++)
 		{
