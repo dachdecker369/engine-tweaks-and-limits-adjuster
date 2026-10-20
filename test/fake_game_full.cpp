@@ -1,7 +1,6 @@
 // Test harness for TweaksV: pretends to be GTA5_Enhanced.exe and contains copies of the game
-// code TweaksV patches: HeapAdjuster's, StraightToStoryMode's, ModkitLimitAdjusterEnhanced's,
-// PackfileLimitAdjusterEnhanced's, the BoxStreamer part's and the DecalDefs part's here, RageOpenV's in
-// fake_game_rov.cpp.
+// code TweaksV patches: HeapAdjuster's, StraightToStoryMode's, ModkitLimit's, PackfileLimit's,
+// BoxStreamer's and Decals' here, RageOpenV's in fake_game_rov.cpp.
 // Prints every patch site after TweaksV.asi has loaded.
 // Link it with a version resource (fake_game_version.rc) for the game build to pretend to be.
 // Usage: GTA5_Enhanced.exe [TweaksV.asi] [options...]
@@ -78,7 +77,7 @@ volatile unsigned char g_landingSite[] = { 0xE8, 0x00, 0x00, 0x00, 0x00, 0x8B, 0
 	0x83, 0xC1, 0x07, 0x84, 0xC0 };
 volatile unsigned char g_landingCallee[] = { 0x48, 0x89, 0x5C, 0x24, 0x08, 0x57, 0x48, 0x83, 0xEC, 0x20 };
 
-// ModkitLimitAdjusterEnhanced: the game's own modkit array (1024 entries here), the six
+// ModkitLimit: the game's own modkit array (1024 entries here), the six
 // "lea reg, [rip+disp32]" references to it and the eight hard-coded limits.
 uint16_t g_oldModkitArray[1024];
 volatile unsigned char g_modkitRef1[] = { 0x31, 0xC9, 0x48, 0x8D, 0x05, 0, 0, 0, 0, 0xEB };
@@ -103,7 +102,7 @@ volatile unsigned char g_modkitLimit8[] = { 0x41, 0x0F, 0xB7, 0xCA, 0x66, 0xB8, 
 static Site g_modkitLimits[] = { SITE(g_modkitLimit1, 8), SITE(g_modkitLimit2, 15), SITE(g_modkitLimit3, 16), SITE(g_modkitLimit4, 15),
 	SITE(g_modkitLimit5, 15), SITE(g_modkitLimit6, 2), SITE(g_modkitLimit7, 10), SITE(g_modkitLimit8, 10) };
 
-// PackfileLimitAdjusterEnhanced: the game's own packfile array (4500 entries here), its two size
+// PackfileLimit: the game's own packfile array (4500 entries here), its two size
 // limits, the call that reads the streaming configuration and the references to the array. Every
 // site ends in CC so no pattern can match across two neighbouring arrays.
 void* g_oldPackfileArray[4500];
@@ -210,7 +209,7 @@ static Site g_boxRefs[] = { SITE(g_boxRef1, 5), SITE(g_boxRef2, 14), SITE(g_boxC
 static Site g_boxRef9Site = SITE(g_boxRef9, 3);
 static Site g_boxCalls[] = { SITE(g_boxCap1, 31), SITE(g_boxCap2, 35), SITE(g_boxCap3, 43), SITE(g_boxCap4, 31) };	// the rel32 of each call
 
-// DecalDefs: the game's code that carries the decal definitions limit and loads the array (the array
+// Decals: the game's code that carries the decal definitions limit and loads the array (the array
 // itself, with its count 16 bytes before it, is below, outside this section, as the game's is): the
 // parser's "full" check, whose mov reads the count; the parser's lea; FindById's head, with three constant
 // sites and a lea beyond the pattern; PickVariant's head; the texture override's five sites, two of them
@@ -560,7 +559,7 @@ static void PrintBoxStreamer()
 // "new" is the common target of the first reference when that is outside the game and not the other
 // mod's address (option "decalmoved"); the limits are what the first site of each kind holds (N-1, N,
 // the end of the start-up loop) and how many sites differ from the first of their kind
-static void PrintDecalDefs()
+static void PrintDecals()
 {
 	const unsigned char* const oldArray = g_oldDecalStore->entries;
 	const unsigned char* const otherMod = ImageEnd() + 0x50000;
@@ -968,7 +967,7 @@ int wmain(int argc, wchar_t** argv)
 	RovForEachDataSite(CheckData);
 	PrintPackfile(argc, argv);
 	PrintBoxStreamer();
-	PrintDecalDefs();
+	PrintDecals();
 	RovReport();
 	wprintf(L"%ls%ls", g_dstorageResult, g_fileOpensResult);
 	CheckStub(Rel32Target(g_packCallSite));

@@ -8,12 +8,6 @@
     <Filter Include="Shared">
       <UniqueIdentifier>{82CD2E76-CA21-4C93-940E-10F7C0B761D4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ModkitLimitAdjusterEnhanced">
-      <UniqueIdentifier>{39AADB46-A54B-4023-A199-B2DF08B9504F}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="PackfileLimitAdjusterEnhanced">
-      <UniqueIdentifier>{35F24293-AC0D-4E9B-92F0-AAC11A8AD3AD}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RageOpenV">
       <UniqueIdentifier>{B51F24F7-CBC4-49B5-913E-097F5C136CD4}</UniqueIdentifier>
     </Filter>
@@ -31,7 +25,7 @@
     <ClCompile Include="TweaksVConflicts.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
-    <ClCompile Include="TweaksVDecalDefs.cpp">
+    <ClCompile Include="TweaksVDecals.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
     <ClCompile Include="TweaksVDirectStorage.cpp">
@@ -55,7 +49,16 @@
     <ClCompile Include="TweaksVLog.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVModkitLimit.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
+    <ClCompile Include="TweaksVPackfileLimit.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVPatch.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
+    <ClCompile Include="TweaksVRelocation.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
     <ClCompile Include="TweaksVSettings.cpp">
@@ -75,18 +78,6 @@
     </ClCompile>
     <ClCompile Include="StubMemory.cpp">
       <Filter>Shared</Filter>
-    </ClCompile>
-    <ClCompile Include="ModkitLimitAdjusterEnhanced_Game.cpp">
-      <Filter>ModkitLimitAdjusterEnhanced</Filter>
-    </ClCompile>
-    <ClCompile Include="ModkitLimitAdjusterEnhanced_Logging.cpp">
-      <Filter>ModkitLimitAdjusterEnhanced</Filter>
-    </ClCompile>
-    <ClCompile Include="PackfileLimitAdjusterEnhanced_Game.cpp">
-      <Filter>PackfileLimitAdjusterEnhanced</Filter>
-    </ClCompile>
-    <ClCompile Include="PackfileLimitAdjusterEnhanced_Logging.cpp">
-      <Filter>PackfileLimitAdjusterEnhanced</Filter>
     </ClCompile>
     <ClCompile Include="FileReadHooks.cpp">
       <Filter>RageOpenV</Filter>
@@ -120,7 +111,7 @@
     <ClInclude Include="TweaksVConflicts.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
-    <ClInclude Include="TweaksVDecalDefs.h">
+    <ClInclude Include="TweaksVDecals.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVDirectStorage.h">
@@ -144,10 +135,19 @@
     <ClInclude Include="TweaksVLog.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <ClInclude Include="TweaksVModkitLimit.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVPackfileLimit.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVPatch.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVPatterns.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVRelocation.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVSettings.h">
@@ -173,18 +173,6 @@
     </ClInclude>
     <ClInclude Include="StubMemory.h">
       <Filter>Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="ModkitLimitAdjusterEnhanced_Game.h">
-      <Filter>ModkitLimitAdjusterEnhanced</Filter>
-    </ClInclude>
-    <ClInclude Include="ModkitLimitAdjusterEnhanced_Logging.h">
-      <Filter>ModkitLimitAdjusterEnhanced</Filter>
-    </ClInclude>
-    <ClInclude Include="PackfileLimitAdjusterEnhanced_Game.h">
-      <Filter>PackfileLimitAdjusterEnhanced</Filter>
-    </ClInclude>
-    <ClInclude Include="PackfileLimitAdjusterEnhanced_Logging.h">
-      <Filter>PackfileLimitAdjusterEnhanced</Filter>
     </ClInclude>
     <ClInclude Include="config.h">
       <Filter>RageOpenV</Filter>

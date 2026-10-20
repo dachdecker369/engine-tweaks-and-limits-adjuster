@@ -125,7 +125,7 @@
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="TweaksVBoxStreamer.cpp" />
     <ClCompile Include="TweaksVConflicts.cpp" />
-    <ClCompile Include="TweaksVDecalDefs.cpp" />
+    <ClCompile Include="TweaksVDecals.cpp" />
     <ClCompile Include="TweaksVDirectStorage.cpp" />
     <ClCompile Include="TweaksVDump.cpp" />
     <ClCompile Include="TweaksVFeatures.cpp" />
@@ -133,17 +133,16 @@
     <ClCompile Include="TweaksVHeapAdjuster.cpp" />
     <ClCompile Include="TweaksVIni.cpp" />
     <ClCompile Include="TweaksVLog.cpp" />
+    <ClCompile Include="TweaksVModkitLimit.cpp" />
+    <ClCompile Include="TweaksVPackfileLimit.cpp" />
     <ClCompile Include="TweaksVPatch.cpp" />
+    <ClCompile Include="TweaksVRelocation.cpp" />
     <ClCompile Include="TweaksVSettings.cpp" />
     <ClCompile Include="TweaksVStraightToStoryMode.cpp" />
     <ClCompile Include="TweaksVSummary.cpp" />
     <ClCompile Include="ClearLog.cpp" />
     <ClCompile Include="MemScanner.cpp" />
     <ClCompile Include="StubMemory.cpp" />
-    <ClCompile Include="ModkitLimitAdjusterEnhanced_Game.cpp" />
-    <ClCompile Include="ModkitLimitAdjusterEnhanced_Logging.cpp" />
-    <ClCompile Include="PackfileLimitAdjusterEnhanced_Game.cpp" />
-    <ClCompile Include="PackfileLimitAdjusterEnhanced_Logging.cpp" />
     <ClCompile Include="FileReadHooks.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
@@ -167,7 +166,7 @@
   <ItemGroup>
     <ClInclude Include="TweaksVBoxStreamer.h" />
     <ClInclude Include="TweaksVConflicts.h" />
-    <ClInclude Include="TweaksVDecalDefs.h" />
+    <ClInclude Include="TweaksVDecals.h" />
     <ClInclude Include="TweaksVDirectStorage.h" />
     <ClInclude Include="TweaksVDump.h" />
     <ClInclude Include="TweaksVFeatures.h" />
@@ -175,8 +174,11 @@
     <ClInclude Include="TweaksVHeapAdjuster.h" />
     <ClInclude Include="TweaksVIni.h" />
     <ClInclude Include="TweaksVLog.h" />
+    <ClInclude Include="TweaksVModkitLimit.h" />
+    <ClInclude Include="TweaksVPackfileLimit.h" />
     <ClInclude Include="TweaksVPatch.h" />
     <ClInclude Include="TweaksVPatterns.h" />
+    <ClInclude Include="TweaksVRelocation.h" />
     <ClInclude Include="TweaksVSettings.h" />
     <ClInclude Include="TweaksVStraightToStoryMode.h" />
     <ClInclude Include="TweaksVSummary.h" />
@@ -185,10 +187,6 @@
     <ClInclude Include="IsEnhanced.h" />
     <ClInclude Include="MemScanner.h" />
     <ClInclude Include="StubMemory.h" />
-    <ClInclude Include="ModkitLimitAdjusterEnhanced_Game.h" />
-    <ClInclude Include="ModkitLimitAdjusterEnhanced_Logging.h" />
-    <ClInclude Include="PackfileLimitAdjusterEnhanced_Game.h" />
-    <ClInclude Include="PackfileLimitAdjusterEnhanced_Logging.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="fiDevice.h" />
     <ClInclude Include="fiPackfile.h" />

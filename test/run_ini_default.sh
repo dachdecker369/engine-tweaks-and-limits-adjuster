@@ -22,7 +22,7 @@ out=$(game full_game.exe); echo "      ${out:0:160}"
 check "TweaksV.ini is created" '[ -f TweaksV.ini ]'
 check "it is exactly the new default text (CRLF)" 'cmp -s TweaksV.ini expected.ini'
 check "the log says it was created" 'grep -q "Created TweaksV.ini with the default settings" TweaksV.log'
-check "log header: HEAP_SIZE=2000, PACKFILEARRAY_SIZE=13000, TRAVERSAL_LIST_SIZE=10000, DECALDEFS_SIZE=2048, the [TWEAKSV] line with VERSION=2" 'grep -q "HeapAdjuster: HEAP_SIZE=2000" TweaksV.log && grep -q "PackfileLimitAdjusterEnhanced: PACKFILEARRAY_SIZE=13000" TweaksV.log && grep -q "BoxStreamer: TRAVERSAL_LIST_SIZE=10000" TweaksV.log && grep -q "DecalDefs: DECALDEFS_SIZE=2048" TweaksV.log && grep -q "TweaksV: LOG=1 DIAGNOSTIC_MODE=0 DRY_RUN=0 CONSOLE=0 ERROR_POPUP=1 CONFLICT_CHECK=1 VERSION=2" TweaksV.log'
+check "log header: HEAP_SIZE=2000, PACKFILEARRAY_SIZE=13000, TRAVERSAL_LIST_SIZE=10000, DECALDEFS_SIZE=2048, the [TWEAKSV] line with VERSION=2" 'grep -q "HeapAdjuster: HEAP_SIZE=2000" TweaksV.log && grep -q "PackfileLimit: PACKFILEARRAY_SIZE=13000" TweaksV.log && grep -q "BoxStreamer: TRAVERSAL_LIST_SIZE=10000" TweaksV.log && grep -q "Decals: DECALDEFS_SIZE=2048" TweaksV.log && grep -q "TweaksV: LOG=1 DIAGNOSTIC_MODE=0 DRY_RUN=0 CONSOLE=0 ERROR_POPUP=1 CONFLICT_CHECK=1 VERSION=2" TweaksV.log'
 check "log header: no newmods line, no testing switch of a part" '! grep -qi "newmods" TweaksV.log && ! grep -q "LOG_DUMP\|LOG_SEARCHES\|LOG_DECALDEFS\|LOG_CALLS\|LOG_FILE_OPENS\|LOG_INFO\|LOG_MODS" TweaksV.log'
 check "the heap is set to 2000 MB" 'grep -q "heap: 2000 MB" harness.out'
 check "the packfile limit is 13000" 'grep -q "I=13000" harness.out'

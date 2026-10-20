@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# PackfileLimitAdjusterEnhanced scenarios: a fake GTA5_Enhanced.exe with copies of the
-# patched game code loads the real TweaksV.asi. Fake LOCALAPPDATA: the real one is never touched.
+# PackfileLimit scenarios (TweaksVPackfileLimit): a fake GTA5_Enhanced.exe with copies of the patched game
+# code loads the real TweaksV.asi. Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" .
@@ -16,8 +16,8 @@ fresh_ini; out=$(game full_game.exe); echo "      $out"
 check "all 30 common references + the 1158.13+ one -> one new 512 KB read/write array; the older build's one untouched" "has '$MOVED'"
 check "direct size (1158.13+ site) and indirect size 12000, the older builds' sites untouched" "has 'pack sizes: D3=12000 D2=4500 D1=4500 I=12000'"
 check "hooked call replaces the configured 3000 with 12000 and calls the game's function with it" "has 'hook: config 3000 -> 12000, original called 1x with 12000'"
-check "original log lines (4500 / 3000 / 12000)" "log_has 'Vanilla Packfile List Size is: 4500' && log_has 'Vanilla Packfile List Size From ConfigFile is: 3000' && log_has 'Packfile List Size Adjusted to: 12000'"
-check "status line" "log_has 'Packfile array moved and its limits raised from 4500 to 12000'"
+check "the hook's line" "log_has 'The archive count of the game.s configuration, 3000, is replaced by 12000.'"
+check "status lines" "log_has 'The packfile array moved and its limit raised from 4500 to 12000 entries.' && log_has 'The streaming configuration call at RVA .* is redirected: the archive count the game.s configuration holds is replaced by 12000 when the game reads it.'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'splash: E9 86 01 00 00 90' && has 'modkit refs: new array (RW, 128 KB)'"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
 check "the redirected call leads to a call stub that is read+execute, never writable" "has ', all RX' && ! has 'stubs: 0,'"
@@ -45,23 +45,24 @@ check "invalid value reported for the start-up summary" "log_has 'PROBLEM: Tweak
 echo "== P6 DRY_RUN=1: everything found and checked, nothing written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
 check "references, sizes and call untouched" "has '$UNMOVED' && has '$GAME_SIZES' && has '$NO_HOOK'"
-check "both 'would' lines" "log_has 'DRY_RUN: would move the packfile array (31 references)' && log_has 'DRY_RUN: would change the packfile limits from 4500 to 12000 and hook the streaming configuration call at RVA'"
+check "the 'would' line" "log_has 'DRY_RUN: would move the packfile array (31 references) and raise its limit from 4500 to 12000 (2 sites) and redirect the streaming configuration call at RVA'"
 
 echo "== P7 DIAGNOSTIC_MODE=1: every pattern, reference and site logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
 check "the 34 packfile patterns of this build each found exactly once" "[ \$(grep -c -E 'Pattern P-E-[A-Za-z0-9]+ found: .* 1 match,' TweaksV.log) -eq 34 ]"
-check "31 references logged" "[ \$(count 'PackfileLimitAdjusterEnhanced\] DIAGNOSTIC: reference at RVA') -eq 31 ]"
-check "direct size, indirect variable and call logged" "log_has 'DIAGNOSTIC: direct size at RVA .* holds 4500' && log_has 'DIAGNOSTIC: indirect size variable at RVA .* holds 4500' && log_has 'DIAGNOSTIC: streaming configuration call at RVA .* -> RVA'"
+check "31 references logged" "[ \$(count 'PackfileLimit\] DIAGNOSTIC: reference at RVA') -eq 31 ]"
+check "direct size, indirect variable, array and call logged" "log_has 'PackfileLimit\] DIAGNOSTIC: limit at RVA .* holds 4500 (N, P-E-D3) -> game size 4500' && log_has 'PackfileLimit\] DIAGNOSTIC: limit variable at RVA .* holds 4500 (N, P-E-I1) -> game size 4500' && log_has 'DIAGNOSTIC: the packfile array is at RVA .* - 4500 entries of 8 bytes' && log_has 'PackfileLimit\] DIAGNOSTIC: streaming configuration call at RVA .* -> RVA'"
+check "the 34 writes logged" "[ \$(count 'PackfileLimit\] DIAGNOSTIC: packfile array reference at RVA') -eq 31 ] && [ \$(count 'PackfileLimit\] DIAGNOSTIC: packfile array limit at RVA') -eq 2 ] && [ \$(count 'PackfileLimit\] DIAGNOSTIC: streaming configuration call at RVA .*: E8 .* -> E8') -eq 1 ]"
 check "still applied" "has 'D3=12000 D2=4500 D1=4500 I=12000'"
 check "patterns found once get no per-match lines (only D-E-L12, which matches 7 times, gets them)" "[ \$(count ' match 1 of ') -eq 1 ] && log_has 'D-E-L12 match 1 of 7 at RVA'"
 
-echo "== P7b DIAGNOSTIC_MODE=1, a second identical copy of the 1158.13+ reference: each match logged with its bytes"
+echo "== P7b DIAGNOSTIC_MODE=1, a second identical copy of the 1158.13+ reference: each match logged with its bytes, nothing written"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe twor31a)
 check "its line counts 2 matches" "log_has 'Pattern P-E-R31a found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 2 matches, bytes: BF '"
 check "one line per match, naming the pattern: 16 bytes before it, | at its start, 48 bytes from it" "[ \$(tr -d '\r' < TweaksV.log | grep -c -E '\[MemScanner\]   P-E-R31a match [12] of 2 at RVA 0x[0-9A-F]+:( [0-9A-F]{2}){16} \| BF( [0-9A-F]{2}){47}\$') -eq 2 ]"
 check "both copies' bytes shown" "[ \$(count '| BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 ') -eq 2 ]"
 check "no other pattern gets per-match lines (but D-E-L12, which matches 7 times)" "[ \$(count ' match 1 of ') -eq 2 ] && log_has 'D-E-L12 match 1 of 7 at RVA'"
-check "the array still moved, no problem" "has 'pack refs: 30 new 0 game 0 other' && ! log_has 'PROBLEM'"
+check "a reference pattern that matches twice is not used: nothing written, reported" "has '$UNMOVED' && has '$GAME_SIZES' && has '$NO_HOOK' && log_has 'the game code holds P-E-R31a 2 or more times, not the expected 1.' && log_has 'PROBLEM: The packfile limit is not changed'"
 
 echo "== P7c the game's obfuscated code that the old 1158.13+ pattern also matched (RVA 0x582A227): not matched now"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe junkr31a)
@@ -71,7 +72,7 @@ check "the array moved, no problem" "has '$MOVED' && ! log_has 'PROBLEM'"
 echo "== P8 [PACKFILE_LIMIT] ENABLED=0"
 fresh_ini; setkey ENABLED 0 PACKFILE_LIMIT; out=$(game full_game.exe)
 check "nothing changed" "has '$UNMOVED' && has '$GAME_SIZES' && has '$NO_HOOK'"
-check "no packfile lines" "! log_has '\[PackfileLimitAdjusterEnhanced\]'"
+check "header: PackfileLimit off; no PackfileLimit lines" "log_has 'Features: .*, PackfileLimit off' && ! log_has '\[PackfileLimit\]'"
 
 echo "== P9 an old PackfileLimitAdjusterEnhanced.asi in the folder: skipped"
 fresh_ini; touch PackfileLimitAdjusterEnhanced.asi; out=$(game full_game.exe); rm -f PackfileLimitAdjusterEnhanced.asi
@@ -84,14 +85,14 @@ check "references untouched (one elsewhere), sizes and call untouched" "has 'pac
 check "reason logged and reported" "log_has 'do not all point to the game.s own array: RVA .* and 0x.* (outside the game)' && log_has 'PROBLEM: The packfile limit is not changed'"
 check "every page back to its own protection" "has 'protect: all restored'"
 
-echo "== P11 another mod already hooked the streaming configuration call: limits left alone"
+echo "== P11 another mod already hooked the streaming configuration call: nothing written"
 fresh_ini; out=$(game full_game.exe packhooked); echo "      $out"
-check "the array was moved (the earlier step), sizes untouched, the other mod's call kept" "has '$MOVED' && has '$GAME_SIZES' && has \"hook: other mod's\""
+check "references and sizes untouched, the other mod's call kept" "has '$UNMOVED' && has '$GAME_SIZES' && has \"hook: other mod's\""
 check "reason logged and reported" "log_has 'is not a call into the game (another mod may have hooked it already)' && log_has 'PROBLEM: The packfile limit is not changed'"
 
-echo "== P12 implausible direct size (70000): limits left alone"
+echo "== P12 implausible direct size (70000): nothing written"
 fresh_ini; out=$(game full_game.exe packbadsize); echo "      $out"
-check "array moved, direct sizes as they were, indirect untouched, call untouched" "has '$MOVED' && has 'pack sizes: D3=70000 D2=70000 D1=70000 I=4500' && has '$NO_HOOK'"
+check "references untouched, direct sizes as they were, indirect and call untouched" "has '$UNMOVED' && has 'pack sizes: D3=70000 D2=70000 D1=70000 I=4500' && has '$NO_HOOK'"
 check "reason logged" "log_has 'packfile list size, 70000, is not plausible'"
 
 echo "== P13 no version resource: the build cannot be told, nothing done"
@@ -117,7 +118,7 @@ check "oldest direct size used" "has 'pack sizes: D3=4500 D2=4500 D1=12000 I=120
 echo "== P17 none of the game code present (plain fake game): logged and skipped, no crash"
 fresh_ini; out=$(game plain_game.exe)
 check "harness survived" "grep -q 'loaded' harness.out"
-check "reported" "log_has 'A reference to the packfile array was not found' && log_has 'PROBLEM: The packfile limit is not changed'"
+check "reported" "log_has 'PROBLEM: The packfile limit is not changed this session: P-E-R01 was not found.'"
 
 echo
 echo "PACKFILE SCENARIOS: $pass passed, $fail failed"

@@ -21,17 +21,17 @@ namespace TweaksV
 
 	inline constexpr SettingsSection kTweaksVSection{ "TWEAKSV", "TweaksV" };
 	inline constexpr SettingsSection kHeapSection{ "HEAP_ADJUSTER", "HeapAdjuster" };
-	inline constexpr SettingsSection kModkitSection{ "MODKIT_LIMIT", "ModkitLimitAdjusterEnhanced" };
-	inline constexpr SettingsSection kPackfileSection{ "PACKFILE_LIMIT", "PackfileLimitAdjusterEnhanced" };
+	inline constexpr SettingsSection kModkitSection{ "MODKIT_LIMIT", "ModkitLimit" };
+	inline constexpr SettingsSection kPackfileSection{ "PACKFILE_LIMIT", "PackfileLimit" };
 	inline constexpr SettingsSection kBoxStreamerSection{ "BOXSTREAMER", "BoxStreamer" };
-	inline constexpr SettingsSection kDecalDefsSection{ "DECALS", "DecalDefs" };
+	inline constexpr SettingsSection kDecalsSection{ "DECALS", "Decals" };
 	inline constexpr SettingsSection kRageOpenVSection{ "RAGEOPENV", "RageOpenV" };
 	inline constexpr SettingsSection kStoryModeSection{ "STRAIGHTTOSTORYMODE", "StraightToStoryMode" };
 	inline constexpr SettingsSection kDirectStorageSection{ "DIRECTSTORAGE", "DirectStorage" };
 
 	// The sections in file order; every one but the first is a part of TweaksV with an ENABLED key.
 	inline constexpr const SettingsSection* kSections[] = { &kTweaksVSection, &kHeapSection, &kModkitSection,
-		&kPackfileSection, &kBoxStreamerSection, &kDecalDefsSection, &kRageOpenVSection, &kStoryModeSection, &kDirectStorageSection };
+		&kPackfileSection, &kBoxStreamerSection, &kDecalsSection, &kRageOpenVSection, &kStoryModeSection, &kDirectStorageSection };
 
 	// The layout of TweaksV.ini this build writes and reads: VERSION, the last key of [TWEAKSV]. A file
 	// without VERSION has the layout of TweaksV 1.x and is replaced (TweaksVIni.h); a file with a higher
@@ -93,8 +93,8 @@ namespace TweaksV
 		Switch(kBoxStreamerSection, "ENABLED", true),
 		Number(kBoxStreamerSection, "TRAVERSAL_LIST_SIZE", 10000, 1000, 100000),
 
-		Switch(kDecalDefsSection, "ENABLED", true),
-		Number(kDecalDefsSection, "DECALDEFS_SIZE", 2048, 260, 16384),
+		Switch(kDecalsSection, "ENABLED", true),
+		Number(kDecalsSection, "DECALDEFS_SIZE", 2048, 260, 16384),
 
 		Switch(kRageOpenVSection, "ENABLED", true),
 		Switch(kRageOpenVSection, "MODS_FOLDER", true),
@@ -146,7 +146,7 @@ namespace TweaksV
 	inline constexpr const Setting& kModkitArraySize = FindSetting(kModkitSection, "MODKITARRAY_SIZE");
 	inline constexpr const Setting& kPackfileArraySize = FindSetting(kPackfileSection, "PACKFILEARRAY_SIZE");
 	inline constexpr const Setting& kTraversalListSize = FindSetting(kBoxStreamerSection, "TRAVERSAL_LIST_SIZE");
-	inline constexpr const Setting& kDecalDefsSize = FindSetting(kDecalDefsSection, "DECALDEFS_SIZE");
+	inline constexpr const Setting& kDecalDefsSize = FindSetting(kDecalsSection, "DECALDEFS_SIZE");
 	inline constexpr const Setting& kModsFolder = FindSetting(kRageOpenVSection, "MODS_FOLDER");
 	inline constexpr const Setting& kOpenRpf = FindSetting(kRageOpenVSection, "OPEN_RPF");
 	inline constexpr const Setting& kSkipRpfCacheCheck = FindSetting(kRageOpenVSection, "SKIP_RPF_CACHE_CHECK");

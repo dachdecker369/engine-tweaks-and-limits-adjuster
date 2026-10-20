@@ -9,12 +9,12 @@ This file reproduces the copyright notices and license texts that those projects
 | Component | Copyright | License | Where in TweaksV |
 |---|---|---|---|
 | [MinHook](https://github.com/TsudaKageyu/minhook) 1.3.4 | Tsuda Kageyu; Hacker Disassembler Engine by Vyacheslav Patkov | BSD-2-Clause | `vendor/MinHook`, compiled into `TweaksV.asi`; the search for free memory near the game in `StubMemory.cpp` follows its `buffer.c` |
-| [HeapAdjusterEnhanced](https://github.com/Chiheb-Bacha/HeapAdjusterEnhanced) | Chiheb-Bacha; based on work by the CitizenFX Collective and Dilapidated | MIT (see the notes) | `HeapAdjusterEnhanced_Game.cpp`, `HeapAdjusterEnhanced_Game.h` |
-| [ModkitLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced) | Chiheb-Bacha | GPL-3.0 | `ModkitLimitAdjusterEnhanced_*`, `ClearLog.*`, `StubMemory.*` |
-| [PackfileLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/PackfileLimitAdjusterEnhanced) | Chiheb-Bacha | GPL-3.0 | `PackfileLimitAdjusterEnhanced_*`, `GameVersion.h` |
+| [HeapAdjusterEnhanced](https://github.com/Chiheb-Bacha/HeapAdjusterEnhanced) | Chiheb-Bacha; based on work by the CitizenFX Collective and Dilapidated | MIT (see the notes) | No longer in TweaksV's code: the HeapAdjuster part is TweaksV's own since 2.0.0, written on the pattern `H-E1`, which comes from it |
+| [ModkitLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced) | Chiheb-Bacha | GPL-3.0 | `ClearLog.*`, `StubMemory.*`; the ModkitLimit part is TweaksV's own since 2.0.0, written on the patterns `M-E-*`, which come from it |
+| [PackfileLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/PackfileLimitAdjusterEnhanced) | Chiheb-Bacha | GPL-3.0 | `GameVersion.h`; the PackfileLimit part is TweaksV's own since 2.0.0, written on the patterns `P-E-*`, which come from it |
 | [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV) | Chiheb-Bacha; based on ClosedIV by martonp96 | GPL-3.0 | `main.*`, `CustomDevice.cpp`, `FileReadHooks.cpp`, `PackfileEncryptionHooks.cpp`, `fiDevice.*`, `fiPackfile.h`, `config.h`, `log.*`, `memory.h`, `rpf.h`, `IsEnhanced.h` |
-| [StraightToStoryMode](https://github.com/Chiheb-Bacha/StraightToStoryMode) | Chiheb-Bacha | GPL-3.0 | `StraightToStoryMode_*` |
-| [ChaosModV](https://github.com/gta-chaos-mod/ChaosModV) | The ChaosModV team | GPL-3.0 | The splash and legal screen patches in `StraightToStoryMode_Game.cpp` |
+| [StraightToStoryMode](https://github.com/Chiheb-Bacha/StraightToStoryMode) | Chiheb-Bacha | GPL-3.0 | No longer in TweaksV's code: the StraightToStoryMode part is TweaksV's own since 2.0.0, written on the patterns `S-E1..E3`, which come from it |
+| [ChaosModV](https://github.com/gta-chaos-mod/ChaosModV) | The ChaosModV team | GPL-3.0 | The splash and legal screen patches (`S-E1`, `S-E2`), which StraightToStoryMode took from it; TweaksV's own code since 2.0.0 |
 | [GTA5-VehicleModKitLimit-Fix](https://github.com/0x-FADED/GTA5-VehicleModKitLimit-Fix) | 0x-FADED | MIT (see the notes) | The basis of ModkitLimitAdjusterEnhanced |
 | [PauseMenuHelper](https://github.com/CamxxCore/PauseMenuHelper) | Cameron Berry (CamxxCore) | MIT | No longer in TweaksV's code. Its `pattern.h` and `Hooking.h` are in the original projects archived in `upstream\` (HeapAdjusterEnhanced, PackfileLimitAdjusterEnhanced) |
 | Stub allocator | Bas Timmer / NTAuthority et al. | MIT | The search for free memory near the game in `StubMemory.cpp`, the same as in the stub allocator that PackfileLimitAdjusterEnhanced's `Hooking.cpp` carried |

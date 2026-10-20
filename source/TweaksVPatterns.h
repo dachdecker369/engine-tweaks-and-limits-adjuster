@@ -11,7 +11,7 @@ namespace TweaksV
 {
 	struct GamePattern
 	{
-		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, D- DecalDefs, R- RageOpenV, S- StraightToStoryMode
+		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, D- Decals, R- RageOpenV, S- StraightToStoryMode
 		const char* text;	// the bytes in hex, one space apart; ? matches any byte
 	};
 
@@ -20,7 +20,7 @@ namespace TweaksV
 		// HeapAdjuster: the heap size
 		{ "H-E1", "BA ? ? ? ? 45 31 C0 41 B1 01 E8 ? ? ? ? 48 8D 0D" },
 
-		// ModkitLimitAdjusterEnhanced: the references to the modkit array, then its hard-coded limits
+		// ModkitLimit: the references to the modkit array, then its hard-coded limits
 		{ "M-E-R1", "31 c9 48 8d 05 ? ? ? ? eb" },
 		{ "M-E-R2", "89 c2 48 8d 0d ? ? ? ? eb" },
 		{ "M-E-R3", "41 0f b7 c2 48 8d 0d ? ? ? ? 0f b7 04 41" },
@@ -36,7 +36,7 @@ namespace TweaksV
 		{ "M-E-L7", "0f b7 41 ? 66 bf ? ? 48 3d" },
 		{ "M-E-L8", "41 0f b7 ca 66 b8 ? ? 81 f9" },
 
-		// PackfileLimitAdjusterEnhanced: the direct size (one pattern per range of game builds), the
+		// PackfileLimit: the direct size (one pattern per range of game builds), the
 		// indirect size, the streaming configuration call, then the references to the packfile array -
 		// the last one again per range of game builds
 		{ "P-E-D3", "48 83 C6 ? 48 81 F9" },
@@ -85,12 +85,12 @@ namespace TweaksV
 		{ "B-E-L3", "0F 29 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D" },
 		{ "B-E-L4", "48 8B 01 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D" },
 
-		// DecalDefs: the parser's "full" check (the count's address and N) and its lea of the array (L1, L2);
+		// Decals: the parser's "full" check (the count's address and N) and its lea of the array (L1, L2);
 		// FindById's head (three constant sites and a lea), PickVariant's head (two sites) and the texture
 		// override's five sites (L3..L9); the decal manager's start-up loop, its start (with a lea) and its
 		// end (L10, L11); the "add decal" check that seven decal-placing functions share (L12, which matches
 		// 7 times) and the four that differ (L13..L16). The array's other loads are found by their address
-		// (TweaksVDecalDefs.cpp)
+		// (TweaksVDecals.cpp)
 		{ "D-E-L1", "8B 35 ? ? ? ? 48 81 FE ? ? ? ? 77 ? 48 89 F9 FF 15" },
 		{ "D-E-L2", "4C 8D 2D ? ? ? ? F3 44 0F 10 0D ? ? ? ? F3 44 0F 10 15" },
 		{ "D-E-L3", "56 85 C9 74 ? C7 02 04 01 00 00 41 C7 00 00 00 00 00 44 8B 1D" },

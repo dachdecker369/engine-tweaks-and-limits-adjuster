@@ -26,7 +26,7 @@ TweaksV merges the projects below. All credit for the original research and code
 ## Ideas behind TweaksV's own parts
 
 - **alloc8or** - DirectStorageFix, the idea behind TweaksV's DirectStorage part (only its description is used, none of its code) - https://github.com/alloc8or/DirectStorageFix
-- **CitizenFX Collective** - the box streamer traversal list fix and the decal definitions limit fix in FiveM, the ideas behind TweaksV's BoxStreamer and DecalDefs parts (none of their code is used) - https://github.com/citizenfx/fivem
+- **CitizenFX Collective** - the box streamer traversal list fix and the decal definitions limit fix in FiveM, the ideas behind TweaksV's BoxStreamer and Decals parts (none of their code is used) - https://github.com/citizenfx/fivem
 - **Tanuki / 0x-FADED** - the port of those fixes to GTA V Legacy (none of its code is used) - https://github.com/0x-FADED/GTA-V-fwBoxStreamerVariable-and-decals-limit-Patch
 
 ## Libraries and tools

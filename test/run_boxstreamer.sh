@@ -18,7 +18,7 @@ echo "== B1 defaults: list moved, capacity 10000, the other plugins still fine"
 fresh_ini; out=$(game full_game.exe); echo "      $out"
 check "all 8 references -> one new 784 KB read/write list outside the game" "has '$MOVED'"
 check "all 4 capacities 10000" "has '$NEW_CAPS'"
-check "status line" "log_has 'Box streamer traversal list moved and its capacity raised from 1000 to 10000 entries'"
+check "status line" "log_has 'The box streamer.s traversal list moved and its limit raised from 1000 to 10000 entries.'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack refs: 30 new 0 game 0 other'"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
 check "the tree-search calls untouched (DIAGNOSTIC_MODE=0): the game's own searches run" "has '$CALLS_GAME'"
@@ -46,14 +46,14 @@ check "reported" "log_has 'PROBLEM: TweaksV.ini: \[BOXSTREAMER\] TRAVERSAL_LIST_
 echo "== B6 DRY_RUN=1: everything found and checked, nothing written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
 check "references and capacities untouched" "has '$UNMOVED' && has '$GAME_CAPS'"
-check "the 'would' line" "log_has 'DRY_RUN: would move the box streamer.s traversal list (8 references) and raise its capacity from 1000 to 10000 (4 sites).'"
+check "the 'would' line" "log_has 'DRY_RUN: would move the box streamer.s traversal list (8 references) and raise its limit from 1000 to 10000 (4 sites).'"
 
 echo "== B7 DIAGNOSTIC_MODE=1: every pattern, capacity, reference and write logged; the tree-search calls counted"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe); echo "      $out"
 check "the 4 patterns each found exactly once" "[ \$(grep -c -E 'Pattern B-E-L[1-4] found: .* 1 match,' TweaksV.log) -eq 4 ]"
-check "4 capacities logged, all holding 1000" "[ \$(count 'BoxStreamer\] DIAGNOSTIC: capacity at RVA .* holds 1000') -eq 4 ]"
-check "the list and the 8 places that load it logged" "log_has 'DIAGNOSTIC: the traversal list is at RVA .* - 1000 entries of 8 bytes' && [ \$(count 'BoxStreamer\] DIAGNOSTIC: the list is loaded at RVA') -eq 8 ]"
-check "the 12 writes logged" "[ \$(count 'BoxStreamer\] DIAGNOSTIC: box streamer list reference at RVA') -eq 8 ] && [ \$(count 'BoxStreamer\] DIAGNOSTIC: box streamer list capacity at RVA') -eq 4 ]"
+check "4 capacities logged, all holding 1000" "[ \$(count 'BoxStreamer\] DIAGNOSTIC: limit at RVA .* holds 1000 (N, B-E-L[1-4]) -> game size 1000') -eq 4 ]"
+check "the list, the 3 references after the capacity sites and the 8 places that load it logged" "log_has 'DIAGNOSTIC: the box streamer.s traversal list is at RVA .* - 1000 entries of 8 bytes' && [ \$(count 'BoxStreamer\] DIAGNOSTIC: reference at RVA .* (B-E-L[2-4])') -eq 3 ] && [ \$(count 'BoxStreamer\] DIAGNOSTIC: reference at RVA .* (lea scan)') -eq 8 ]"
+check "the 12 writes logged" "[ \$(count 'BoxStreamer\] DIAGNOSTIC: box streamer.s traversal list reference at RVA') -eq 8 ] && [ \$(count 'BoxStreamer\] DIAGNOSTIC: box streamer.s traversal list limit at RVA') -eq 4 ]"
 check "the four tree-search calls and their targets logged, the four redirections logged as writes" "[ \$(count 'BoxStreamer\] DIAGNOSTIC: tree-search call at RVA .* -> RVA') -eq 4 ] && [ \$(count 'BoxStreamer\] DIAGNOSTIC: tree-search call at RVA .*: E8 .* -> E8') -eq 4 ]"
 check "still applied; all four calls redirected to the counting wrappers, the game's searches still run with the game's arguments and their results come back unchanged" "has '$MOVED' && has '$NEW_CAPS' && has '$CALLS_COUNTED'"
 check "the four stubs are read+execute, every page back to its own protection" "has 'stubs: 10, all RX' && has 'protect: all restored (RX)'"
@@ -87,7 +87,7 @@ check "reason logged and reported" "log_has 'loads the box streamer.s traversal 
 echo "== B12 one capacity disagrees about the game's own size (1001): nothing written"
 fresh_ini; out=$(game full_game.exe boxmismatch); echo "      $out"
 check "nothing changed" "has '$UNMOVED' && has 'box caps: 1000 1000 1001 1000'"
-check "reason logged and reported" "log_has 'capacities of the box streamer.s traversal list disagree about the game.s own size: 1000 and 1001 (B-E-L3)' && log_has '$NOT_ENLARGED'"
+check "reason logged and reported" "log_has 'limits of the box streamer.s traversal list disagree about the game.s own size: 1000 and 1001 (B-E-L3)' && log_has '$NOT_ENLARGED'"
 
 echo "== B13 implausible capacities (200000): nothing written"
 fresh_ini; out=$(game full_game.exe boxbadsize); echo "      $out"
@@ -97,7 +97,7 @@ check "reason logged and reported" "log_has 'box streamer traversal list size, 2
 echo "== B14 none of the game code present (plain fake game): logged and skipped, no crash"
 fresh_ini; out=$(game plain_game.exe)
 check "harness survived" "grep -q 'loaded' harness.out"
-check "reported" "log_has 'A capacity of the box streamer.s traversal list was not found in the game code: B-E-L1' && log_has '$NOT_ENLARGED'"
+check "reported" "log_has '$NOT_ENLARGED: B-E-L1 was not found.'"
 
 echo "== B15 DIAGNOSTIC_MODE=1 with the game running on: the searches are counted and summed up 10 s in"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe wait); echo "      $out"
@@ -118,7 +118,7 @@ check "reason logged and reported" "log_has 'tree-search calls of the box stream
 echo "== B18 DIAGNOSTIC_MODE=1 and DRY_RUN=1: the calls are checked, nothing written, nothing counted"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; setkey DRY_RUN 1; out=$(game full_game.exe)
 check "nothing changed" "has '$UNMOVED' && has '$GAME_CAPS' && has '$CALLS_GAME'"
-check "the 'would' line names the calls" "log_has 'DRY_RUN: would move the box streamer.s traversal list (8 references) and raise its capacity from 1000 to 10000 (4 sites) and redirect the 4 tree-search calls (DIAGNOSTIC_MODE).'"
+check "the 'would' line names the calls" "log_has 'DRY_RUN: would move the box streamer.s traversal list (8 references) and raise its limit from 1000 to 10000 (4 sites) and redirect the 4 tree-search calls (DIAGNOSTIC_MODE).'"
 
 echo "== B19 DIAGNOSTIC_MODE=0 with a hooked call: the calls are not looked at, the list is moved all the same"
 fresh_ini; out=$(game full_game.exe boxcallhooked)

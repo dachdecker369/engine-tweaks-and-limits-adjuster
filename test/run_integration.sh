@@ -58,18 +58,18 @@ breaktest "H-E1 (heap): heap unchanged, the rest applied" "H-E1" \
 	"has '$GAME_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'"
 breaktest "M-E-R3 (a modkit reference): modkit untouched, the rest applied" "M-E-R3" \
 	"has '$ALL_ON_HEAP' && has '$MODKIT_OFF' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'"
-breaktest "M-E-L6 (a modkit limit): array moved, limits as in the game - harmless" "M-E-L6" \
-	"has 'modkit refs: new array (RW, 128 KB) | limits: 1023 1027 1027 1027 1027 2048' && has '$PACK_ON' && has '$ROV_ON'"
+breaktest "M-E-L6 (a modkit limit): modkit untouched, the rest applied" "M-E-L6" \
+	"has '$ALL_ON_HEAP' && has '$MODKIT_OFF' && has '$PACK_ON' && has '$ROV_ON'"
 breaktest "P-E-R12 (a packfile reference): packfile untouched, the rest applied" "P-E-R12" \
 	"has '$PACK_OFF' && has '$MODKIT_ON' && has '$ROV_ON' && has '$STORY_ON'"
-breaktest "P-E-H1 (the hooked call): array moved, limits as in the game, no hook - harmless" "P-E-H1" \
-	"has 'pack refs: 30 new 0 game 0 other' && has 'pack sizes: D3=4500 D2=4500 D1=4500 I=4500 | hook: not set' && has '$ROV_ON'"
+breaktest "P-E-H1 (the streaming configuration call): packfile untouched, the rest applied" "P-E-H1" \
+	"has '$PACK_OFF' && has '$MODKIT_ON' && has '$ROV_ON'"
 breaktest "B-E-L2 (a box streamer capacity): list untouched, the rest applied" "B-E-L2" \
 	"has '$BOX_OFF' && has '$DECAL_ON' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'"
 breaktest "D-E-L3 (a decal definitions site): array untouched, the rest applied" "D-E-L3" \
 	"has '$DECAL_OFF' && has '$BOX_ON' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'"
 breaktest "D-E-L12 (the shared 'add decal' check, needed 7 times): array untouched, the rest applied" "D-E-L12" \
-	"has '$DECAL_OFF' && has '$BOX_ON' && has '$ROV_ON' && log_has 'A site of the decal definitions limit was not found in the game code: D-E-L12'"
+	"has '$DECAL_OFF' && has '$BOX_ON' && has '$ROV_ON' && log_has 'The decal definitions limit is not raised this session: D-E-L12 was not found.'"
 breaktest "R-E-F5 (a file function): no file hooks, OPEN on" "R-E-F5" \
 	"has 'file hooks 0/8 | open calls 5/5, behaviour ok' && has '$PACK_ON'"
 breaktest "R-E-E3 (an encryption call): no OPEN calls, files on" "R-E-E3" \

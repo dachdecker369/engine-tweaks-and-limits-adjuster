@@ -44,6 +44,12 @@
 
 - **One feature table:** `TweaksVFeatures.cpp` lists each feature once: its section of `TweaksV.ini`, the old stand-alone plugins that do its job and the function that starts it. DllMain starts the features from it and the conflict check takes their old plugins from it, so a new feature is one entry there, plus its settings.
 
+- **One relocation core:** the four parts that move one of the game's static arrays - the modkit array, the packfile array, the box streamer's traversal list, the decal definitions array - describe it in a table (`TweaksVRelocation.h`: each pattern, where its match holds a reference to the array or a limit, and how the limit encodes the size) and share one implementation:
+  - Every site is found and checked before anything is written: every reference must point at one array inside the game, every limit must be the expected instruction and decode to the same plausible size, and where the array's loads are found by its address (the box streamer's list, the decal definitions array) exactly as many must be found as the game has;
+  - The new array always has its full size, as read/write data near the game, zeroed; the setting is clamped to the game's own size..that size;
+  - Every reference and every limit, with what the part adds (a redirected call, a loop end), is written in one go, all or nothing - a part either does its whole job or leaves the game as it was;
+  - DRY_RUN logs one line with what would change; DIAGNOSTIC_MODE logs every site, the value it holds and every write, in one wording for all four parts.
+
 - **HeapAdjuster (TweaksV's own part since 2.0.0; the merged HeapAdjusterEnhanced before):** `[HEAP_ADJUSTER] HEAP_SIZE` (default 2000 MB) sets the game's memory heap, one immediate in its start-up code (`H-E1`):
   - The instruction is checked before the write, and the size it holds must be a whole number of MB up to 2047;
   - `HEAP_SIZE` is clamped to the size found..2047 MB, with 64-bit arithmetic; a heap that has the size asked for already is left as it is;
@@ -57,30 +63,24 @@
   - A missing pattern skips only that screen and is reported in the start-up summary;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
-- **ModkitLimitAdjusterEnhanced merged:** `[MODKIT_LIMIT] MODKITARRAY_SIZE` (default 65536) is read from `TweaksV.ini`. Fixes:
-  - Every reference and limit is found and checked before anything is written;
-  - All references must point to the game's own array, so it is not moved twice;
-  - All limits must agree on the game's own size;
-  - The new array always has the full 65536 entries, as read/write data;
-  - The limits are clamped to the game's own size..65536;
-  - Each page of game code gets its original protection back, even when two sites share a page;
-  - A failure no longer quits the game;
+- **ModkitLimit (TweaksV's own part since 2.0.0; the merged ModkitLimitAdjusterEnhanced before):** `[MODKIT_LIMIT] MODKITARRAY_SIZE` (default 65536) enlarges the game's array of vehicle modkit IDs - 1024 entries of 2 bytes, loaded by six `lea` (`M-E-R1..R6`) and sized by eight immediates that hold N-1, N+3 or 2N (`M-E-L1..L8`) - on the relocation core:
+  - Every reference and limit is found and checked before anything is written: all six references must point at one array inside the game, so an array another mod has moved is left alone, and all eight limits must decode to the same plausible size;
+  - The new array always has the full 65536 entries, as read/write data; the limits are clamped to the game's own size..65536;
+  - The six references and the eight limits are written together, all or nothing (1.x moved the array first and could leave it moved with the limits as they were);
+  - A failure is reported in the start-up summary and leaves the game as it was;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
-- **PackfileLimitAdjusterEnhanced merged:** `[PACKFILE_LIMIT] PACKFILEARRAY_SIZE` (default 13000) is read from `TweaksV.ini`. Fixes:
-  - The array is moved before the limits are raised, so a failure at any step leaves the game safe;
-  - Every reference, both size limits and the hooked call are found and checked before anything is written;
-  - All references must point to the game's own array, so it is not moved twice;
-  - The pattern for the reference that builds 1.0.1158.13 and later use now includes its two constants, so it no longer also matches obfuscated game code;
-  - A call that another mod has already hooked is left alone;
-  - The hook is written with the right page protection, and every page gets its original protection back;
-  - The new array always has the full 65535 entries, as read/write data;
-  - The limits are clamped to the game's own size..65535;
-  - A failure no longer quits the game;
-  - The original's link error (a variable defined in a header) is gone;
+- **PackfileLimit (TweaksV's own part since 2.0.0; the merged PackfileLimitAdjusterEnhanced before):** `[PACKFILE_LIMIT] PACKFILEARRAY_SIZE` (default 13000) enlarges the game's array of RPF archives - 7260 entries of 8 bytes on the current build, referenced by 31 instructions (`P-E-R01..R30` and, by game build, `R31a` or `R31b`) and sized by an immediate (`P-E-D3`, `D2` or `D1` by game build) and a variable the game compares against (`P-E-I1`) - on the relocation core, and replaces the archive count of the game's configuration:
+  - Every reference, both limits and the streaming configuration call (`P-E-H1`) are found and checked before anything is written: all references must point at one array inside the game, the limits must agree on a plausible size, and the call must lead into the game - one another mod has already redirected is left alone;
+  - The call goes through a read+execute call stub to TweaksV's function, which replaces the archive count read from `gameconfig.xml` with the new size and calls the game's own function; the log says what it replaced;
+  - The new array always has the full 65535 entries, as read/write data; the limits are clamped to the game's own size..65535;
+  - The 31 references, the two limits and the redirected call are written together, all or nothing (1.x moved the array first and could leave it moved with the limits and the call as they were);
+  - The pattern for the reference that builds 1.0.1158.13 and later use includes its two constants, so it does not also match obfuscated game code;
+  - The game's file version chooses the patterns of its build; without one nothing is done, and the start-up summary says so;
+  - A failure is reported in the start-up summary and leaves the game as it was;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
-- **BoxStreamer (TweaksV's own part):** `[BOXSTREAMER] TRAVERSAL_LIST_SIZE` (default 10000) is read from `TweaksV.ini`. The game's box streamer keeps the map boxes one search returns in a static list of 1000 entries; with heavy map mods it fills up, and the boxes it has no room for are never streamed, so their LODs are missing. TweaksV moves the list to a larger one and raises the capacity the game hands its tree searches:
+- **BoxStreamer (TweaksV's own part):** `[BOXSTREAMER] TRAVERSAL_LIST_SIZE` (default 10000) is read from `TweaksV.ini`. The game's box streamer keeps the map boxes one search returns in a static list of 1000 entries; with heavy map mods it fills up, and the boxes it has no room for are never streamed, so their LODs are missing. TweaksV moves the list to a larger one and raises the capacity the game hands its tree searches, on the relocation core since 2.0.0:
   - The idea is the CitizenFX Collective's fix for FiveM, as 0x-FADED ported it to GTA V Legacy. TweaksV's code is its own, written from the game's code alone: none of theirs was read;
   - The four capacity sites are found by pattern and must agree on the game's own size. The list's address comes from the `lea` after three of them, and the game's code is scanned for every `lea` that loads it: exactly 8 must be found (two of the game's four query functions are near-identical copies, which no pattern tells apart), so a list another mod has moved, or a game that has changed, is left alone;
   - The new list always has the full 100000 entries, as read/write data; the capacity is clamped to the game's own size..100000;
@@ -90,7 +90,7 @@
   - A failure is reported in the start-up summary and leaves the game as it was;
   - It supports DRY_RUN and DIAGNOSTIC_MODE.
 
-- **DecalDefs (TweaksV's own part):** `[DECALS] DECALDEFS_SIZE` (default 2048) is read from `TweaksV.ini`. The game keeps its decal definitions - the kinds of decal it reads from the `decals.dat` files - in a static array of 260 entries, with the number registered so far in a dword 16 bytes before it; once 260 are registered the parser drops every further definition silently, and add-on content, which comes last, loses its decals. TweaksV moves the array to a larger one and raises the limit at every site that carries it:
+- **Decals (TweaksV's own part; named DecalDefs in 1.6.0):** `[DECALS] DECALDEFS_SIZE` (default 2048) is read from `TweaksV.ini`. The game keeps its decal definitions - the kinds of decal it reads from the `decals.dat` files - in a static array of 260 entries, with the number registered so far in a dword 16 bytes before it; once 260 are registered the parser drops every further definition silently, and add-on content, which comes last, loses its decals. TweaksV moves the array to a larger one and raises the limit at every site that carries it, on the relocation core since 2.0.0:
   - The idea is the CitizenFX Collective's fix for FiveM, as 0x-FADED ported it to GTA V Legacy. TweaksV's code is its own, written from TweaksV's own findings about the game's code; the published patches were known as the idea and as a guide to what to look for, and no line of their code was read for the build;
   - The parser's "full" check gives the count's address and N (260), its `lea` the array's address, which must lie 16 bytes after the count, both inside the game. Every other site that carries the limit - 21 instructions, one pattern matching the 7 identical checks of the decal-placing functions - is found by pattern, must be the expected instruction and must hold N-1 or N; the decal manager's start-up loop must clear a whole number of entries per pass and end at its start offset + N x 80. The game's code is then scanned for every `lea` that loads the array: exactly 31 must be found, each with a 48 or 4C prefix, so an array another mod has moved, or a game that has changed, is left alone;
   - The new array always has the full 16384 entries (1.3 MB), as read/write data, zeroed - the array's initial state; the limit is clamped to the game's own size..16384 (a definition's index is a uint16 in the game's decal instances);
@@ -131,7 +131,7 @@
 - **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from; the mod page carries the credits and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
   - Provenance: RageOpenV's README asks that its binaries not be redistributed - a request, not a license term (the GPL-3.0 allows redistribution and forbids further restrictions), so the credits stay prominent; martonp96's original ClosedIV repository is no longer public, and RageOpenV's README is the source of that credit.
 
-- **Tests:** `test\` holds fake-game test suites (423 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (425 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Open Issues
 

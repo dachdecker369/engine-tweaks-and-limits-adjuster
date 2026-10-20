@@ -7,13 +7,13 @@
 
 #include <iterator>
 
-#include "ModkitLimitAdjusterEnhanced_Game.h"
-#include "PackfileLimitAdjusterEnhanced_Game.h"
 #include "main.h"
 #include "TweaksVBoxStreamer.h"
-#include "TweaksVDecalDefs.h"
+#include "TweaksVDecals.h"
 #include "TweaksVDirectStorage.h"
 #include "TweaksVHeapAdjuster.h"
+#include "TweaksVModkitLimit.h"
+#include "TweaksVPackfileLimit.h"
 #include "TweaksVStraightToStoryMode.h"
 #include "TweaksVSummary.h"
 
@@ -31,13 +31,13 @@ namespace TweaksV
 			{ &kHeapSection, { L"HeapAdjuster.asi", L"ZHeapAdjuster.asi" },
 				[] { InitHeapAdjuster(); return false; } },
 			{ &kModkitSection, { L"ModkitLimitAdjusterEnhanced.asi" },
-				[] { ModkitLimitAdjusterEnhanced::initializeGame(); return false; } },
+				[] { InitModkitLimit(); return false; } },
 			{ &kPackfileSection, { L"PackfileLimitAdjusterEnhanced.asi" },
-				[] { PackfileLimitAdjusterEnhanced::initializeGame(); return false; } },
+				[] { InitPackfileLimit(); return false; } },
 			{ &kBoxStreamerSection, { L"DecalPatch.asi" },
 				[] { InitBoxStreamer(); return false; } },
-			{ &kDecalDefsSection, { L"DecalPatch.asi" },
-				[] { InitDecalDefs(); return false; } },
+			{ &kDecalsSection, { L"DecalPatch.asi" },
+				[] { InitDecals(); return false; } },
 			// RageOpenV's start-up runs later, in its GetSystemTimeAsFileTime hook, which then shows the summary
 			{ &kRageOpenVSection, { L"RageOpenV.asi", L"OpenRPF.asi", L"OpenIV.asi" },
 				[] { return RageOpenV::DllMain(nullptr, DLL_PROCESS_ATTACH, nullptr) != FALSE; } },

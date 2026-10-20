@@ -47,10 +47,10 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 
 ### 3. The relocation core and the four array parts
 
-- [ ] `TweaksVRelocation.cpp`, `.h` as section 5.1 describes.
-- [ ] `TweaksVModkitLimit` and `TweaksVPackfileLimit` written on it, with the packfile's streaming configuration hook kept in its own file; the originals' files deleted.
-- [ ] `TweaksVBoxStreamer` and `TweaksVDecals` (renamed from `TweaksVDecalDefs`) moved onto the core where it fits; their counted calls, count global and loop stay theirs.
-- [ ] The `modkit`, `packfile`, `boxstreamer` and `decals` (renamed) suites on the new lines.
+- [x] `TweaksVRelocation.cpp`, `.h` as section 5.1 describes.
+- [x] `TweaksVModkitLimit` and `TweaksVPackfileLimit` written on it, with the packfile's streaming configuration hook kept in its own file; the originals' files deleted.
+- [x] `TweaksVBoxStreamer` and `TweaksVDecals` (renamed from `TweaksVDecalDefs`) moved onto the core where it fits; their counted calls, count global and loop stay theirs.
+- [x] The `modkit`, `packfile`, `boxstreamer` and `decals` (renamed) suites on the new lines.
 - Checkpoint: suites green; my boot with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1` (every pattern found once, nothing written), then a normal boot with my mods folder (every array moved, the archive count replaced, the searches and the decal count measured with `DIAGNOSTIC_MODE=1`).
 
 ### 4. RageOpenV
@@ -83,6 +83,6 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 
 ## Next steps
 
-1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phases 1 and 2 are built, committed and booted (phase 2's checkpoint boot is next), the suites green with 423 checks; then phase 3.
+1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phases 1 to 3 are built and committed, phases 1 and 2 booted (phase 3's checkpoint boots are next), the suites green with 425 checks; then phase 4.
 2. Phase 6: the 2.0.0 commit, my boots of SPECIFICATIONS.md section 8, then push and tag on my word, then Nexus, then the removal of these two files.
 3. Open: nothing; the session asks me again whenever something new comes up.

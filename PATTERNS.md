@@ -25,13 +25,13 @@ The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstor
 3. Update the pattern in `source\TweaksVPatterns.h` and in this file - the tests check that both agree - and confirm that it matches exactly once. `GTA5_Enhanced.exe` is encrypted on disk, so look for the code in a copy of the running game: a test build with `TEST_DUMP_CODE=60` saves one (README, Test Builds).
 4. DirectStorage: if `UNLOCK_FILES=1` reports a problem (another interface, or an `OpenFile` outside DirectStorage's DLLs), look at the factory's functions with `DIAGNOSTIC_MODE=1`.
 
-## HeapAdjusterEnhanced
+## HeapAdjuster
 
 | Label | Pattern | Use | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
 | H-E1 | `BA ? ? ? ? 45 31 C0 41 B1 01 E8 ? ? ? ? 48 8D 0D` | +1: imm32 of `mov edx` - heap size in bytes | found | 0x13F7 |
 
-## ModkitLimitAdjusterEnhanced
+## ModkitLimit
 
 References to modkit array (rel32 of a `lea` - moved to new array):
 
@@ -57,9 +57,9 @@ Hard-coded limits (imm32 = size x mul + add; every one MUST decode to the same g
 | M-E-L7 | `0f b7 41 ? 66 bf ? ? 48 3d` | 10, 1, -1 | found | 0xD225BE |
 | M-E-L8 | `41 0f b7 ca 66 b8 ? ? 81 f9` | 10, 1, -1 | found | 0x7A6F3B |
 
-## PackfileLimitAdjusterEnhanced
+## PackfileLimit
 
-Sizes and hooked call (`EnhancedPatch`):
+Sizes and the streaming configuration call (the two limit sites and the call the part redirects):
 
 | Label | Pattern | Use | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
@@ -69,7 +69,7 @@ Sizes and hooked call (`EnhancedPatch`):
 | P-E-I1 | `3b 05 ? ? ? ? 0f 8d ? ? ? ? 89 c0` | +2: rel32 to the indirect size variable | found | 0x1279156 |
 | P-E-H1 | `89 48 ? 48 8d 0d ? ? ? ? 48 89 08 48 89 c1 e8` | +0x10: the streaming configuration call; 8512 archive count on current build | found | 0x5093D5 |
 
-References to the packfile array (`AdjustPackFileArrayLimit`, rel32 moved to the new array):
+References to the packfile array (rel32 moved to the new array):
 
 | Label | Pattern | Offset | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
@@ -117,7 +117,7 @@ The four sites that hand the traversal list's capacity to the tree search (`mov 
 | B-E-L3 | `0F 29 44 24 40 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 13, 20, 42 | found | 0x92DDBC |
 | B-E-L4 | `48 8B 01 48 8B 48 08 C7 44 24 20 ? ? ? ? 4C 8D 2D` | 11, 18, 30 | found | 0x92E07A |
 
-## DecalDefs
+## Decals
 
 The decal definitions array (260 entries of 80 bytes, at RVA 0x42EC8A0 on the current build) and the number of registered definitions, a dword 16 bytes before it (0x42EC890). The parser's "full" check `D-E-L1` gives the count's address (the disp32 of its `mov`) and N (its imm32 is N-1: 259, so N = 260, on the current build); the parser's `lea` `D-E-L2` gives the array's address, which MUST lie 16 bytes after the count, both inside the game. Every other site that carries the limit is found by its own pattern, MUST be the expected instruction and MUST hold N-1 or N: `D-E-L3` (FindById: three sites, two of them past the pattern's end, and a `lea` of the array), `D-E-L4` (PickVariant), `D-E-L5..L9` (the texture override; `L6` and `L9` also hold a `lea`), `D-E-L13..L16` (four decal-placing functions) and `D-E-L12`, the check seven more decal-placing functions share, which MUST match exactly 7 times. The decal manager's start-up loop, which zeroes the texture pointers of 26 entries per pass, gives its start offset and a `lea` of the array (`D-E-L10`) and the bytes one pass clears and its end (`D-E-L11`), which MUST be the start offset + N x 80. The array's loads have no pattern of their own: the game's code is scanned for every `lea r64, [rip+disp32]` that loads it, which MUST find exactly 31 - on the current build at RVAs 0xB195A8, 0xB3187E, 0xB31AD6, 0xB31FA7, 0xB324CA, 0xB326EF, 0xB32C71, 0xB32F2B, 0xB33423, 0xB338F6, 0xB33EF5, 0xB34892, 0xB34CF7, 0xB34F96, 0xCA0A1F, 0xCA11CE, 0xCA323B, 0xCA6DD5, 0xCA756C, 0xCA960E, 0xCAA2F7, 0xCAD859, 0xCADE17, 0xCB30C9, 0xCB386D, 0xCB3A4F, 0xCBEAE2, 0xCBF181, 0xCBF251, 0xCBF2D0 and 0xCD2B60. `DIAGNOSTIC_MODE=1` logs every one of them and every constant site.
 
