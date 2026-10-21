@@ -170,6 +170,7 @@
     <ClInclude Include="TweaksVGame.h" />
     <ClInclude Include="TweaksVHeapAdjuster.h" />
     <ClInclude Include="TweaksVIni.h" />
+    <ClInclude Include="TweaksVLock.h" />
     <ClInclude Include="TweaksVLog.h" />
     <ClInclude Include="TweaksVModkitLimit.h" />
     <ClInclude Include="TweaksVPackfileLimit.h" />

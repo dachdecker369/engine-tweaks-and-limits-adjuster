@@ -21,7 +21,7 @@ The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstor
 ### When Game Updates
 
 1. Start the game with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1` - and `CONSOLE=1`, with every part on, so every pattern is looked for. Then game binary isn't patched. `TweaksV.log` lists every pattern not found, by its label.
-2. Check whether the project the pattern came from has changed it (`UPSTREAM.md` names them).
+2. Check whether the project the pattern came from has changed it (`CREDITS.md` names them).
 3. Update the pattern in `source\TweaksVPatterns.h` and in this file - the tests check that both agree - and confirm that it matches exactly once. `GTA5_Enhanced.exe` is encrypted on disk, so look for the code in a copy of the running game: a test build with `TEST_DUMP_CODE=60` saves one (README, Test Builds).
 4. DirectStorage: if `UNLOCK_FILES=1` reports a problem (another interface, or an `OpenFile` outside DirectStorage's DLLs), look at the factory's functions with `DIAGNOSTIC_MODE=1`.
 

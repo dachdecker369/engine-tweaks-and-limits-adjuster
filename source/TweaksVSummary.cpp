@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "TweaksVLock.h"
 #include "TweaksVLog.h"
 #include "TweaksVSettings.h"
 
@@ -74,9 +75,25 @@ namespace TweaksV
 			MessageBoxW(nullptr, text.c_str(), L"TweaksV", MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST);
 		}
 
+		// Nothing may leave a thread of this module: an exception that does ends the game. The problems a
+		// box could not show are in the log already (ReportFailure writes them first).
 		DWORD WINAPI SummaryThread(LPVOID module)
 		{
-			ShowStartupSummary();
+			try
+			{
+				ShowStartupSummary();
+			}
+			catch (...)
+			{
+				try
+				{
+					WriteLog("TweaksV", "Unexpected exception while showing the start-up summary - the box is not shown; "
+						"the problems are logged above.");
+				}
+				catch (...)
+				{
+				}
+			}
 			FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
 		}
 
@@ -84,31 +101,48 @@ namespace TweaksV
 		// (more usually follow at once), until none is left.
 		DWORD WINAPI LateThread(LPVOID module)
 		{
-			for (;;)
+			try
 			{
-				Sleep(1000);
-				AcquireSRWLockExclusive(&g_lock);
-				std::vector<std::string> items;
-				items.swap(g_late);
-				if (items.empty())
-					g_lateThread = false;	// under the lock, so a new problem starts a new thread
-				ReleaseSRWLockExclusive(&g_lock);
-				if (items.empty())
-					break;
-
-				if (!IsOn(kErrorPopup))
-					WriteLog("TweaksV", "Problem after the start-up summary not shown (ERROR_POPUP=0): " +
-						std::to_string(items.size()) + " problem(s), see above.");
-				else if (g_lateBoxes >= kMaxLateBoxes)
-					WriteLog("TweaksV", "Problem after the start-up summary not shown: " + std::to_string(kMaxLateBoxes) +
-						" message boxes were shown already this session.");
-				else
+				for (;;)
 				{
-					++g_lateBoxes;
-					WriteLog("TweaksV", "Showing a problem after the start-up summary (" + std::to_string(items.size()) +
-						" problem(s)).");
-					ShowBox(L"TweaksV: a part stopped working after the start-up:", items, 0);
+					Sleep(1000);
+					std::vector<std::string> items;
+					{
+						ExclusiveLock lock(g_lock);
+						items.swap(g_late);
+						if (items.empty())
+							g_lateThread = false;	// under the lock, so a new problem starts a new thread
+					}
+					if (items.empty())
+						break;
+
+					if (!IsOn(kErrorPopup))
+						WriteLog("TweaksV", "Problem after the start-up summary not shown (ERROR_POPUP=0): " +
+							std::to_string(items.size()) + " problem(s), see above.");
+					else if (g_lateBoxes >= kMaxLateBoxes)
+						WriteLog("TweaksV", "Problem after the start-up summary not shown: " + std::to_string(kMaxLateBoxes) +
+							" message boxes were shown already this session.");
+					else
+					{
+						++g_lateBoxes;
+						WriteLog("TweaksV", "Showing a problem after the start-up summary (" + std::to_string(items.size()) +
+							" problem(s)).");
+						ShowBox(L"TweaksV: a part stopped working after the start-up:", items, 0);
+					}
 				}
+			}
+			catch (...)
+			{
+				try
+				{
+					WriteLog("TweaksV", "Unexpected exception while showing a problem after the start-up summary - the box "
+						"is not shown; the problem is logged above.");
+				}
+				catch (...)
+				{
+				}
+				ExclusiveLock lock(g_lock);
+				g_lateThread = false;	// the next problem starts a new thread
 			}
 			FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
 		}
@@ -118,40 +152,46 @@ namespace TweaksV
 	{
 		WriteLog(plugin, "PROBLEM: " + what);
 
+		const std::string item = std::string("[") + plugin + "] " + what;	// built outside the lock: it can throw
 		bool startLate = false;
-		AcquireSRWLockExclusive(&g_lock);
-		if (InterlockedCompareExchange(&g_shown, 0, 0) == 0)	// the start-up summary is still to come
 		{
-			if (g_items.size() < kMaxItems)
-				g_items.push_back(std::string("[") + plugin + "] " + what);
-			else
-				++g_dropped;
+			ExclusiveLock lock(g_lock);
+			if (InterlockedCompareExchange(&g_shown, 0, 0) == 0)	// the start-up summary is still to come
+			{
+				if (g_items.size() < kMaxItems)
+					g_items.push_back(item);
+				else
+					++g_dropped;
+			}
+			else if (g_late.size() < kMaxItems)
+			{
+				g_late.push_back(item);
+				startLate = !g_lateThread;
+				g_lateThread = true;
+			}
 		}
-		else if (g_late.size() < kMaxItems)
-		{
-			g_late.push_back(std::string("[") + plugin + "] " + what);
-			startLate = !g_lateThread;
-			g_lateThread = true;
-		}
-		ReleaseSRWLockExclusive(&g_lock);
 
 		if (startLate && !StartModuleThread(LateThread, "problem after the start-up summary"))
 		{
-			AcquireSRWLockExclusive(&g_lock);
+			ExclusiveLock lock(g_lock);
 			g_lateThread = false;
-			ReleaseSRWLockExclusive(&g_lock);
 		}
 	}
 
 	void ShowStartupSummary()
 	{
 		// From here on, a reported problem is shown on its own (LateThread): the list is taken under
-		// the same lock ReportFailure adds to it with, so no problem is lost in between.
-		AcquireSRWLockExclusive(&g_lock);
-		const bool first = InterlockedExchange(&g_shown, 1) == 0;
-		const std::vector<std::string> items = g_items;
-		const size_t dropped = g_dropped;
-		ReleaseSRWLockExclusive(&g_lock);
+		// the same lock ReportFailure adds to it with, so no problem is lost in between. Taken by a
+		// swap, which cannot throw under the lock; the list is not needed again.
+		std::vector<std::string> items;
+		size_t dropped = 0;
+		bool first = false;
+		{
+			ExclusiveLock lock(g_lock);
+			first = InterlockedExchange(&g_shown, 1) == 0;
+			items.swap(g_items);
+			dropped = g_dropped;
+		}
 
 		if (!first || items.empty())
 			return;

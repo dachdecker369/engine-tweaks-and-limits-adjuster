@@ -694,19 +694,26 @@ namespace TweaksV
 		{
 			if (!g_started.load(std::memory_order_relaxed) && !g_started.exchange(true))
 			{
+				// nothing may leave this hook: it runs on one of the game's threads
 				try
 				{
-					StartUp();
+					try
+					{
+						StartUp();
+					}
+					catch (...)
+					{
+						ReportFailure(kTag, "Unexpected exception during the start-up - the rest of RageOpenV is skipped this session.");
+					}
+					// one start-up summary for what DllMain and this start-up found - from a worker thread,
+					// because this hook must not hold up the game's thread
+					ShowStartupSummaryLater();
+					// the hook's one job is done: the game's later calls go straight to Windows again
+					DisableHook(g_timeFunction, kTag);
 				}
 				catch (...)
 				{
-					ReportFailure(kTag, "Unexpected exception during the start-up - the rest of RageOpenV is skipped this session.");
 				}
-				// one start-up summary for what DllMain and this start-up found - from a worker thread,
-				// because this hook must not hold up the game's thread
-				ShowStartupSummaryLater();
-				// the hook's one job is done: the game's later calls go straight to Windows again
-				DisableHook(g_timeFunction, kTag);
 			}
 			g_originalGetSystemTimeAsFileTime(time);
 		}

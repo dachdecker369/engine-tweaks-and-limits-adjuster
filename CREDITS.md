@@ -1,15 +1,17 @@
 # Credits
 
-TweaksV's parts are rewritten from the projects below; the research and the original code are theirs. All credit for them goes to their authors.
+TweaksV's parts are rewritten from the projects below; the research and the original code are theirs, and what little of their code TweaksV still carries is named in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). All credit for them goes to their authors.
 
 ## Chiheb-Bacha - https://github.com/Chiheb-Bacha
 
-- [HeapAdjusterEnhanced](https://github.com/Chiheb-Bacha/HeapAdjusterEnhanced)
-- [ModkitLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced)
-- [PackfileLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/PackfileLimitAdjusterEnhanced)
-- [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV)
-- [StraightToStoryMode](https://github.com/Chiheb-Bacha/StraightToStoryMode)
-- [ScriptHookVDotNetEnhanced](https://github.com/Chiheb-Bacha/ScriptHookVDotNetEnhanced) origin of the C++ memory scanner port
+The five plugins TweaksV 1.x merged and 2.0.0 rewrote as its own parts, each taken from its main branch as it was when TweaksV merged it (the copies held no git data, so no commit is known). When a pattern stops matching after a game update, these projects are where it came from and worth a look ([PATTERNS.md](PATTERNS.md), "When Game Updates").
+
+- [HeapAdjusterEnhanced](https://github.com/Chiheb-Bacha/HeapAdjusterEnhanced) - the HeapAdjuster part
+- [ModkitLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced) - the ModkitLimit part
+- [PackfileLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/PackfileLimitAdjusterEnhanced) - the PackfileLimit part
+- [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV) - the RageOpenV part; its newmods folder was never carried over
+- [StraightToStoryMode](https://github.com/Chiheb-Bacha/StraightToStoryMode) - the StraightToStoryMode part
+- [ScriptHookVDotNetEnhanced](https://github.com/Chiheb-Bacha/ScriptHookVDotNetEnhanced) - the C++ port of ScriptHookVDotNet's `MemScanner.cs` that those plugins carried, altered into the scanner's pattern parser
 
 ## The work those plugins build on
 
@@ -31,6 +33,6 @@ TweaksV's parts are rewritten from the projects below; the research and the orig
 
 ## Libraries and tools
 
-- **Tsuda Kageyu** - MinHook - https://github.com/TsudaKageyu/minhook
+- **Tsuda Kageyu** - MinHook, 1.3.4 unchanged in `vendor\MinHook` - https://github.com/TsudaKageyu/minhook
 - **Alexander Blade** - Script Hook V, whose ASI loader file (`xinput1_4.dll`) loads TweaksV. It is not bundled, and TweaksV does not use Script Hook V itself. - http://www.dev-c.com/gtav/scripthookv/
 - **ThirteenAG** - Ultimate ASI Loader, an alternative loader (not bundled) - https://github.com/ThirteenAG/Ultimate-ASI-Loader

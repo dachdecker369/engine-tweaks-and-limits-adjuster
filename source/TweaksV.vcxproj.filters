@@ -117,6 +117,9 @@
     <ClInclude Include="TweaksVIni.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <ClInclude Include="TweaksVLock.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVLog.h">
       <Filter>TweaksV</Filter>
     </ClInclude>

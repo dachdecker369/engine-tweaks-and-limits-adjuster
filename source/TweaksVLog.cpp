@@ -17,6 +17,7 @@
 #include "TweaksVFiles.h"
 #include "TweaksVGame.h"
 #include "TweaksVIni.h"
+#include "TweaksVLock.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
 
@@ -224,7 +225,7 @@ namespace TweaksV
 	{
 		const std::string line = FormatLine(tag, text);
 
-		AcquireSRWLockExclusive(&g_lock);
+		ExclusiveLock lock(g_lock);
 		if (!g_started)
 		{
 			if (g_pending.size() < kMaxPending)
@@ -234,7 +235,6 @@ namespace TweaksV
 		{
 			WriteLineLocked(line);
 		}
-		ReleaseSRWLockExclusive(&g_lock);
 	}
 
 	void ClearLogFile()
@@ -248,53 +248,54 @@ namespace TweaksV
 		const unsigned long testLimitKb = testLimit.empty() ? 0 : strtoul(testLimit.c_str(), nullptr, 10);
 #endif
 
-		AcquireSRWLockExclusive(&g_lock);
-		g_toFile = toFile;
-		if (g_file != INVALID_HANDLE_VALUE)
-		{
-			CloseHandle(g_file);
-			g_file = INVALID_HANDLE_VALUE;
-		}
-		g_path.clear();
-		g_logBytes = 0;
-		g_logFull = false;
-#ifdef TWEAKSV_TEST_BUILD
-		if (testLimitKb >= 1 && testLimitKb <= 65536)
-			g_logLimit = static_cast<uint64_t>(testLimitKb) * 1024;
-#endif
-
 		// Only a TweaksV.log that is what its path says is written (TweaksVFiles.h): first in the game
 		// folder, else - the game folder read-only, a link there, the file in use - in %LOCALAPPDATA%\TweaksV.
 		OwnFile primary{}, fallback{};
 		std::wstring fallbackPath;
-		if (g_toFile)
+		bool usingFallback = false, noFile = false;
 		{
-			primary = OpenOwnFile(GetGameFolder(), L"TweaksV.log", FileFolder::Game, OPEN_ALWAYS, true);
-			if (primary.handle != INVALID_HANDLE_VALUE)
+			ExclusiveLock lock(g_lock);
+			g_toFile = toFile;
+			if (g_file != INVALID_HANDLE_VALUE)
 			{
-				g_file = primary.handle;
-				g_path = primaryPath;
+				CloseHandle(g_file);
+				g_file = INVALID_HANDLE_VALUE;
 			}
-			else
+			g_path.clear();
+			g_logBytes = 0;
+			g_logFull = false;
+#ifdef TWEAKSV_TEST_BUILD
+			if (testLimitKb >= 1 && testLimitKb <= 65536)
+				g_logLimit = static_cast<uint64_t>(testLimitKb) * 1024;
+#endif
+			if (g_toFile)
 			{
-				const std::wstring folder = GetFallbackFolder();
-				if (!folder.empty())
+				primary = OpenOwnFile(GetGameFolder(), L"TweaksV.log", FileFolder::Game, OPEN_ALWAYS, true);
+				if (primary.handle != INVALID_HANDLE_VALUE)
 				{
-					CreateDirectoryW(folder.c_str(), nullptr);
-					fallbackPath = folder + L"\\TweaksV.log";
-					fallback = OpenOwnFile(folder, L"TweaksV.log", FileFolder::Own, OPEN_ALWAYS, true);
-					if (fallback.handle != INVALID_HANDLE_VALUE)
+					g_file = primary.handle;
+					g_path = primaryPath;
+				}
+				else
+				{
+					const std::wstring folder = GetFallbackFolder();
+					if (!folder.empty())
 					{
-						g_file = fallback.handle;
-						g_path = fallbackPath;
+						CreateDirectoryW(folder.c_str(), nullptr);
+						fallbackPath = folder + L"\\TweaksV.log";
+						fallback = OpenOwnFile(folder, L"TweaksV.log", FileFolder::Own, OPEN_ALWAYS, true);
+						if (fallback.handle != INVALID_HANDLE_VALUE)
+						{
+							g_file = fallback.handle;
+							g_path = fallbackPath;
+						}
 					}
 				}
 			}
+			g_cleared = true;
+			usingFallback = g_toFile && !fallbackPath.empty() && g_path == fallbackPath;
+			noFile = g_toFile && g_file == INVALID_HANDLE_VALUE;
 		}
-		g_cleared = true;
-		const bool usingFallback = g_toFile && !fallbackPath.empty() && g_path == fallbackPath;
-		const bool noFile = g_toFile && g_file == INVALID_HANDLE_VALUE;
-		ReleaseSRWLockExclusive(&g_lock);
 
 		// Written after releasing the lock: WriteLog and ReportFailure take it. A read-only game folder
 		// is normal (e.g. under C:\Program Files), so that fallback is only logged; any other reason - a
@@ -327,7 +328,7 @@ namespace TweaksV
 		for (std::string& line : DescribeSettings())	// which parts are on, then every setting's value
 			header.push_back(std::move(line));
 
-		AcquireSRWLockExclusive(&g_lock);
+		ExclusiveLock lock(g_lock);
 		for (const auto& line : header)
 			WriteLineLocked(FormatLine("TweaksV", line));
 		for (const auto& line : g_pending)
@@ -335,7 +336,6 @@ namespace TweaksV
 		g_pending.clear();
 		g_pending.shrink_to_fit();
 		g_started = true;
-		ReleaseSRWLockExclusive(&g_lock);
 	}
 
 	void CloseLog()
@@ -368,19 +368,23 @@ namespace TweaksV
 		freopen_s(&unused, "CONOUT$", "w", stderr);
 		SetConsoleTitleW(L"TweaksV");
 
-		AcquireSRWLockExclusive(&g_lock);
-		g_console = true;
-		ReleaseSRWLockExclusive(&g_lock);
+		{
+			ExclusiveLock lock(g_lock);
+			g_console = true;
+		}
 		WriteLog("TweaksV", "Console opened (CONSOLE=1).");
 	}
 
 	std::wstring GetLogPathW()
 	{
-		AcquireSRWLockShared(&g_lock);
-		std::wstring path = g_path;
-		const bool cleared = g_cleared;
-		const bool toFile = g_toFile;
-		ReleaseSRWLockShared(&g_lock);
+		std::wstring path;
+		bool cleared = false, toFile = false;
+		{
+			SharedLock lock(g_lock);
+			path = g_path;
+			cleared = g_cleared;
+			toFile = g_toFile;
+		}
 		if (!cleared)
 			return GetGameFolder() + L"\\TweaksV.log";
 		return toFile ? path : std::wstring(L"(off - LOG=0)");

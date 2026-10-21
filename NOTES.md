@@ -1,6 +1,6 @@
 # Notes
 
-What each part does and the checks it makes, the measurements, the open issues and the bugs found in the projects the parts derive from. The design - every module, every format, every line of the log - is in [SPECIFICATIONS.md](SPECIFICATIONS.md), the game facts are in [PATTERNS.md](PATTERNS.md), the player's guide is [README.md](README.md), the credits in [CREDITS.md](CREDITS.md) and the derivations in [UPSTREAM.md](UPSTREAM.md). Every part is TweaksV's own code since 2.0.0; the parts that follow another project's idea use none of its code.
+What each part does and the checks it makes, the measurements, the open issues and the bugs found in the projects the parts derive from. The design - every module, every format, every line of the log - is in [SPECIFICATIONS.md](SPECIFICATIONS.md), the game facts are in [PATTERNS.md](PATTERNS.md), the player's guide is [README.md](README.md), the credits and derivations in [CREDITS.md](CREDITS.md). Every part is TweaksV's own code since 2.0.0; the parts that follow another project's idea use none of its code.
 
 - **Rules every part follows:** everything is found and checked before anything is written; a job's writes are all or nothing; what another mod has already changed is left alone; every job not done is a problem in the start-up summary, with the reason in the log; every value read from the game or the INI is bounded; nothing throws into the game; `DRY_RUN` and `DIAGNOSTIC_MODE` work the same for every part.
 
@@ -123,12 +123,6 @@ Known bugs and open issues in TweaksV.
 - **What:** MinHook, the hook library, keeps the trampolines of TweaksV's hooks in memory that is writable and executable at once. That only helps an attack that can already write to the game's memory. The rest of the code review's hardening is done: links, the user name and the size limit of `TweaksV.log`, problems after the start-up summary, the exploit mitigations.
 - **Status:** accepted. It is MinHook's own design, and `vendor\MinHook` stays unchanged; TweaksV's own stubs are never writable and executable at once.
 - **When it goes:** when MinHook keeps its trampolines read and execute only, or TweaksV moves to a hook library that does.
-
-### T-TRY: the two summary threads have no try
-
-- **What:** the thread that shows the start-up summary and the one that shows a late problem build their strings and show their box without a `try`; every hook and every measurement thread puts what can throw inside one. An exception there - only memory exhaustion while building a short string could raise one - would end the game instead of one message box.
-- **Status:** open; found while writing SPECIFICATIONS.md.
-- **When it goes:** with the next code change: the two thread bodies wrapped the way the measurement threads' are.
 
 ## Bugs Found in the Originals
 
