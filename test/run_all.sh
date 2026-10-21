@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
 # Builds TweaksV (Release and the test build) and the fake game programs, runs every suite, and
 # deletes what the run made (object\TestRun and object\Test). From Git Bash, in the repository:
 #   bash test/run_all.sh [--no-build] [--keep]

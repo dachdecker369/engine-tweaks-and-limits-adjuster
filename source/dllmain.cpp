@@ -37,8 +37,10 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 			// TweaksV.asi now stays loaded until the game exits: RageOpenV's and Packfile's hooks
 			// point into it, so an early FreeLibrary would crash the game at the next hooked call.
 			HMODULE self = nullptr;
-			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
-				reinterpret_cast<LPCWSTR>(&DllMain), &self);
+			if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+				reinterpret_cast<LPCWSTR>(&DllMain), &self))
+				TweaksV::ReportFailure("TweaksV", "TweaksV.asi could not be pinned in memory (" + TweaksV::DescribeError(GetLastError()) +
+					"): an ASI loader that unloads it later would crash the game.");
 			TweaksV::ClearLogFile();												// 5. once, for TweaksV.log
 			TweaksV::WriteLogHeader();
 			if (TweaksV::IsOn(TweaksV::kConsole))					// 6.

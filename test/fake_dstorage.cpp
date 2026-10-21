@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // Test harness for TweaksV: a stand-in for DirectStorage's dstorage.dll with its four exports. The
 // fake game (option "dstorage") loads it before TweaksV, as the real game imports it, and calls it
 // after TweaksV has started. The factory has an 8-entry function table, as IDStorageFactory has:

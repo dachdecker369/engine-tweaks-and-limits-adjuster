@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "TweaksVIni.h"
+#include "TweaksVLock.h"
 #include "TweaksVLog.h"
 #include "TweaksVPatch.h"
 #include "TweaksVSettings.h"
@@ -110,12 +111,12 @@ namespace TweaksV
 				return {};
 			base = reinterpret_cast<uintptr_t>(module);
 
-			AcquireSRWLockShared(&g_moduleLock);
-			const auto known = g_moduleNames.find(base);
-			std::string name = known != g_moduleNames.end() ? known->second : std::string();
-			ReleaseSRWLockShared(&g_moduleLock);
-			if (!name.empty())
-				return name;
+			{
+				SharedLock lock(g_moduleLock);
+				const auto known = g_moduleNames.find(base);
+				if (known != g_moduleNames.end())
+					return known->second;
+			}
 
 			wchar_t path[MAX_PATH]{};
 			const DWORD length = GetModuleFileNameW(module, path, MAX_PATH);
@@ -123,11 +124,12 @@ namespace TweaksV
 			const size_t slash = file.find_last_of(L"\\/");
 			if (slash != std::wstring_view::npos)
 				file.remove_prefix(slash + 1);
-			name = file.empty() ? std::string("?") : ToUtf8(file);
+			const std::string name = file.empty() ? std::string("?") : ToUtf8(file);
 
-			AcquireSRWLockExclusive(&g_moduleLock);
-			g_moduleNames.emplace(base, name);
-			ReleaseSRWLockExclusive(&g_moduleLock);
+			{
+				ExclusiveLock lock(g_moduleLock);
+				g_moduleNames.emplace(base, name);
+			}
 			return name;
 		}
 
@@ -438,12 +440,14 @@ namespace TweaksV
 
 			const std::wstring lower = Lower(relative);
 			const std::wstring way = lower + L"|" + FromUtf8(caller) + L"|" + std::to_wstring(share & 7);
-			AcquireSRWLockExclusive(&g_statsLock);
-			const int seen = ++g_ways[way];
-			g_paths.insert(lower);
-			++g_byCaller[caller];
-			++g_byType[TypeOf(lower, folder)];
-			ReleaseSRWLockExclusive(&g_statsLock);
+			int seen = 0;
+			{
+				ExclusiveLock lock(g_statsLock);
+				seen = ++g_ways[way];
+				g_paths.insert(lower);
+				++g_byCaller[caller];
+				++g_byType[TypeOf(lower, folder)];
+			}
 
 			if (seen > kLinesPerWay)
 			{
@@ -470,11 +474,15 @@ namespace TweaksV
 
 		void LogSummary()
 		{
-			AcquireSRWLockShared(&g_statsLock);
-			const size_t paths = g_paths.size();
-			std::vector<std::pair<std::string, uint64_t>> callers(g_byCaller.begin(), g_byCaller.end());
-			std::vector<std::pair<std::wstring, uint64_t>> types(g_byType.begin(), g_byType.end());
-			ReleaseSRWLockShared(&g_statsLock);
+			size_t paths = 0;
+			std::vector<std::pair<std::string, uint64_t>> callers;
+			std::vector<std::pair<std::wstring, uint64_t>> types;
+			{
+				SharedLock lock(g_statsLock);
+				paths = g_paths.size();
+				callers.assign(g_byCaller.begin(), g_byCaller.end());
+				types.assign(g_byType.begin(), g_byType.end());
+			}
 
 			const auto byCount = [](const auto& a, const auto& b) { return a.second > b.second; };
 			std::sort(callers.begin(), callers.end(), byCount);
@@ -561,15 +569,6 @@ namespace TweaksV
 		std::atomic<uint64_t> g_unreadable{ 0 };		// paths that could not be read: passed on unchecked
 		std::atomic<bool> g_openFileSummaryDone{ false };
 
-		struct ExclusiveLock
-		{
-			SRWLOCK& lock;
-			explicit ExclusiveLock(SRWLOCK& l) : lock(l) { AcquireSRWLockExclusive(&lock); }
-			~ExclusiveLock() { ReleaseSRWLockExclusive(&lock); }
-			ExclusiveLock(const ExclusiveLock&) = delete;
-			ExclusiveLock& operator=(const ExclusiveLock&) = delete;
-		};
-
 		// True for a path that ends in .rpf or .cache, in any case: the files DirectStorage reads.
 		bool IsArchive(std::wstring_view path)
 		{
@@ -610,6 +609,8 @@ namespace TweaksV
 		// path made absolute from the current directory, as DirectStorage does. Empty if that fails.
 		std::wstring FullOpenFilePath(std::wstring_view path)
 		{
+			if (path.substr(0, 8) == L"\\\\?\\UNC\\")	// a network path: absolute, as \\server\share\...
+				return L"\\\\" + std::wstring(path.substr(8));
 			if (path.substr(0, 4) == L"\\\\?\\")
 				path.remove_prefix(4);
 			const bool absolute = (path.size() >= 3 && path[1] == L':' && path[2] == L'\\') || path.substr(0, 2) == L"\\\\";

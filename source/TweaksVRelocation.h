@@ -163,8 +163,8 @@ namespace TweaksV
 	bool FindRelocation(const RelocationSpec& spec, RelocationPlan& plan);
 
 	// DRY_RUN: logs what would change (with also, the part's own addition to the line) and returns true.
-	// Otherwise allocates the new array - the full maxEntries, read/write, near the game, zeroed - and
-	// writes every reference (its rel32 recomputed, with the distance check) and every limit (re-encoded
+	// Otherwise allocates the new array - the full maxEntries, read/write, near the game, the game's own
+	// entries copied in and the rest zero - and writes every reference (its rel32 recomputed, with the distance check) and every limit (re-encoded
 	// for plan.size), together with the part's own writes and redirected calls, all or nothing; then logs
 	// "The <name> moved and its limit raised from A to B entries." False, reported, if nothing was written.
 	bool ApplyRelocation(const RelocationSpec& spec, const RelocationPlan& plan, std::vector<CodeWrite> alsoWrite,

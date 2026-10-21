@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
 # The pattern table: source\TweaksVPatterns.h and PATTERNS.md list the same patterns - the same labels
 # with the same bytes - and the code uses every pattern of the table exactly once. Needs no fake game.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"

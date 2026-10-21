@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // Version resource for the fake game: the game build it pretends to be (rc /dVER_C=... /dVER_D=...).
 #include <winver.h>
 #ifndef VER_C

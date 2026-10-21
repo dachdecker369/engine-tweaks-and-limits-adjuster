@@ -1,4 +1,5 @@
 @echo off
+rem SPDX-License-Identifier: GPL-3.0-only
 rem Builds the test programs into %OUT_DIR%: the plain fake game and the full fake game, the
 rem latter once per game build it pretends to be (version resource) and once without a version.
 call "%~dp0vsenv.cmd" || exit /b 1

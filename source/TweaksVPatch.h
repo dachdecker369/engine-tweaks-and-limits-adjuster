@@ -42,7 +42,8 @@ namespace TweaksV
 
 	// Writes every write, or none. Every page a write touches is made writable first (a page that is
 	// writable already is left alone, and a page that cannot be changed stops everything); then all are
-	// written, every page gets its own protection back and the instruction cache is flushed. False if
+	// written, every page gets its own protection back - on an exception too, through a guard; nothing
+	// that can throw runs while a page is writable - and the instruction cache is flushed. False if
 	// nothing could be written - logged under tag.
 	// DRY_RUN: nothing is written; "DRY_RUN: would patch the <what>: <old> -> <new>" is logged for each.
 	// DIAGNOSTIC_MODE: "DIAGNOSTIC: <what> at <address>: <old> -> <new>" is logged for each write.
@@ -77,8 +78,8 @@ namespace TweaksV
 	bool StartsWithJump(const void* address);
 
 	// True if address is where a function starts: the game's unwind data says so, or - for code
-	// without unwind data - the byte before it is padding or a ret (CC, 90, C3). detail says which,
-	// for the log.
+	// without unwind data - the byte before it, read only where it is readable, is padding or a ret
+	// (CC, 90, C3). detail says which, for the log.
 	bool IsFunctionStart(const void* address, std::string& detail);
 
 	// True if the size bytes at address are committed memory that can be read. A site that lies before or

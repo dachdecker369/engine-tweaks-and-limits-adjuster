@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
 # RageOpenV scenarios: a fake GTA5_Enhanced.exe with copies of the code RageOpenV patches
 # (the hooked functions are real code, so the hooks are called end to end) loads the real
 # TweaksV.asi and then asks for the time once, as the game does. Fake LOCALAPPDATA: the real one
@@ -47,12 +48,22 @@ check "logged, no problem" "log_has 'No mods folder in the current directory - t
 fresh_ini; setkey DIAGNOSTIC_MODE 1; mv mods mods_off; out=$(game full_game.exe); mv mods_off mods
 check "DIAGNOSTIC_MODE without a mods folder: the 8 patterns are still checked, nothing hooked" "has 'file hooks 0/8' && [ \$(count 'RageOpenV\] DIAGNOSTIC: \(OpenBulk\|GetFileTime\|GetFileSize\|GetAttributes\) [12] at') -eq 8 ] && log_has 'the patterns were checked (DIAGNOSTIC_MODE), the file functions are not hooked'"
 
-echo "== R4b crafted mods folders: deeper than the limit, a name outside ASCII"
-fresh_ini; deep=mods/deep; for i in $(seq 1 33); do deep="$deep/d"; done; mkdir -p "$deep"; touch "mods/test/ファイル.txt"
+echo "== R4b crafted mods folders: deeper than the limit; a name outside ASCII"
+fresh_ini; deep=mods/deep; for i in $(seq 1 33); do deep="$deep/d"; done; mkdir -p "$deep"
 out=$(game full_game.exe)
 check "too deep: reported, the rest of the folder still used" "log_has 'PROBLEM: Only part of the mods folder is used' && has '$FILES_OK'"
-check "a name outside ASCII does not break the lookup" "has 'spellings ok, folder ok, outside ok'"
-rm -rf mods/deep "mods/test/ファイル.txt"
+rm -rf mods/deep
+# The name is listed where the ANSI code page can hold it (UTF-8, 65001) and left out, counted in the log,
+# where it cannot (1252 and the other single-byte pages); the lookup works either way.
+acp=$(MSYS_NO_PATHCONV=1 reg query 'HKLM\SYSTEM\CurrentControlSet\Control\Nls\CodePage' /v ACP 2>/dev/null | tr -d '\r' | sed -nE 's/.*ACP\s+REG_SZ\s+([0-9]+).*/\1/p')
+fresh_ini; touch "mods/test/ファイル.txt"; out=$(game full_game.exe)
+if [ "$acp" = 65001 ]; then
+	check "a name outside ASCII on the UTF-8 code page: listed, nothing left out" "log_has 'The mods folder has 3 files and folders.' && ! log_has 'left out of the list'"
+else
+	check "a name outside ASCII on code page ${acp:-?}: left out and counted, the rest listed" "log_has 'The mods folder has 2 files and folders.' && log_has 'Names in the mods folder left out of the list: 1 - the game asks with paths in the ANSI code page (${acp:-[0-9]*}), which cannot hold them'"
+fi
+check "the lookup still works with the name there" "has 'spellings ok, folder ok, outside ok' && has '$FILES_OK'"
+rm -f "mods/test/ファイル.txt"
 
 echo "== R5 DRY_RUN=1: the time hook is installed so the checks run at their moment; nothing else written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"

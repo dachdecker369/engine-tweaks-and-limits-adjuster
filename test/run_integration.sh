@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
 # TweaksV as a whole, in the fake game: old plugins present, one pattern deliberately broken per
 # plugin with the TEST build, another game exe, no C runtime DLLs, a renamed .asi, no code changes
 # allowed, the user name kept out of the log, the log's limit, links, a read-only game folder, a held log, the code dump.

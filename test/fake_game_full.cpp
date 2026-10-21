@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // Test harness for TweaksV: pretends to be GTA5_Enhanced.exe and contains copies of the game
 // code TweaksV patches: HeapAdjuster's, StraightToStoryMode's, ModkitLimit's, PackfileLimit's,
 // BoxStreamer's and Decals' here, RageOpenV's in fake_game_rov.cpp.
@@ -404,6 +405,26 @@ static void PrintModkitLimits()
 	wprintf(L" | ");
 }
 
+// "modkit copy: ok" - the new array holds the game's own 1024 entries (main puts a value in the first
+// and the last); "game array" when nothing was moved
+static void PrintModkitCopy()
+{
+	const unsigned char* first = Rel32Target(g_modkitRefs[0]);
+	if (first == reinterpret_cast<const unsigned char*>(g_oldModkitArray) || InImage(first))
+	{
+		wprintf(L"modkit copy: game array | ");
+		return;
+	}
+	MEMORY_BASIC_INFORMATION info{};
+	if (VirtualQuery(first, &info, sizeof(info)) != sizeof(info) || info.State != MEM_COMMIT ||
+		static_cast<const unsigned char*>(info.BaseAddress) + info.RegionSize < first + sizeof(g_oldModkitArray))
+	{
+		wprintf(L"modkit copy: unreadable | ");
+		return;
+	}
+	wprintf(L"modkit copy: %ls | ", memcmp(first, g_oldModkitArray, sizeof(g_oldModkitArray)) == 0 ? L"ok" : L"MISSING");
+}
+
 // "pack refs: 30 new, R31a new, R31b game (RW, 512 KB)" - "new" is the common target of the
 // first reference when that is outside the game
 static void PrintPackfile(int argc, wchar_t** argv);
@@ -694,7 +715,8 @@ static void CheckStub(const unsigned char* callTarget)
 }
 
 // DirectStorage (TweaksV's UNLOCK_FILES and DIAGNOSTIC_MODE): the calls the game makes into dstorage.dll,
-// and the factory's OpenFile for 3 archives (one with a full path) and 3 other files.
+// and the factory's OpenFile for 3 archives (one with a full path), 3 other files in the game folder and
+// 3 paths outside it.
 static wchar_t g_dstorageResult[400];
 static void CallDStorage(HMODULE dstorage, bool otherInterfaceFirst)
 {
@@ -732,24 +754,25 @@ static void CallDStorage(HMODULE dstorage, bool otherInterfaceFirst)
 	wchar_t absolute[MAX_PATH + 32] = {};
 	GetCurrentDirectoryW(MAX_PATH, absolute);
 	wcscat_s(absolute, L"\\update\\update.RPF");
-	// outside the game folder, like the game's saves (Documents\...\Profiles\...\SGTA50000) and its
-	// cloud files in %TEMP%: these must always reach DirectStorage
+	// outside the game folder, like the game's saves (Documents\...\Profiles\...\SGTA50000), its
+	// cloud files in %TEMP% and a network path in its \\?\UNC\ form: these must always reach DirectStorage
 	wchar_t save[MAX_PATH + 64] = {};
 	wchar_t temp[MAX_PATH + 64] = {};
 	GetTempPathW(MAX_PATH, save);
 	wcscpy_s(temp, save);
 	wcscat_s(save, L"tweaksv_profile\\SGTA50000");
 	wcscat_s(temp, L"cloud_tweaksv.dat");
-	const wchar_t* paths[8] = { L"x64a.rpf", absolute, L"rpf.cache", L"locktest.txt", L"TweaksV.asi", L"noextension", save, temp };
-	unsigned long results[8];
-	for (int i = 0; i < 8; i++)
+	const wchar_t* paths[9] = { L"x64a.rpf", absolute, L"rpf.cache", L"locktest.txt", L"TweaksV.asi", L"noextension", save, temp,
+		L"\\\\?\\UNC\\localhost\\tweaksv_share\\cloud.dat" };
+	unsigned long results[9];
+	for (int i = 0; i < 9; i++)
 	{
 		void* file = nullptr;
 		results[i] = static_cast<unsigned long>(openFile(factory, paths[i], factoryId, &file));
 	}
 	swprintf(g_dstorageResult + length, 400 - length, L"open: rpf 0x%lX, RPF 0x%lX, cache 0x%lX, txt 0x%lX, asi 0x%lX, "
-		L"none 0x%lX, save 0x%lX, temp 0x%lX, reached %ld | ", results[0], results[1], results[2], results[3], results[4],
-		results[5], results[6], results[7], openFileCalls());
+		L"none 0x%lX, save 0x%lX, temp 0x%lX, unc 0x%lX, reached %ld | ", results[0], results[1], results[2], results[3], results[4],
+		results[5], results[6], results[7], results[8], openFileCalls());
 }
 
 // File opens in the game folder (TweaksV's DIAGNOSTIC_MODE): one file 6 times with the same sharing,
@@ -825,6 +848,11 @@ int wmain(int argc, wchar_t** argv)
 		const Site heap = SITE(g_heapSite, 1);
 		SetImm32(heap, 2000u << 20);
 	}
+
+	// The game's own modkit array holds something in its first and last entry, so the report can tell
+	// whether TweaksV copied the game's entries into the new array.
+	g_oldModkitArray[0] = 0x1234;
+	g_oldModkitArray[1023] = 0x5678;
 
 	// Every modkit reference points at the game's own array...
 	for (const Site& site : g_modkitRefs)
@@ -966,6 +994,7 @@ int wmain(int argc, wchar_t** argv)
 	PrintBytes("landing", g_landingCallee, 5);
 	PrintModkitRefs();
 	PrintModkitLimits();
+	PrintModkitCopy();
 	ForEachSite(CheckSite);
 	RovForEachDataSite(CheckData);
 	PrintPackfile(argc, argv);

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // RageOpenV part of the fake game: copies of the code RageOpenV patches, laid out so its patterns
 // match. The functions it hooks with MinHook (and the game functions it calls) are real code in an
 // executable section, so the hooks can be called end to end; the call sites it redirects are only

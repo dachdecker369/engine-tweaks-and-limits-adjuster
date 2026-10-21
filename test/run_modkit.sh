@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
 # ModkitLimit scenarios (TweaksVModkitLimit): a fake GTA5_Enhanced.exe with copies of the patched game
 # code loads the real TweaksV.asi. Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
@@ -14,6 +15,7 @@ echo "== K1 defaults: array moved, limits raised to 65536, the other plugins sti
 fresh_ini; out=$(game full_game.exe); echo "      $out"
 check "all six references -> one new 128 KB read/write array outside the game" "[[ \"\$out\" == *\"$NEW_ARRAY\"* ]]"
 check "limits written for 65536 (size-1, size+3, size*2)" "[[ \"\$out\" == *\"$MAX_LIMITS\"* ]]"
+check "the game's own entries are copied into the new array" "has 'modkit copy: ok'"
 check "status line" "log_has 'The modkit array moved and its limit raised from 1024 to 65536 entries.'"
 check "heap and story mode still applied" "[[ \"\$out\" == *'heap: 1024 MB'* && \"\$out\" == *'splash: E9 86 01 00 00 90'* ]]"
 check "no problems" "! log_has 'PROBLEM'"

@@ -258,13 +258,21 @@ namespace TweaksV
 		}
 
 		// the new array: always the full maxEntries, read/write data near the game (a lea reaches +-2 GB),
-		// zeroed by Windows
+		// the game's own entries copied into it - whatever the image holds there - and the rest zero, as
+		// Windows gives it
+		const size_t gameBytes = static_cast<size_t>(plan.gameSize) * spec.entrySize;
+		if (!IsReadable(plan.array, gameBytes))
+		{
+			RelocationFailed(spec, "the game's own " + name + " cannot be read.");
+			return false;
+		}
 		uint8_t* const newArray = static_cast<uint8_t*>(AllocateNearGame(spec.entrySize * spec.maxEntries));
 		if (!newArray)
 		{
 			RelocationFailed(spec, "the new " + name + " could not be allocated near the game.");
 			return false;
 		}
+		memcpy(newArray, plan.array, gameBytes);
 
 		// one write, all or nothing: every reference to the new array, every limit to the new size, the
 		// part's own writes, and the redirected calls if it has any

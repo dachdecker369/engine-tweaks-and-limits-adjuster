@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
 # The default TweaksV.ini: a first start without a TweaksV.ini creates exactly the default text
 # (expected_default.ini) and uses its defaults; a deleted key comes back with its default; crafted
 # values are reported and clamped. A file without VERSION under [TWEAKSV] has the layout of TweaksV 1.x

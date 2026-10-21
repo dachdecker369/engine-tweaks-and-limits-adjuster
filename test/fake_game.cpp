@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // Test harness: pretends to be the game and loads an .asi the way an ASI loader does.
 // Usage: GTA5_Enhanced.exe [path\to\TweaksV.asi] [unload]
 #include <windows.h>

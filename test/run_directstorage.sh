@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
 # DirectStorage (TweaksVDirectStorage) scenarios: the fake GTA5_Enhanced.exe loads the real
 # TweaksV.asi. With "dstorage" it loads a stand-in dstorage.dll first and calls it afterwards,
-# including the factory's OpenFile for 3 archives and 3 other files in its folder and for a save and
-# a temp file outside it; with "fileopens" it opens files in its folder; with "wait" it stays 11 s
-# longer. Fake LOCALAPPDATA: the real one is never touched.
+# including the factory's OpenFile for 3 archives and 3 other files in its folder and for a save, a
+# temp file and a network path outside it; with "fileopens" it opens files in its folder; with "wait"
+# it stays 11 s longer. Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" .
@@ -11,16 +12,16 @@ mkdir -p appdata
 rm -f DirectStorageFix.asi	# an old plugin another suite may have left
 
 FACTORY='the game asked for the DirectStorage factory (call #1, interface {6924EA0C-C3CD-4826-B10A-F64F4ED927C1}) -> ok, from RVA 0x'
-# the 8 OpenFile results: 3 archives, 3 other files in the game folder, a save and a temp file outside it
-UNLOCKED='open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x80070002, asi 0x80070002, none 0x80070002, save 0x0, temp 0x0, reached 5'
-ALL_OPEN='open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x0, asi 0x0, none 0x0, save 0x0, temp 0x0, reached 8'
+# the 9 OpenFile results: 3 archives, 3 other files in the game folder, a save, a temp file and a \\?\UNC\ path outside it
+UNLOCKED='open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x80070002, asi 0x80070002, none 0x80070002, save 0x0, temp 0x0, unc 0x0, reached 6'
+ALL_OPEN='open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x0, asi 0x0, none 0x0, save 0x0, temp 0x0, unc 0x0, reached 9'
 
 echo "== D1 defaults (UNLOCK_FILES=1, DIAGNOSTIC_MODE=0): in the game folder only .rpf and .cache files reach DirectStorage"
 fresh_ini; out=$(game full_game.exe dstorage fileopens); echo "      $out"
 check "header: DirectStorage on, its line holds UNLOCK_FILES=1 and nothing else" "log_has 'Features: .*, DirectStorage on' && log_line 'DirectStorage: UNLOCK_FILES=1\$'"
 check "the factory hooked, then OpenFile" "log_has 'UNLOCK_FILES: when the game creates its DirectStorage factory, OpenFile is hooked so that in the game folder only .rpf and .cache files can be opened.' && log_has 'UNLOCK_FILES: from now on DirectStorage may open only the .rpf and .cache files in the game folder (OpenFile at dstorage.dll+0x[0-9A-F]*.* hooked); files outside it are not touched.'"
 check "3 archives opened (also .RPF and a full path), 3 other files in the game folder refused as not found, never reaching DirectStorage" "has 'open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x80070002, asi 0x80070002, none 0x80070002, '"
-check "a save and a temp file outside the game folder still reach DirectStorage" "has '$UNLOCKED'"
+check "a save, a temp file and a network path outside the game folder still reach DirectStorage" "has '$UNLOCKED'"
 check "no call or open lines without DIAGNOSTIC_MODE, no problem" "! log_has 'OpenFile #' && ! log_has 'the game asked for the DirectStorage factory' && ! log_has 'open #' && ! log_has 'PROBLEM'"
 check "the game runs on" "has 'dstorage: configuration 0x0/0x0, factory 0x0 set' && has 'file opens: missing file error 2' && has 'protect: all restored'"
 
@@ -44,6 +45,7 @@ check "the factory call with its interface, from the game" "log_has '$FACTORY'"
 check "the archives ok, the first one with its caller" "log_has 'OpenFile #1: x64a.rpf -> ok, from RVA 0x' && log_has 'OpenFile #2: update.update.RPF -> ok' && log_has 'OpenFile #3: rpf.cache -> ok'"
 check "the other files in the game folder refused" "log_has 'OpenFile #4: locktest.txt -> refused (in the game folder, not .rpf or .cache)' && log_has 'OpenFile #5: TweaksV.asi -> refused' && log_has 'OpenFile #6: noextension -> refused'"
 check "the save and the temp file outside the game folder ok, with their full paths" "log_has 'OpenFile #7: .*tweaksv_profile.SGTA50000 -> ok' && log_has 'OpenFile #8: .*cloud_tweaksv.dat -> ok'"
+check "a path in the \\\\?\\UNC\\ form is the network path it names, outside the game folder: opened, not refused" "log_has 'OpenFile #9: ..localhost.tweaksv_share.cloud.dat -> ok'"
 check "unlocked as without DIAGNOSTIC_MODE" "has '$UNLOCKED'"
 check "8 functions, all in dstorage.dll" "log_has 'DIAGNOSTIC: the factory.s first 8 functions: \[0\] dstorage.dll+0x[0-9A-F]* .*\[7\] dstorage.dll+0x'"
 check "7 and 8 configuration values" "log_line 'DIAGNOSTIC: DStorageSetConfiguration values: 00000004 FFFFFFFF 00000000 00000001 00000000 00000000 00000001\$' && log_has 'DIAGNOSTIC: DStorageSetConfiguration1 values: 00000004 FFFFFFFF 00000000 00000001 00000000 00000000 00000001 00000001'"
@@ -98,9 +100,9 @@ check "unlocked" "has '$UNLOCKED'"
 
 echo "== D10 the summary 10 seconds after the first OpenFile"
 fresh_ini; out=$(game full_game.exe dstorage wait)
-check "UNLOCK_FILES=1: 8 asked, 3 archives opened, 3 refused, 2 outside opened" "log_has 'UNLOCK_FILES: in its first 10 seconds the game asked DirectStorage for 8 files: 3 .rpf and .cache files were opened, 3 other files in the game folder refused, so they stay free for other programs, 2 outside the game folder opened as usual.'"
+check "UNLOCK_FILES=1: 9 asked, 3 archives opened, 3 refused, 3 outside opened" "log_has 'UNLOCK_FILES: in its first 10 seconds the game asked DirectStorage for 9 files: 3 .rpf and .cache files were opened, 3 other files in the game folder refused, so they stay free for other programs, 3 outside the game folder opened as usual.'"
 fresh_ini; setkey UNLOCK_FILES 0 DIRECTSTORAGE; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe dstorage wait)
-check "UNLOCK_FILES=0: 8 asked, all opened" "log_has 'OpenFile: in its first 10 seconds the game asked DirectStorage for 8 files: 3 .rpf and .cache files, 3 other files in the game folder and 2 outside it (UNLOCK_FILES=0 - all of them opened).'"
+check "UNLOCK_FILES=0: 9 asked, all opened" "log_has 'OpenFile: in its first 10 seconds the game asked DirectStorage for 9 files: 3 .rpf and .cache files, 3 other files in the game folder and 3 outside it (UNLOCK_FILES=0 - all of them opened).'"
 
 echo "== D11 the game first asks for an interface TweaksV does not know: a problem after the start-up summary"
 fresh_ini; out=$(game full_game.exe dstorage dsotherinterface)

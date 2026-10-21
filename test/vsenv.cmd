@@ -1,4 +1,5 @@
 @echo off
+rem SPDX-License-Identifier: GPL-3.0-only
 rem Sets up the x64 build environment of the newest Visual Studio with the C++ tools (vswhere).
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" exit /b 1

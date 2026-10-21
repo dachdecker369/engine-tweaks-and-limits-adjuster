@@ -36,14 +36,28 @@ namespace TweaksV
 			return size;
 		}
 
-		// Puts the protection of every changed page back, newest first.
-		void Restore(const std::vector<ChangedPage>& changed)
+		// The pages a write made writable, each given its own protection back when the scope ends - on an
+		// exception too, so nothing can leave a page of the game's code writable - newest first.
+		struct ChangedPages
 		{
-			for (size_t i = changed.size(); i-- > 0;)
+			std::vector<ChangedPage> pages;
+			~ChangedPages()
 			{
-				DWORD unused = 0;
-				VirtualProtect(changed[i].page, 1, changed[i].oldProtect, &unused);
+				for (size_t i = pages.size(); i-- > 0;)
+				{
+					DWORD unused = 0;
+					VirtualProtect(pages[i].page, 1, pages[i].oldProtect, &unused);
+				}
 			}
+		};
+
+		// How many pages [address, address + size) touches.
+		size_t PageCount(const uint8_t* address, size_t size)
+		{
+			const uintptr_t pageSize = PageSize();
+			const uintptr_t first = reinterpret_cast<uintptr_t>(address) & ~(pageSize - 1);
+			const uintptr_t last = (reinterpret_cast<uintptr_t>(address) + size - 1) & ~(pageSize - 1);
+			return static_cast<size_t>((last - first) / pageSize + 1);
 		}
 
 		// Makes every page of [address, address + size) writable that is not yet, adding it to changed.
@@ -126,30 +140,41 @@ namespace TweaksV
 			return true;
 		}
 
-		// 1. every page writable before anything is written
-		std::vector<ChangedPage> changed;
-		for (const CodeWrite& write : writes)
-			if (!MakePagesWritable(write.address, write.bytes.size(), changed, tag))
-			{
-				Restore(changed);
-				return false;
-			}
-
-		// 2. the writes, the old bytes kept for the log
+		// The old bytes for the log are read before anything changes, and the lines written after: nothing
+		// that can throw runs while a page is writable, so an exception can neither leave a page writable
+		// nor a group half written.
 		const bool diagnostic = IsDiagnosticMode();
-		for (const CodeWrite& write : writes)
+		std::vector<std::string> before;
+		if (diagnostic)
 		{
-			const std::string before = diagnostic ? HexBytes(write.address, write.bytes.size()) : std::string();
-			memcpy(write.address, write.bytes.data(), write.bytes.size());
-			if (diagnostic)
-				WriteLog(tag, "DIAGNOSTIC: " + write.what + " at " + DescribeAddress(write.address) + ": " + before + " -> " +
-					HexBytes(write.address, write.bytes.size()));
+			before.reserve(writes.size());
+			for (const CodeWrite& write : writes)
+				before.push_back(HexBytes(write.address, write.bytes.size()));
 		}
-
-		// 3. every page's own protection back, and the new code visible to the processor
-		Restore(changed);
+		size_t pageCount = 0;
 		for (const CodeWrite& write : writes)
+			pageCount += PageCount(write.address, write.bytes.size());
+
+		{
+			// 1. every page writable before anything is written - given back by the guard on every exit
+			ChangedPages changed;
+			changed.pages.reserve(pageCount);	// so that recording a page below cannot throw
+			for (const CodeWrite& write : writes)
+				if (!MakePagesWritable(write.address, write.bytes.size(), changed.pages, tag))
+					return false;
+
+			// 2. the writes: nothing here can throw
+			for (const CodeWrite& write : writes)
+				memcpy(write.address, write.bytes.data(), write.bytes.size());
+
+			// 3. every page's own protection back, as the guard goes out of scope
+		}
+		for (const CodeWrite& write : writes)	// and the new code visible to the processor
 			FlushInstructionCache(GetCurrentProcess(), write.address, write.bytes.size());
+		if (diagnostic)
+			for (size_t i = 0; i < writes.size(); i++)
+				WriteLog(tag, "DIAGNOSTIC: " + writes[i].what + " at " + DescribeAddress(writes[i].address) + ": " + before[i] + " -> " +
+					HexBytes(writes[i].address, writes[i].bytes.size()));
 		return true;
 	}
 
@@ -263,7 +288,13 @@ namespace TweaksV
 			return false;
 		}
 
-		const uint8_t before = static_cast<const uint8_t*>(address)[-1];
+		const auto code = static_cast<const uint8_t*>(address);
+		if (!IsReadable(code - 1, 1))
+		{
+			detail = "no unwind data, the byte before it cannot be read";
+			return false;
+		}
+		const uint8_t before = code[-1];
 		char text[64];
 		snprintf(text, sizeof(text), "no unwind data, byte before it %02X", before);
 		detail = text;

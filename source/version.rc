@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // Version resource of TweaksV.asi, shown in Explorer > Properties > Details. The numbers come
 // from BuildInfo.h, which TweaksV.vcxproj writes into object\ before every build.
 #include <winver.h>
@@ -22,6 +23,7 @@ BEGIN
       VALUE "OriginalFilename", "TweaksV.asi"
       VALUE "FileVersion", TWEAKSV_VERSION
       VALUE "ProductVersion", TWEAKSV_VERSION
+      VALUE "LegalCopyright", "Copyright (C) dachdecker369. Licensed under GPL-3.0-only - see LICENSE."
       VALUE "Comments", "Based on plugins by Chiheb-Bacha and others - see CREDITS.md"
     END
   END

@@ -2,7 +2,7 @@
 // TweaksV - the scanner (see TweaksVScanner.h).
 //
 // The pattern parser, ParsePattern below, is an altered version of ScriptHookVDotNet's memory scanner:
-//   Copyright (C) 2015 crosire & kagikn & contributors
+//   Copyright (C) 2015 crosire, kagikn
 //   Copyright (C) 2025 Chiheb-Bacha - the C++ port, which came to TweaksV through his plugins
 //   License: zlib - https://github.com/scripthookvdotnet/scripthookvdotnet#license (the text is in
 //   THIRD_PARTY_NOTICES.md)

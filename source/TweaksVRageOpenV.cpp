@@ -10,7 +10,7 @@
 //                         nothing else: no file system call, no memory allocation, no lock. Both
 //                         spellings of a path (slashes, case) match, a path with ".." is never
 //                         redirected, and a file the folder does not have reaches the game's own
-//                         function untouched. Without a mods folder nothing is hooked.
+//                         function untouched. Without a mods folder, or an empty one, nothing is hooked.
 //   OPEN_RPF              five calls of the archive code (R-E-E1..E5: FindEncryption, DecryptHeader,
 //                         DecryptHeader2 twice, ParseHeader) are redirected through call stubs, so that
 //                         an archive whose header says OPEN is read without decryption. The encryption
@@ -204,15 +204,29 @@ namespace TweaksV
 			return length > 0;
 		}
 
+		// What reading the mods folder found: the entries in the list, the names left out, whether a limit
+		// stopped the reading, and the ANSI code page the names were spelled in.
+		struct ModsFolderRead
+		{
+			size_t entries = 0;
+			size_t leftOut = 0;
+			bool complete = true;
+			UINT codePage = 0;
+		};
+
 		// Reads the mods folder - in the current directory, where the game's own file functions resolve
-		// "mods/..." too - into g_modsList. A name the ANSI code page cannot hold is left out: the game,
-		// which asks with ANSI paths, could not ask for it either. complete is false if a limit stopped
-		// the reading.
-		size_t ReadModsFolder(bool& complete)
+		// "mods/..." too - into g_modsList. A name the ANSI code page cannot hold, or longer than the
+		// limit, is left out and counted: the game, which asks with ANSI paths, could not ask for it either.
+		// A UTF-8 code page (65001) takes neither WC_NO_BEST_FIT_CHARS nor a default character - the call
+		// would fail for every name - so its names are converted as UTF-8.
+		ModsFolderRead ReadModsFolder()
 		{
 			struct Folder { std::wstring path; std::string relative; size_t depth; };
 			std::vector<Folder> todo{ { L"mods", std::string(), 1 } };
-			complete = true;
+			ModsFolderRead read;
+			read.codePage = GetACP();
+			const bool utf8 = read.codePage == CP_UTF8;
+			bool& complete = read.complete;
 			while (!todo.empty() && complete)
 			{
 				const Folder folder = std::move(todo.back());
@@ -228,12 +242,20 @@ namespace TweaksV
 						continue;
 					char name[kMaxModsPath + 1];
 					BOOL lossy = FALSE;
-					const int size = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, found.cFileName, -1, name, sizeof(name), nullptr, &lossy);
+					const int size = utf8
+						? WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, found.cFileName, -1, name, sizeof(name), nullptr, nullptr)
+						: WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, found.cFileName, -1, name, sizeof(name), nullptr, &lossy);
 					if (size <= 1 || lossy)
+					{
+						read.leftOut++;
 						continue;
+					}
 					std::string relative = folder.relative.empty() ? std::string(name) : folder.relative + "/" + name;
 					if (relative.size() > kMaxModsPath)
+					{
+						read.leftOut++;
 						continue;
+					}
 					for (char& c : relative)
 						if (c >= 'A' && c <= 'Z')
 							c = static_cast<char>(c - 'A' + 'a');
@@ -251,7 +273,8 @@ namespace TweaksV
 				} while (FindNextFileW(find, &found));
 				FindClose(find);
 			}
-			return g_modsList.size();
+			read.entries = g_modsList.size();
+			return read;
 		}
 
 		// The path to hand the game's function for a file or folder the mods folder has: "mods/" and the
@@ -364,6 +387,11 @@ namespace TweaksV
 						fail(std::string(name) + " is not inside the game: " + DescribeAddress(start) + " (" + label + ").");
 						return;
 					}
+					if (!IsReadable(start, 2))	// the two bytes StartsWithJump reads; IsFunctionStart checks the byte before itself
+					{
+						fail(std::string(name) + " at " + DescribeAddress(start) + " is not readable memory (" + label + ").");
+						return;
+					}
 					if (function.start != 0 && !IsFunctionStart(start, detail))
 					{
 						fail(std::string(name) + " at " + DescribeAddress(start) + " is not a function start (" + detail + ").");
@@ -390,12 +418,23 @@ namespace TweaksV
 			}
 
 			// 2. the folder, read once before the hooks go on
-			bool complete = true;
-			const size_t entries = ReadModsFolder(complete);
-			WriteLog(kTag, "The mods folder has " + std::to_string(entries) + " files and folders.");
-			if (!complete)
+			const ModsFolderRead read = ReadModsFolder();
+			WriteLog(kTag, "The mods folder has " + std::to_string(read.entries) + " files and folders.");
+			if (read.leftOut)
+				WriteLog(kTag, "Names in the mods folder left out of the list: " + std::to_string(read.leftOut) + " - the game asks with paths in the "
+					"ANSI code page (" + std::to_string(read.codePage) + "), which cannot hold them, or they are longer than " +
+					std::to_string(kMaxModsPath) + " characters.");
+			if (!read.complete)
 				ReportFailure(kTag, "Only part of the mods folder is used this session: it has more than " + std::to_string(kMaxModsEntries) +
 					" files and folders, or folders more than " + std::to_string(kMaxModsDepth) + " levels deep.");
+			if (read.entries == 0)	// nothing to serve: the hooks would only cost
+			{
+				if (read.leftOut)
+					fail("none of the " + std::to_string(read.leftOut) + " names in the mods folder can be used (see the line above).");
+				else
+					WriteLog(kTag, "The mods folder is empty - the file functions are not hooked.");
+				return;
+			}
 
 			// 3. the eight hooks, all or nothing
 			if (!HookFunctions(hooks, kTag))
