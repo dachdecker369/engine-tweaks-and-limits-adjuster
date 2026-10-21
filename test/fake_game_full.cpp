@@ -11,6 +11,7 @@
 //   jnzlegal       a jnz instead of the game's jz at the legal site
 //   hookedlanding  the landing page function starts with a jmp (another mod's hook)
 //   heapraised     the heap site already holds 2000 MB (another heap adjuster ran first)
+//   heapodd        the heap site holds a value that is not a whole number of MB
 //   modkitmoved / modkitsplit / modkitmismatch   see main()
 //   packmoved      one packfile array reference points outside the game (another mod moved it)
 //   packhooked     the streaming configuration call already leads outside the game
@@ -847,6 +848,11 @@ int wmain(int argc, wchar_t** argv)
 	{
 		const Site heap = SITE(g_heapSite, 1);
 		SetImm32(heap, 2000u << 20);
+	}
+	if (HasOption(argc, argv, L"heapodd"))		// a value that is not a whole number of MB
+	{
+		const Site heap = SITE(g_heapSite, 1);
+		SetImm32(heap, (648u << 20) | 1);
 	}
 
 	// The game's own modkit array holds something in its first and last entry, so the report can tell

@@ -107,20 +107,27 @@ check "nothing written: game code, protection and call targets as they were" "ha
 check "every part reported" "log_has 'PROBLEM: The heap size is not changed this session: the game code could not be made writable' && [ \$(count 'is not skipped this session: the game code could not be made writable') -eq 3 ] && log_has 'PROBLEM: .*modkit' && log_has 'PROBLEM: The packfile limit is not changed' && log_has 'PROBLEM: The box streamer.s traversal list is not enlarged' && log_has 'PROBLEM: The decal definitions limit is not raised' && log_has 'PROBLEM: RageOpenV could not start'"
 check "one start-up summary" "summary_once"
 
-echo "== I9 the Windows user name stays out of the log: the profile folder is written as %USERPROFILE%, in both its forms"
+echo "== I8 the Windows user name stays out of the log: the profile folder is written as %USERPROFILE%, in both its forms"
 bw=$(cygpath -w "$B")	# the game folder, here the profile folder too
 fresh_ini; out=$(USERPROFILE="$bw" game full_game.exe)
 check "the paths in it start with %USERPROFILE%, the folder's own name is nowhere in the log" "log_has 'TweaksV.asi: %USERPROFILE%.TweaksV.asi' && ! grep -qiF -- \"\$bw\" TweaksV.log"
+# A profile folder whose name is only a prefix of the game folder's (the game folder minus its last character): left alone
+fresh_ini; out=$(USERPROFILE="${bw%?}" game full_game.exe)
+check "a profile folder that is only a prefix of a longer folder name is not replaced" "log_has 'TweaksV.asi: .*TestRun.TweaksV.asi' && ! log_has '%USERPROFILE%'"
 # A profile folder with a long name has a short one too (C:\Users\NAME~1), which %TEMP% often has. Here
 # %LOCALAPPDATA% has it, and the log header names the TweaksV.ini there that the game folder's wins over.
 pl="$B/Some Long User Name"; mkdir -p "$pl/AppData/TweaksV"; cp TweaksV.ini "$pl/AppData/TweaksV/"
 pw=$(cygpath -w "$pl"); ps=$(cygpath -d "$pl")
 cp full_game.exe GTA5_Enhanced.exe; rm -f TweaksV.log
 USERPROFILE="$pw" LOCALAPPDATA="$ps\\AppData" timeout 60 ./GTA5_Enhanced.exe TweaksV.asi > harness.out 2>&1
-check "its short form as well: the log names %USERPROFILE%\\AppData\\TweaksV, neither form is in it" "[ \"\$ps\" != \"\$pw\" ] && log_has 'wins over the unused copy in %USERPROFILE%.AppData.TweaksV)' && ! grep -qiF -- \"\$ps\" TweaksV.log && ! grep -qiF -- \"\$pw\" TweaksV.log"
+if [ "$ps" = "$pw" ]; then
+	check "its short form as well: this volume has no 8.3 names, so there is no short form to check" "true"
+else
+	check "its short form as well: the log names %USERPROFILE%\\AppData\\TweaksV, neither form is in it" "log_has 'wins over the unused copy in %USERPROFILE%.AppData.TweaksV)' && ! grep -qiF -- \"\$ps\" TweaksV.log && ! grep -qiF -- \"\$pw\" TweaksV.log"
+fi
 rm -rf "$pl"
 
-echo "== I10 TweaksV.log stops growing at its limit (16 KB here, set with TEST_LOG_LIMIT_KB in a test build)"
+echo "== I9 TweaksV.log stops growing at its limit (16 KB here, set with TEST_LOG_LIMIT_KB in a test build)"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; addkey TEST_LOG_LIMIT_KB 16; out=$(ASI=TweaksV_test.asi game full_game.exe)
 check "at most 16 KB, ending with the line that says so" "[ \$(stat -c %s TweaksV.log) -le 16384 ] && tail -n 1 TweaksV.log | grep -q 'TweaksV.log has reached its limit of 16 KB - nothing more is written to it this session.'"
 check "the game is patched all the same" "has '$ALL_ON_HEAP' && has '$STORY_ON' && has '$ROV_ON'"
@@ -129,14 +136,14 @@ check "the game is patched all the same" "has '$ALL_ON_HEAP' && has '$STORY_ON' 
 # link_run [OPTION...] runs the fake game without game(), which would delete TweaksV.log.
 link_run() { cp full_game.exe GTA5_Enhanced.exe; rm -f harness.out; LOCALAPPDATA="$AW" timeout 60 ./GTA5_Enhanced.exe TweaksV.asi "$@" > harness.out 2>&1; out=$(tr -d '\r' < harness.out); }
 
-echo "== I11 TweaksV.log in the game folder is a hard link to another file: that file is left alone"
+echo "== I10 TweaksV.log in the game folder is a hard link to another file: that file is left alone"
 fresh_ini; rm -f TweaksV.log; rm -rf appdata/TweaksV; echo "not the log" > victim.txt; ln victim.txt TweaksV.log
 link_run
 check "the other file is unchanged" "[ \"\$(cat victim.txt)\" = 'not the log' ]"
 check "the log goes to %LOCALAPPDATA%\\TweaksV and says why; the game is patched" "grep -q 'PROBLEM: The TweaksV.log in the game folder is not used: it is a hard link' appdata/TweaksV/TweaksV.log && has '$ALL_ON_HEAP'"
 rm -f TweaksV.log victim.txt; rm -rf appdata/TweaksV
 
-echo "== I12 TweaksV.ini in the game folder is a hard link to another file: neither read nor written"
+echo "== I11 TweaksV.ini in the game folder is a hard link to another file: neither read nor written"
 fresh_ini; setkey SKIP_SPLASH_SCREEN 0 STRAIGHTTOSTORYMODE; sed -b -i '/^HEAP_SIZE=/d' TweaksV.ini
 mv TweaksV.ini victim.ini; cp victim.ini victim.before; ln victim.ini TweaksV.ini
 out=$(ASI=TweaksV_test.asi game full_game.exe)
@@ -145,7 +152,7 @@ check "reported; every setting at its built-in default, not the file's (the spla
 check "the log header says so" "log_has 'TweaksV.ini: .*(not used: it is a hard link'"
 rm -f TweaksV.ini victim.ini victim.before
 
-echo "== I13 and %LOCALAPPDATA%\\TweaksV is a junction to another folder: nothing is written through it"
+echo "== I12 and %LOCALAPPDATA%\\TweaksV is a junction to another folder: nothing is written through it"
 fresh_ini; rm -f TweaksV.log; rm -rf appdata/TweaksV elsewhere; mkdir -p elsewhere; echo "not the log" > victim.txt; ln victim.txt TweaksV.log
 cmd //c "$(cygpath -w "$T/junction.cmd")" "$(cygpath -w "$B/appdata/TweaksV")" "$(cygpath -w "$B/elsewhere")"
 link_run
@@ -156,7 +163,7 @@ check "the junction is removed again - the link only, its target is still there"
 rm -f TweaksV.log victim.txt; rm -rf elsewhere
 
 # Windows keeps a compressed file as a reparse point, as it does a link, but shows it as a plain file.
-echo "== I14 TweaksV.ini and TweaksV.log compressed by Windows (compact /exe, as CompactGUI does): both used as usual"
+echo "== I13 TweaksV.ini and TweaksV.log compressed by Windows (compact /exe, as CompactGUI does): both used as usual"
 fresh_ini; rm -rf appdata/TweaksV
 for i in $(seq 100); do printf '; a comment line, so that Windows has something to compress\r\n'; done >> TweaksV.ini
 for i in $(seq 400); do printf '12:00:00.000 [TweaksV] a line of an older log\r\n'; done > TweaksV.log
@@ -169,7 +176,7 @@ rm -f TweaksV.log
 
 # Read-only as under C:\Program Files: a deny entry for this user on the folder alone (not on the files
 # in it) lets nothing be added to it. The test build, as TweaksV.ini starts out with ERROR_POPUP=1.
-echo "== I15 a read-only game folder (as under C:\\Program Files): both files in %LOCALAPPDATA%\\TweaksV, only logged"
+echo "== I14 a read-only game folder (as under C:\\Program Files): both files in %LOCALAPPDATA%\\TweaksV, only logged"
 rm -rf ro appdata/TweaksV; mkdir -p ro; cp full_game.exe ro/GTA5_Enhanced.exe; cp TweaksV_test.asi ro/TweaksV.asi
 sid=$(MSYS_NO_PATHCONV=1 "$(cygpath -S)/whoami.exe" /user /fo csv /nh | tr -d '\r' | sed -n 's/.*,"\(S-[0-9-]*\)"$/\1/p')
 MSYS_NO_PATHCONV=1 icacls "$(cygpath -w ro)" /deny "*$sid:(WD,AD)" > /dev/null
@@ -186,7 +193,7 @@ MSYS_NO_PATHCONV=1 icacls "$(cygpath -w ro)" /remove:d "*$sid" > /dev/null
 check "the folder is writable again (the test's clean-up)" "touch ro/probe.txt"
 rm -rf ro appdata/TweaksV
 
-echo "== I16 another program holds TweaksV.log in the game folder open: the log goes to %LOCALAPPDATA%\\TweaksV, a problem"
+echo "== I15 another program holds TweaksV.log in the game folder open: the log goes to %LOCALAPPDATA%\\TweaksV, a problem"
 fresh_ini; rm -rf appdata/TweaksV; echo "an older log" > TweaksV.log
 link_run lockedlog
 check "the log was held, and is left as it was" "has 'log held' && [ \"\$(cat TweaksV.log)\" = 'an older log' ]"
@@ -195,7 +202,7 @@ rm -f TweaksV.log; rm -rf appdata/TweaksV
 
 # Test builds only: the game's code as it is in memory, for finding patterns. The fake game's copies of
 # the game code lie in .fakesit, its own data in .data - the part that must never be saved.
-echo "== I17 TEST_DUMP_CODE in a test build: the game's code saved in %LOCALAPPDATA%\\TweaksV at start and later, never its data"
+echo "== I16 TEST_DUMP_CODE in a test build: the game's code saved in %LOCALAPPDATA%\\TweaksV at start and later, never its data"
 d=appdata/TweaksV
 fresh_ini; setkey DRY_RUN 1; addkey TEST_DUMP_CODE 1; rm -rf $d
 out=$(ASI=TweaksV_test.asi game full_game.exe wait)

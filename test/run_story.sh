@@ -89,6 +89,12 @@ fresh_ini; out=$(game full_game.exe heapraised); echo "      $out"
 check "the heap stays at the 2000 MB found, HEAP_SIZE=1024 not applied, logged, no problem" "[[ \"\$out\" == *'heap: 2000 MB'* ]] && log_has 'The heap size is not changed this session: another heap adjuster already set it to 2000 MB - left as it is.' && ! log_has 'Heap size patched' && ! log_has 'PROBLEM'"
 fresh_ini; setkey HEAP_SIZE 2047; out=$(game full_game.exe heapraised)
 check "nor is HEAP_SIZE=2047: what another mod changed is not changed again" "[[ \"\$out\" == *'heap: 2000 MB'* ]] && ! log_has 'Heap size patched' && ! log_has 'PROBLEM'"
+fresh_ini; setkey HEAP_SIZE 648; out=$(game full_game.exe)
+check "HEAP_SIZE at the game's own 648 MB: nothing to patch, logged, no problem" "[[ \"\$out\" == *'heap: 648 MB'* ]] && log_has 'Heap size is 648 MB already (HEAP_SIZE=648) - nothing to patch.' && ! log_has 'Heap size patched' && ! log_has 'PROBLEM'"
+
+echo "== S14 the heap site holds a value that is not a whole number of MB: refused with the value, the screens still skipped"
+fresh_ini; out=$(game full_game.exe heapodd); echo "      $out"
+check "refused, the value in the reason, nothing patched there" "log_has 'The heap size is not changed this session: the game code found holds an unexpected value (0x28800001).' && ! log_has 'Heap size patched' && [[ \"\$out\" == *\"$NEW_SPLASH\"* ]]"
 
 echo
 echo "STORY SCENARIOS: $pass passed, $fail failed"

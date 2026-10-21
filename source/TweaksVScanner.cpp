@@ -151,7 +151,7 @@ namespace TweaksV
 			}
 
 			// The parser (the altered ScriptHookVDotNet code): "48 8B ? 05" into bytes and a mask, 'x' for a
-			// byte that must match and '?' for any. False on a malformed token or a value above 0xFF, so
+			// byte that must match and '?' for any. False on a token that is not two hex digits or ?, so
 			// that nothing throws inside DllMain.
 			bool ParsePattern(const std::string& pat, std::vector<uint8_t>& outPattern, std::string& outMask)
 			{
@@ -170,23 +170,17 @@ namespace TweaksV
 					}
 					else
 					{
-						int value = -1;
-						try
+						// exactly two hex digits; anything else is malformed, and nothing here can throw
+						const auto hex = [](char c) -> int
 						{
-							size_t used = 0;
-							value = std::stoi(token, &used, 16);
-							if (used != token.size())
-								value = -1;
-						}
-						catch (...)
-						{
-							value = -1;
-						}
-						if (value < 0 || value > 0xFF)
+							if (c >= '0' && c <= '9') return c - '0';
+							if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+							if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+							return -1;
+						};
+						if (token.size() != 2 || hex(token[0]) < 0 || hex(token[1]) < 0)
 							return false;
-
-						uint8_t val = (uint8_t)value;
-						outPattern.push_back(val);
+						outPattern.push_back(static_cast<uint8_t>(hex(token[0]) * 16 + hex(token[1])));
 						outMask.push_back('x');
 					}
 				}

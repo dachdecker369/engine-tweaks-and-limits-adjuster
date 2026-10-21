@@ -11,6 +11,7 @@
 //   rovredirected      the DecryptHeader call already leads outside the game
 //   rovcachepatched    the RPF cache check function already starts with a ret
 //   rovflood           20,000 file requests before the usual ones: more than the diagnostic lines' cap lets through
+//   rovopenfail        the fake OpenBulk functions fail for a path under mods/, so the hook must fall back to the game's own file
 #include <windows.h>
 #include <cstdint>
 #include <cstdio>
@@ -22,10 +23,16 @@
 #pragma section(".fakefn", read, write, execute)
 __declspec(allocate(".fakefn")) unsigned char g_fakeCode[0x2000] = { 0xCC };
 
-// What the fake game functions were called with.
+// What the fake game functions were called with, and what they return: 1, or 0 for a path under mods/
+// with the option rovopenfail, as a game function that could not open the file.
 static std::vector<std::string> g_fileCalls;
-static void RecordFile(const char* p) { g_fileCalls.push_back(p ? p : "(null)"); }
-static void (*volatile g_recordFile)(const char*) = RecordFile;
+static bool g_openFail = false;
+static uint64_t RecordFile(const char* p)
+{
+	g_fileCalls.push_back(p ? p : "(null)");
+	return g_openFail && p && strncmp(p, "mods/", 5) == 0 ? 0 : 1;
+}
+static uint64_t (*volatile g_recordFile)(const char*) = RecordFile;
 
 // The game's own functions behind the redirected calls.
 static int g_decryptCalls = 0, g_decrypt2Calls = 0, g_parseCalls = 0;
@@ -121,13 +128,13 @@ enum : size_t { F_OPENBULK1, F_GETFILETIME1, F_GETFILESIZE1, F_GETATTRIBS1, F_OP
 	F_GETATTRIBS2 };
 static unsigned char* FnStart(size_t index) { return g_fakeCode + index * 0x200 + 0x10; }
 
-// push rsi/rdi/rbx; sub rsp,0x260; record the path in rdx; return 1 - the start of a computed target
+// push rsi/rdi/rbx; sub rsp,0x260; record the path in rdx and return what RecordFile returns - the start
+// of a computed target
 static void EmitSimple(Asm& a)
 {
 	a.hex("56 57 53 48 81 ec 60 02 00 00");
 	a.b({ 0x48, 0x89, 0xD1 });						// mov rcx, rdx
 	a.callPtr(&g_recordFile);
-	a.b({ 0xB8, 1, 0, 0, 0 });						// mov eax, 1
 	a.hex("48 81 c4 60 02 00 00 5b 5f 5e c3");		// add rsp; pop rbx/rdi/rsi; ret
 }
 
@@ -140,22 +147,22 @@ static void BuildFakeCode(bool notStart, bool missing, bool jump)
 
 	a.pos = FnStart(F_OPENBULK1) - g_fakeCode;		// push r14/rsi/rdi/rbx; sub rsp,0x268; mov rdi,r8; ...
 	a.hex("41 56 56 57 53 48 81 ec 68 02 00 00 4c 89 c7 66 c7 44 24 20 00 00 4c 8d 74 24 30");
-	a.b({ 0x48, 0x89, 0xD1 }); a.callPtr(&g_recordFile); a.b({ 0xB8, 1, 0, 0, 0 });
+	a.b({ 0x48, 0x89, 0xD1 }); a.callPtr(&g_recordFile);
 	a.hex("48 81 c4 68 02 00 00 5b 5f 5e 41 5e c3");
 
 	a.pos = FnStart(F_GETATTRIBS1) - g_fakeCode;
 	a.hex("41 56 56 57 53 48 81 ec 68 02 00 00 66 c7 44 24 20 00 00 4c 8d 74 24 30");
-	a.b({ 0x48, 0x89, 0xD1 }); a.callPtr(&g_recordFile); a.b({ 0xB8, 1, 0, 0, 0 });
+	a.b({ 0x48, 0x89, 0xD1 }); a.callPtr(&g_recordFile);
 	a.hex("48 81 c4 68 02 00 00 5b 5f 5e 41 5e c3");
 
 	a.pos = FnStart(F_OPENBULK2) - g_fakeCode;		// push r15/r14/rsi/rdi/rbx; sub rsp,0x260; mov rbx,rdx; mov rdi,rcx
 	a.hex("41 57 41 56 56 57 53 48 81 ec 60 02 00 00 48 89 d3 48 89 cf");
-	a.b({ 0x48, 0x89, 0xD9 }); a.callPtr(&g_recordFile); a.b({ 0xB8, 1, 0, 0, 0 });	// mov rcx, rbx
+	a.b({ 0x48, 0x89, 0xD9 }); a.callPtr(&g_recordFile);	// mov rcx, rbx
 	a.hex("48 81 c4 60 02 00 00 5b 5f 5e 41 5e 41 5f c3");
 
 	a.pos = FnStart(F_GETATTRIBS2) - g_fakeCode;		// ... mov rdi,rdx; ...; mov edx,0x3a
 	a.hex("56 57 53 48 81 ec 60 02 00 00 48 89 d7 48 89 ce c7 44 24 3c ff ff ff ff 48 89 d1 ba 3a 00 00 00");
-	a.b({ 0x48, 0x89, 0xF9 }); a.callPtr(&g_recordFile); a.b({ 0xB8, 1, 0, 0, 0 });	// mov rcx, rdi
+	a.b({ 0x48, 0x89, 0xF9 }); a.callPtr(&g_recordFile);	// mov rcx, rdi
 	a.hex("48 81 c4 60 02 00 00 5b 5f 5e c3");
 
 	// The four starts computed back from a pattern inside the function (-0x10D / -0x15D).
@@ -195,6 +202,7 @@ void RovSetup(int argc, wchar_t** argv)
 {
 	BuildFakeCode(Has(argc, argv, L"rovnotstart"), Has(argc, argv, L"rovmissing"), Has(argc, argv, L"rovjump"));
 	g_flood = Has(argc, argv, L"rovflood");
+	g_openFail = Has(argc, argv, L"rovopenfail");
 
 	SetCallTarget(g_rovCacheSite, const_cast<unsigned char*>(g_rovCacheCallee));
 	if (Has(argc, argv, L"rovcachepatched"))
@@ -272,6 +280,13 @@ void RovReport()
 				passed++;
 		}
 		wprintf(L", redirect %d/8, pass %d/8", redirected, passed);
+		if (g_openFail)	// the mods file could not be opened: the hook must hand the game's own path to the game's function next
+		{
+			g_fileCalls.clear();
+			reinterpret_cast<uint64_t (*)(void*, const char*, int64_t*)>(FnStart(F_OPENBULK1))(nullptr, "test/file.txt", nullptr);
+			const bool fallback = g_fileCalls.size() == 2 && g_fileCalls[0] == "mods/test/file.txt" && g_fileCalls[1] == "test/file.txt";
+			wprintf(L", fallback %ls", fallback ? L"ok" : L"no");
+		}
 
 		// The same lookup with the game's other spellings, a folder, and paths that must never be
 		// redirected: one that climbs out with "..", and one longer than any path TweaksV looks up.
@@ -341,6 +356,13 @@ void RovReport()
 		memset(packfile + 0xB4 + 8, 0, 4);
 		findEncryption(0x0FE00000);											// not OPEN: left alone
 		ok = ok && parse(packfile, "test2.rpf", true, nullptr);
+		memcpy(&enc1, entries[1] + 12, 4); memcpy(&offset, packfile + 0xB4 + 8, 4);
+		ok = ok && enc1 == 1 && offset == 0;
+		// an OPEN archive whose header claims more entries than plausible: left alone, said in the log
+		const int32_t tooMany = 0x100001;
+		memcpy(packfile + 0x28 + 8, &tooMany, 4);
+		findEncryption(0x4E45504F);
+		ok = ok && parse(packfile, "test3.rpf", true, nullptr);
 		memcpy(&enc1, entries[1] + 12, 4); memcpy(&offset, packfile + 0xB4 + 8, 4);
 		ok = ok && enc1 == 1 && offset == 0;
 		wprintf(L", behaviour %ls", ok ? L"ok" : L"WRONG");

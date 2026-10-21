@@ -25,6 +25,7 @@ namespace TweaksV
 		LONG g_shown = 0;
 		// Problems reported after the start-up summary was shown: a thread of their own shows them
 		std::vector<std::string> g_late;	// under g_lock
+		size_t g_lateDropped = 0;			// under g_lock: late problems beyond kMaxItems, counted for the box
 		bool g_lateThread = false;			// under g_lock: that thread runs
 		int g_lateBoxes = 0;				// only that thread uses it
 
@@ -107,9 +108,12 @@ namespace TweaksV
 				{
 					Sleep(1000);
 					std::vector<std::string> items;
+					size_t dropped = 0;
 					{
 						ExclusiveLock lock(g_lock);
 						items.swap(g_late);
+						dropped = g_lateDropped;
+						g_lateDropped = 0;
 						if (items.empty())
 							g_lateThread = false;	// under the lock, so a new problem starts a new thread
 					}
@@ -118,16 +122,16 @@ namespace TweaksV
 
 					if (!IsOn(kErrorPopup))
 						WriteLog("TweaksV", "Problem after the start-up summary not shown (ERROR_POPUP=0): " +
-							std::to_string(items.size()) + " problem(s), see above.");
+							std::to_string(items.size() + dropped) + " problem(s), see above.");
 					else if (g_lateBoxes >= kMaxLateBoxes)
 						WriteLog("TweaksV", "Problem after the start-up summary not shown: " + std::to_string(kMaxLateBoxes) +
 							" message boxes were shown already this session.");
 					else
 					{
 						++g_lateBoxes;
-						WriteLog("TweaksV", "Showing a problem after the start-up summary (" + std::to_string(items.size()) +
+						WriteLog("TweaksV", "Showing a problem after the start-up summary (" + std::to_string(items.size() + dropped) +
 							" problem(s)).");
-						ShowBox(L"TweaksV: a part stopped working after the start-up:", items, 0);
+						ShowBox(L"TweaksV: a part stopped working after the start-up:", items, dropped);
 					}
 				}
 			}
@@ -169,6 +173,8 @@ namespace TweaksV
 				startLate = !g_lateThread;
 				g_lateThread = true;
 			}
+			else
+				++g_lateDropped;	// the running thread counts it in its box
 		}
 
 		if (startLate && !StartModuleThread(LateThread, "problem after the start-up summary"))

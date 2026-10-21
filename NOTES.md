@@ -24,7 +24,7 @@ What each part does and the checks it makes, the measurements, the open issues a
 
 - **Conflicts:** old stand-alone plugins (HeapAdjuster.asi, OpenRPF.asi, ...) are detected. Their TweaksV part is switched off for the session and listed in a start-up summary.
 
-- **Problems on screen:** every problem at start-up is listed in one message box, the start-up summary (`ERROR_POPUP=1`, the default). A part that stops working later, such as the DirectStorage hook a few seconds in, gets a message box of its own, at most three per session.
+- **Problems on screen:** every problem at start-up is listed in one message box, the start-up summary (`ERROR_POPUP=1`, the default). A part that stops working later, such as the DirectStorage hook a few seconds in, gets a message box of its own, at most three per session; more than 40 problems at once are counted as "... and N more".
 
 - **Scanner:** TweaksV's own search for its patterns in the running game's code (`TweaksVScanner`); the pattern parser is an altered version of ScriptHookVDotNet's (THIRD_PARTY_NOTICES.md):
   - A pattern miss is logged and returns null instead of exiting the game;
@@ -110,15 +110,15 @@ What each part does and the checks it makes, the measurements, the open issues a
 - **Build:** all of TweaksV's code builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
   - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four. Control Flow Guard and CET only take effect in a game that turns them on itself, which GTA V Enhanced 1.0.1158.16 does not; TweaksV carries them so that it never leaves a gap in a game that does, nor is refused by one.
 
-- **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from and link the repository, which `THIRD_PARTY_NOTICES.md` in the zip names too, so the source is one step from the binary wherever the zip goes (GPL-3.0, section 6d); the mod page carries the credits, links the repository and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
+- **Releasing:** a release zip carries exactly five files, now and for every version to come: `TweaksV.asi`, `LICENSE`, `THIRD_PARTY_NOTICES.md`, `CREDITS.md` and `README.md` - the binary, its license, the notices it must travel with, the credits and the player's guide; nothing else, not the `.pdb`. The release notes name the tag the build came from and link the repository, which `THIRD_PARTY_NOTICES.md` and `README.md` in the zip name too, so the source is one step from the binary wherever the zip goes (GPL-3.0, section 6d); the mod page carries the credits, links the repository and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
 
-- **Tests:** `test\` holds fake-game test suites (432 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (437 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Versions
 
 Newest first; the tags carry the same numbers. One line per version with what it brought.
 
-- **2.0.0:** every part rewritten as TweaksV's own code on shared code - the scanner, the patch module, the relocation core, the three tables; `TweaksV.ini` layout 2 (28 keys, `DIAGNOSTIC_MODE` as the one testing switch, a 1.x file renamed to `TweaksV.old.ini`); the newmods folder and the originals' archives gone; the lock guard; the mods list on a UTF-8 code page, a guard for the patched pages, the game's entries copied into a moved array, a named copyright holder.
+- **2.0.0:** every part rewritten as TweaksV's own code on shared code - the scanner, the patch module, the relocation core, the three tables; `TweaksV.ini` layout 2 (28 keys, `DIAGNOSTIC_MODE` as the one testing switch, a 1.x file renamed to `TweaksV.old.ini`); the newmods folder and the originals' archives gone; the lock guard; the mods list on a UTF-8 code page, a guard for the patched pages, the game's entries copied into a moved array, a named copyright holder; the release zip defined as five files.
 - **1.6.0:** the Decals part - the decal definitions array moved and its limit raised; `DecalPatch.asi` as an old plugin.
 - **1.5.0:** the box streamer's measurement, and the list's loads found by its address instead of a pattern.
 - **1.4.0:** the BoxStreamer part - the traversal list moved and its capacity raised; `TEST_DUMP_CODE` in test builds.
@@ -203,7 +203,7 @@ What the merge found in the five original projects, with the file and line in th
 | B-ROV-06 | corrupt | `PackfileEncryptionHooks.cpp` line 5: `currentEncryption` is one global, written by one hook and read by the later ones; archives opened on different threads mix up their tags | `thread_local`; `ParseHeaderHook` checks the entry table and the file count |
 | B-ROV-07 | crash | `utils\config.h` with `inicpp.h`: inicpp throws on a line without `=` (a `;` comment), on section errors and on a missing or non-boolean key - reached from DllMain and from every log write | the settings come from `TweaksV.ini` through the Win32 INI functions |
 | B-ROV-08 | crash, latent | `utils\memory.h` line 65, `memory::init`: the trampoline area is requested at the fixed address exe+0x20000000 without a failure check | memory near the game from `AllocateNearGame`, checked |
-| B-ROV-09 | robust | `memory.h` lines 153-159, `memory::hook`: `MH_EnableHook(MH_ALL_HOOKS)` after every hook, freezing all threads each time | hooks are queued, one apply per group |
+| B-ROV-09 | robust | `memory.h` lines 153-159, `memory::hook`: `MH_EnableHook(MH_ALL_HOOKS)` after every hook, freezing all threads each time | a group of hooks is queued and applied once; a hook on a single export is enabled on its own |
 | B-ROV-10 | robust | `main.cpp` lines 3-10: the one-time guard is a plain `bool` | an atomic, claimed with `exchange` before the start-up runs; the hook switches itself off afterwards |
 | B-ROV-11 | robust | `utils\log.cpp` lines 16, 33 and 35: a 256-byte line buffer truncates paths; `printf` on every line even without a console; INI lookups and a file open per line | lines go to `TweaksV.log`; the switches are read once |
 | B-ROV-12 | robust | `fiDevice.cpp`: a "device" log line is formatted on every device call even when device logging is off | gone with newmods; 1.x checked the switch first |

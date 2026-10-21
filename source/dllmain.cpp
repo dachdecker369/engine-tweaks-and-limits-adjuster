@@ -55,8 +55,16 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 			if (!summaryLater)										// 9. unless a feature shows it
 				TweaksV::ShowStartupSummaryLater();					//    itself, later (RageOpenV)
 		}
-		catch (...)
+		catch (...)	// never silent: the start-up summary names it, also when the log could not be started
 		{
+			try
+			{
+				TweaksV::ReportFailure("TweaksV", "Unexpected exception during the start-up - the rest of TweaksV is skipped this session.");
+				TweaksV::ShowStartupSummaryLater();
+			}
+			catch (...)
+			{
+			}
 		}
 		break;
 

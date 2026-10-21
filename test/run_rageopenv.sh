@@ -23,6 +23,7 @@ check "console call left alone (CONSOLE=0)" "has 'console: FF 15'"
 check "mods folder: 8 functions hooked; a file in mods\\ is used, any other passes through" "has '$FILES_OK'"
 check "mods folder read once (2 entries); other spellings and the folder found, '..' and too-long paths never redirected" "has 'spellings ok, folder ok, outside ok' && log_has 'The mods folder has 2 files and folders.'"
 check "OPEN archives: 5 calls redirected; OPEN not decrypted, others decrypted; entries marked" "has '$OPEN_OK'"
+check "an OPEN archive with an implausible entry count is left alone and said so" "log_has 'The OPEN archive test3.rpf has an implausible entry table (1048577 entries) - left as it is.'"
 check "status lines; no line per hooked function without DIAGNOSTIC_MODE" "log_has 'Files in the mods folder are used (8 file functions hooked)' && log_has 'Unencrypted (OPEN) RPF archives can be loaded (5 calls redirected)' && ! log_has ' hooked at RVA'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'splash: E9 86 01 00 00 90' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack sizes: D3=12000'"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
@@ -133,6 +134,10 @@ check "one start-up summary for both moments (shown after the one-time start-up)
 echo "== R16 FreeLibrary while hooked: TweaksV.asi stays loaded (pinned), no crash afterwards"
 fresh_ini; cp plain_game.exe GTA5_Enhanced.exe; LOCALAPPDATA="$AW" timeout 60 ./GTA5_Enhanced.exe TweaksV.asi unload > harness.out 2>&1
 check "loaded and 'unloaded' without a crash" "grep -q 'loaded and unloaded' harness.out"
+
+echo "== R17 the mods file cannot be opened: OpenBulk hands the game its own path next"
+fresh_ini; out=$(game full_game.exe rovopenfail); echo "      $out"
+check "the fall-back: the mods path first, the game's own path next; the other six hooks redirect as before" "has 'fallback ok' && has 'redirect 6/8, pass 8/8' && has '$OPEN_OK'"
 
 echo
 echo "RAGEOPENV SCENARIOS: $pass passed, $fail failed"
