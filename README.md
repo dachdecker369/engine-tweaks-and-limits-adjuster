@@ -93,6 +93,7 @@ TweaksV writes `TweaksV.ini` next to `TweaksV.asi` on the first start - or in `%
 - **Own code:** every part is TweaksV's own, in the `TweaksV*` files and `dllmain.cpp`; nothing of the original plugins' code is carried. What TweaksV knows about the game - the byte patterns and what each site holds - is in [PATTERNS.md](PATTERNS.md), and that is the one place to work when the game changes.
 - **Tables:** each setting is one entry in `TweaksVSettings.h`, each byte pattern one in `TweaksVPatterns.h`, each part one in `TweaksVFeatures.cpp`. A new part is an entry in these tables plus its own file.
 - **Shared code:** patches to the game's code go through `TweaksVPatch` - one writer for bytes, one for redirected calls, the hooks on a function's start through MinHook - which writes all or nothing and gives every page its own protection back; `TweaksVScanner` finds the patterns in the running game's code; the four parts that move one of the game's arrays describe it in a table and share the relocation core, `TweaksVRelocation`, which finds and checks every site before anything is written and then writes all of it in one go.
+- **The whole design:** [SPECIFICATIONS.md](SPECIFICATIONS.md) describes every module, format and log line as built, [NOTES.md](NOTES.md) what each part does and measures, [PATTERNS.md](PATTERNS.md) every game fact - with this file, the whole truth about the code: enough to fork it or build on it without reading the source first.
 
 ## Building
 

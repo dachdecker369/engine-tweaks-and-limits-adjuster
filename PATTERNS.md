@@ -1,6 +1,6 @@
 # Patterns
 
-Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game build each one was last verified on. TweaksV searches only the game's code (its executable sections). Each pattern is defined once, in the table in `source\TweaksVPatterns.h`, under the label it has here (`H-E1`, `P-E-R31a`, ...), and is written here exactly as there; `?` matches any byte. The tests check that this file and the table list the same patterns, and `TweaksV.log` names each pattern by its label. RVA is where each pattern matched on 1.0.1158.16, counted from the start of `GTA5_Enhanced.exe` in memory.
+Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game build each one was last verified on. TweaksV searches only the game's code (its executable sections). Each pattern is defined once, in the table in `source\TweaksVPatterns.h`, under the label it has here (`H-E1`, `P-E-R31a`, ...), and is written here exactly as there; `?` matches any byte. The tests check that this file and the table list the same patterns, and `TweaksV.log` names each pattern by its label. RVA is where each pattern matched on 1.0.1158.16, counted from the start of `GTA5_Enhanced.exe` in memory. What each part does with a match - the reference, limit, call or function it holds - is in [SPECIFICATIONS.md](SPECIFICATIONS.md).
 
 ## Status
 

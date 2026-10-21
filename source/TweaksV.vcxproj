@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <!-- TweaksV.asi: TweaksV's own code, the five merged plugins and MinHook (vendor\MinHook) in one
-       project. Builds go to x64\<Configuration>, intermediate files to object\<Configuration>. -->
+  <!-- TweaksV.asi: TweaksV's own code and MinHook (vendor\MinHook) in one project. Builds go to
+       x64\<Configuration>, intermediate files to object\<Configuration>. -->
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>

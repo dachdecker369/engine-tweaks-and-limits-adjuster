@@ -1,13 +1,17 @@
 # Notes
 
+What each part does and the checks it makes, the measurements, the open issues and the bugs found in the projects the parts derive from. The design - every module, every format, every line of the log - is in [SPECIFICATIONS.md](SPECIFICATIONS.md), the game facts are in [PATTERNS.md](PATTERNS.md), the player's guide is [README.md](README.md), the credits in [CREDITS.md](CREDITS.md) and the derivations in [UPSTREAM.md](UPSTREAM.md). Every part is TweaksV's own code since 2.0.0; the parts that follow another project's idea use none of its code.
+
+- **Rules every part follows:** everything is found and checked before anything is written; a job's writes are all or nothing; what another mod has already changed is left alone; every job not done is a problem in the start-up summary, with the reason in the log; every value read from the game or the INI is bounded; nothing throws into the game; `DRY_RUN` and `DIAGNOSTIC_MODE` work the same for every part.
+
 - **`TweaksV.ini`:** created on the first start with its default settings. Missing keys are added back; existing values are never changed.
-  - Every setting is defined once, in the table in `TweaksVSettings.h`: its section, key, default and limits. The default file, which carries no comment (README.md explains every key), the keys added back, the log header and every reader come from it, and each setting is read once at start-up.
+  - Every setting is defined once, in the table in `TweaksVSettings.h`: its section, key, default and limits. The default file, which carries a header and no comment per key (README.md explains every key), the keys added back, the log header and every reader come from it, and each setting is read once at start-up.
   - A value TweaksV cannot use - not a number, not on or off, outside its limits - is shown in the start-up summary as well as the log, with the value used instead.
   - `VERSION` under `[TWEAKSV]` says which layout the file has (2). A file without it has the layout of TweaksV 1.x, whatever else it holds: it is renamed to `TweaksV.old.ini` (an older `TweaksV.old.ini` that passes the own-file checks is replaced), the default file is written in its place and the start-up summary says so - nothing of the old file is read; a 1.x file that cannot be renamed is reported every start and not read either. A file from a newer TweaksV is reported.
 - **`TweaksV.log`:** one log with a header (versions, paths, switches).
   - Paths in the Windows user's profile folder are written as `%USERPROFILE%\...`, also where the folder has its short form (`C:\Users\NAME~1`, as `%TEMP%` often has): logs get posted in public, and that folder is usually named after the user.
-  - It grows to 64 MB at most, room for hours of the logs for testing; a last line says when it stops.
-- **Read-only game folders:** both files go to `%LOCALAPPDATA%\TweaksV` when the game folder is read-only, for example a Rockstar Games Launcher install under `C:\Program Files`.
+  - It grows to 64 MB at most, room for hours of the logs for testing; a last line says when it stops. Every kind of line that comes per event stops after 20,000 lines; the events are then only counted, with a summary every minute.
+- **Read-only game folders:** both files go to `%LOCALAPPDATA%\TweaksV` when the game folder is read-only, for example an install under `C:\Program Files` whose folder the game cannot write to.
   - A `TweaksV.ini` in the game folder always wins.
   - A read-only folder is normal, so it is only logged; it shows no message box. Any other reason, such as a `TweaksV.log` that another program holds open, is a problem in the start-up summary.
 - **Links:** TweaksV writes only to its own files, never through a link to another file - which matters when the game runs as administrator:
@@ -26,15 +30,15 @@
   - A pattern miss is logged and returns null instead of exiting the game;
   - A malformed pattern is refused instead of throwing;
   - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match;
-  - Only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. The search compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than the originals' search, which went through the whole image almost byte by byte;
+  - Only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. The search compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than a search through the whole image byte by byte;
   - A second search, built the same way, finds every `lea` that loads one address - for a static array the game loads in places no pattern can tell apart (the box streamer's list, the decal definitions array);
   - A pattern can be asked for every match instead of the first, for a site the game repeats - the check seven decal-placing functions share (the decals part).
 
-- **One patch module:** every patch to the game's code goes through `TweaksVPatch`, one writer for bytes and one for redirected calls (a hook on a function's start - RageOpenV's file and archive functions, DirectStorage's - is MinHook's, see T-HARDEN):
+- **One patch module:** every patch to the game's code goes through `TweaksVPatch`, one writer for bytes, one for redirected calls and one for hooks on a function's start (MinHook, see T-HARDEN):
   - A group of writes is all or nothing: every page is made writable first, so a page that cannot be changed leaves the game as it was;
   - Every page gets its own protection back, and the processor sees the new code;
-  - A redirected call goes through a 16-byte jump near the game, which is written once and then only read and executed - never writable and executable at once (the originals' trampolines were both);
-  - DRY_RUN and DIAGNOSTIC_MODE work the same for every part.
+  - A redirected call goes through a 16-byte jump near the game, which is written once and then only read and executed - never writable and executable at once;
+  - A group of hooks is switched on together, the threads frozen once, and removed again when one of them cannot be made.
 
 - **One pattern table:** every byte pattern TweaksV looks for is defined once, in `TweaksVPatterns.h`, under the label `PATTERNS.md` gives it:
   - A label the table does not have, or a malformed pattern, stops the build;
@@ -50,73 +54,55 @@
   - Every reference and every limit, with what the part adds (a redirected call, a loop end), is written in one go, all or nothing - a part either does its whole job or leaves the game as it was;
   - DRY_RUN logs one line with what would change; DIAGNOSTIC_MODE logs every site, the value it holds and every write, in one wording for all four parts.
 
-- **HeapAdjuster (TweaksV's own part since 2.0.0; the merged HeapAdjusterEnhanced before):** `[HEAP_ADJUSTER] HEAP_SIZE` (default 2000 MB) sets the game's memory heap, one immediate in its start-up code (`H-E1`):
+- **HeapAdjuster:** `[HEAP_ADJUSTER] HEAP_SIZE` (default 2000 MB) sets the game's memory heap, one immediate in its start-up code (`H-E1`):
   - The instruction is checked before the write, and the size it holds must be a whole number of MB up to 2047;
   - `HEAP_SIZE` is clamped to the size found..2047 MB, with 64-bit arithmetic; a heap that has the size asked for already is left as it is;
-  - A heap of 1024 MB or more is not the game's own: another heap adjuster set it, so it is left as it is and the log says so - what another mod has already changed, TweaksV does not change again (with NaturalVision Enhanced its heap size wins, README's "Other mods");
-  - A missing pattern, a wrong instruction or a page that cannot be written is reported in the start-up summary;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+  - A heap of 1024 MB or more is not the game's own (646 MB on 1.0.1158.16): another heap adjuster set it, so it is left as it is and the log says so - with NaturalVision Enhanced its heap size wins (README's "Other mods").
 
-- **StraightToStoryMode (TweaksV's own part since 2.0.0):** one switch per screen in `[STRAIGHTTOSTORYMODE]` (`SKIP_SPLASH_SCREEN`, `SKIP_LEGAL_SCREEN`, `SKIP_LANDING_PAGE`):
+- **StraightToStoryMode:** one switch per screen in `[STRAIGHTTOSTORYMODE]` (`SKIP_SPLASH_SCREEN`, `SKIP_LEGAL_SCREEN`, `SKIP_LANDING_PAGE`):
   - The splash screen's `jz` (0x0D before `S-E1`) becomes a `jmp` to the same target, computed from the game's own instruction; the legal screen's 6-byte `jz` (0x0F before `S-E2`) becomes NOPs; the function the landing page's call (`S-E3`) leads to returns 0 at once;
   - The bytes are checked before writing (the splash and legal sites must hold the game's `jz`, the landing page's call must lead into the game); an already-patched screen is skipped quietly; a landing-page function hooked by another mod is left alone and reported;
-  - A missing pattern skips only that screen and is reported in the start-up summary;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+  - A missing pattern skips only that screen.
 
-- **ModkitLimit (TweaksV's own part since 2.0.0; the merged ModkitLimitAdjusterEnhanced before):** `[MODKIT_LIMIT] MODKITARRAY_SIZE` (default 65536) enlarges the game's array of vehicle modkit IDs - 1024 entries of 2 bytes, loaded by six `lea` (`M-E-R1..R6`) and sized by eight immediates that hold N-1, N+3 or 2N (`M-E-L1..L8`) - on the relocation core:
-  - Every reference and limit is found and checked before anything is written: all six references must point at one array inside the game, so an array another mod has moved is left alone, and all eight limits must decode to the same plausible size;
+- **ModkitLimit:** `[MODKIT_LIMIT] MODKITARRAY_SIZE` (default 65536) enlarges the game's array of vehicle modkit IDs - 1024 entries of 2 bytes, loaded by six `lea` (`M-E-R1..R6`) and sized by eight immediates that hold N-1, N+3 or 2N (`M-E-L1..L8`) - on the relocation core:
+  - All six references must point at one array inside the game, so an array another mod has moved is left alone, and all eight limits must decode to the same plausible size;
   - The new array always has the full 65536 entries, as read/write data; the limits are clamped to the game's own size..65536;
-  - The six references and the eight limits are written together, all or nothing (1.x moved the array first and could leave it moved with the limits as they were);
-  - A failure is reported in the start-up summary and leaves the game as it was;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+  - The six references and the eight limits are written together, all or nothing.
 
-- **PackfileLimit (TweaksV's own part since 2.0.0; the merged PackfileLimitAdjusterEnhanced before):** `[PACKFILE_LIMIT] PACKFILEARRAY_SIZE` (default 13000) enlarges the game's array of RPF archives - 7260 entries of 8 bytes on the current build, referenced by 31 instructions (`P-E-R01..R30` and, by game build, `R31a` or `R31b`) and sized by an immediate (`P-E-D3`, `D2` or `D1` by game build) and a variable the game compares an archive index against, which holds four less than the array's size (`P-E-I1`; 1.x and the originals wrote the full size over it, 2.0.0 keeps the margin) - on the relocation core, and replaces the archive count of the game's configuration:
-  - Every reference, both limits and the streaming configuration call (`P-E-H1`) are found and checked before anything is written: all references must point at one array inside the game, the limits must agree on a plausible size, and the call must lead into the game - one another mod has already redirected is left alone;
+- **PackfileLimit:** `[PACKFILE_LIMIT] PACKFILEARRAY_SIZE` (default 13000) enlarges the game's array of RPF archives - 7260 entries of 8 bytes on the current build, referenced by 31 instructions (`P-E-R01..R30` and, by game build, `R31a` or `R31b`) and sized by an immediate (`P-E-D3`, `D2` or `D1` by game build) and a variable the game compares an archive index against, which holds four less than the array's size (`P-E-I1`; the margin is kept) - on the relocation core, and replaces the archive count of the game's configuration:
+  - All references must point at one array inside the game, the limits must agree on a plausible size, and the streaming configuration call (`P-E-H1`) must lead into the game - one another mod has already redirected is left alone;
   - The call goes through a read+execute call stub to TweaksV's function, which replaces the archive count read from `gameconfig.xml` with the new size and calls the game's own function; the log says what it replaced;
   - The new array always has the full 65535 entries, as read/write data; the limits are clamped to the game's own size..65535;
-  - The 31 references, the two limits and the redirected call are written together, all or nothing (1.x moved the array first and could leave it moved with the limits and the call as they were);
-  - The pattern for the reference that builds 1.0.1158.13 and later use includes its two constants, so it does not also match obfuscated game code;
-  - The game's file version chooses the patterns of its build; without one nothing is done, and the start-up summary says so;
-  - A failure is reported in the start-up summary and leaves the game as it was;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+  - The 31 references, the two limits and the redirected call are written together, all or nothing;
+  - The game's file version chooses the patterns of its build; without one nothing is done, and the start-up summary says so.
 
-- **BoxStreamer (TweaksV's own part):** `[BOXSTREAMER] TRAVERSAL_LIST_SIZE` (default 10000) is read from `TweaksV.ini`. The game's box streamer keeps the map boxes one search returns in a static list of 1000 entries; with heavy map mods it fills up, and the boxes it has no room for are never streamed, so their LODs are missing. TweaksV moves the list to a larger one and raises the capacity the game hands its tree searches, on the relocation core since 2.0.0:
-  - The idea is the CitizenFX Collective's fix for FiveM, as 0x-FADED ported it to GTA V Legacy. TweaksV's code is its own, written from the game's code alone: none of theirs was read;
+- **BoxStreamer:** `[BOXSTREAMER] TRAVERSAL_LIST_SIZE` (default 10000). The game's box streamer keeps the map boxes one search returns in a static list of 1000 entries; with heavy map mods it fills up, and the boxes it has no room for are never streamed, so their LODs are missing. TweaksV moves the list to a larger one and raises the capacity the game hands its tree searches, on the relocation core:
   - The four capacity sites are found by pattern and must agree on the game's own size. The list's address comes from the `lea` after three of them, and the game's code is scanned for every `lea` that loads it: exactly 8 must be found (two of the game's four query functions are near-identical copies, which no pattern tells apart), so a list another mod has moved, or a game that has changed, is left alone;
   - The new list always has the full 100000 entries, as read/write data; the capacity is clamped to the game's own size..100000;
   - The 8 references and the 4 capacities are written together, all or nothing;
-  - With `DIAGNOSTIC_MODE=1` (the one testing switch since 2.0.0; 1.6.0 had `LOG_SEARCHES`) the four calls to the game's tree searches go through TweaksV's call stubs to a wrapper that only counts (atomics, nothing else on the streaming thread) and logs, 10 seconds in and then every minute while the numbers change, how many searches ran, the most entries one returned and how many returned more than the game's own list could hold - the number that says whether a map load needs the larger list. A call another mod has hooked, or a pair of calls that does not lead to the same tree search, skips the part; the calls are redirected in the same all-or-nothing write as the references and capacities;
-  - Measured on 1.0.1158.16 with Forests of San Andreas: Revised and GTA V Remastered: Enhanced loaded, the measurement on: 180353 searches in three minutes, the largest returned 1123 entries, and 7209 returned more than the game's own list of 1000 could hold - each of those would have been cut off without the larger list;
-  - A failure is reported in the start-up summary and leaves the game as it was;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+  - With `DIAGNOSTIC_MODE=1` the four calls to the game's tree searches go through TweaksV's call stubs to a wrapper that only counts (atomics, nothing else on the streaming thread) and logs, 10 seconds in and then every minute while the numbers change, how many searches ran, the most entries one returned and how many returned more than the game's own list could hold - the number that says whether a map load needs the larger list. A call another mod has hooked, or a pair of calls that does not lead to the same tree search, skips the part; the calls are redirected in the same all-or-nothing write as the references and capacities;
+  - Measured on 1.0.1158.16 with Forests of San Andreas: Revised and GTA V Remastered: Enhanced loaded, the measurement on: 180353 searches in three minutes, the largest returned 1123 entries, and 7209 returned more than the game's own list of 1000 could hold - each of those would have been cut off without the larger list.
 
-- **Decals (TweaksV's own part; named DecalDefs in 1.6.0):** `[DECALS] DECALDEFS_SIZE` (default 2048) is read from `TweaksV.ini`. The game keeps its decal definitions - the kinds of decal it reads from the `decals.dat` files - in a static array of 260 entries, with the number registered so far in a dword 16 bytes before it; once 260 are registered the parser drops every further definition silently, and add-on content, which comes last, loses its decals. TweaksV moves the array to a larger one and raises the limit at every site that carries it, on the relocation core since 2.0.0:
-  - The idea is the CitizenFX Collective's fix for FiveM, as 0x-FADED ported it to GTA V Legacy. TweaksV's code is its own, written from TweaksV's own findings about the game's code; the published patches were known as the idea and as a guide to what to look for, and no line of their code was read for the build;
+- **Decals:** `[DECALS] DECALDEFS_SIZE` (default 2048). The game keeps its decal definitions - the kinds of decal it reads from the `decals.dat` files - in a static array of 260 entries, with the number registered so far in a dword 16 bytes before it; once 260 are registered the parser drops every further definition silently, and add-on content, which comes last, loses its decals. TweaksV moves the array to a larger one and raises the limit at every site that carries it, on the relocation core:
   - The parser's "full" check gives the count's address and N (260), its `lea` the array's address, which must lie 16 bytes after the count, both inside the game. Every other site that carries the limit - 21 instructions, one pattern matching the 7 identical checks of the decal-placing functions - is found by pattern, must be the expected instruction and must hold N-1 or N; the decal manager's start-up loop must clear a whole number of entries per pass and end at its start offset + N x 80. The game's code is then scanned for every `lea` that loads the array: exactly 31 must be found, each with a 48 or 4C prefix, so an array another mod has moved, or a game that has changed, is left alone;
   - The new array always has the full 16384 entries (1.3 MB), as read/write data, zeroed - the array's initial state; the limit is clamped to the game's own size..16384 (a definition's index is a uint16 in the game's decal instances);
   - The 31 references and the 23 constants are written together, all or nothing; the loop end becomes a whole number of passes below the new size (the entries it leaves are zero anyway); the count stays where it is, since nothing reaches it through the array or the array through it;
-  - With `DIAGNOSTIC_MODE=1` (1.6.0 had `LOG_DECALDEFS`) the part reads the count 10 seconds in and then every minute while it changes, and logs it against the limit and the game's own 260, with how many the game's own array would have dropped - nothing is hooked; with `DRY_RUN=1` it measures the unpatched game (without the mods folder, which RageOpenV does not serve in a dry run);
+  - With `DIAGNOSTIC_MODE=1` the part reads the count 10 seconds in and then every minute while it changes, and logs it against the limit and the game's own 260, with how many the game's own array would have dropped - nothing is hooked; with `DRY_RUN=1` it measures the unpatched game (without the mods folder, which RageOpenV does not serve in a dry run);
   - Measured on 1.0.1158.16 with the measurement on: vanilla registers 259 definitions - one short of the game's own 260, so a mod that adds two is already one too many. With a test `decals.dat` of 659 definitions (400 copies of a definition only a heist scene places, put first, then vanilla's 259) the part held all 659 and every decal type appeared; with the part switched off and the same file, the game's own array filled with the copies and not one bullet hole, blood splatter or tyre mark appeared - the failure the part cures, seen directly;
-  - `DecalPatch.asi` counts as an old plugin for this part and the box streamer part: with it installed, both are switched off;
-  - A failure is reported in the start-up summary and leaves the game as it was;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+  - `DecalPatch.asi` counts as an old plugin for this part and the box streamer part: with it installed, both are switched off.
 
-- **RageOpenV (TweaksV's own part since 2.0.0; the merged RageOpenV before):** the mods folder, unencrypted (OPEN) RPF archives and the RPF cache check skip each have a switch in `[RAGEOPENV]`; the experimental newmods folder the original had is gone. The part does its work when the game first asks for the time - a hook on `GetSystemTimeAsFileTime` that runs once, shows the start-up summary and switches itself off - because the game's file system is not up in DllMain:
+- **RageOpenV:** the mods folder, unencrypted (OPEN) RPF archives and the RPF cache check skip each have a switch in `[RAGEOPENV]`. The part does its work when the game first asks for the time - a hook on `GetSystemTimeAsFileTime` that runs once, shows the start-up summary and switches itself off - because the game's file system is not up in DllMain:
   - The mods folder: the eight file functions of the game's two file devices (`R-E-F1..F8`; two per device found at their start, two by a pattern inside them, every computed start checked with the game's unwind data) are hooked together or not at all, so that a path that exists under `mods\` is served from there. The folder is read once at start-up into a list of at most 200,000 files and folders, 32 levels deep (more is reported in the start-up summary), and every call looks its path up in that list: no file system call, memory allocation or lock per call; both spellings of a path match; a path with `..` is never redirected; a file the folder does not have reaches the game's own function untouched. Without a mods folder nothing is hooked (DIAGNOSTIC_MODE still checks the patterns). A function another mod has hooked is hooked on top and chains through, said in the log;
   - OPEN archives: the five calls of the archive code (`R-E-E1..E5`) are redirected through call stubs together or not at all; both DecryptHeader2 calls must lead to the same function, and a call another mod has redirected is left alone. The encryption tag is kept per thread, so archives opened at the same time never mix; only an OPEN archive's entry table is walked, and only a plausible one;
   - The cache check: the function it calls (`R-E-K1`) gets `C3 90`; a check another mod already skipped is left alone and is not a problem. The console patch (`R-E-C1`) only with `CONSOLE=1`;
-  - Every write goes through `TweaksVPatch`, every hook through its MinHook helper: the threads are frozen once per group, a group that cannot be completed is removed again, every page gets its own protection back, and the call stubs are never writable and executable at once;
-  - With `DIAGNOSTIC_MODE=1` every site and write is logged, then every file request, every file served from `mods\` and every archive header read - 20,000 lines of each kind at most, then only counted (1.6.0 had `LOG_INFO` and `LOG_MODS`, uncapped: one diagnostic boot wrote 21,000 of their lines in a few minutes) - and a summary 10 seconds in, then every minute while the numbers change; off, a hook costs one comparison;
-  - A failure is reported in the start-up summary and leaves the game as it was;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE.
+  - With `DIAGNOSTIC_MODE=1` every site and write is logged, then every file request, every file served from `mods\` and every archive header read - 20,000 lines of each kind at most, then only counted - and a summary 10 seconds in, then every minute while the numbers change; off, a hook costs one comparison.
 
-- **DirectStorage (TweaksV's own part):** `[DIRECTSTORAGE]` in `TweaksV.ini` (`ENABLED`, `UNLOCK_FILES`):
+- **DirectStorage:** `[DIRECTSTORAGE]` in `TweaksV.ini` (`ENABLED`, `UNLOCK_FILES`):
   - `UNLOCK_FILES=1` (on by default) lets DirectStorage open only the `.rpf` and `.cache` files in the game folder. The game asks it to open every file in its folder at start-up and keeps them locked; the folder's other files are now refused as "not found", so they can be written, renamed and deleted while the game runs;
   - Files outside the game folder are never refused: the game reads its saves and `pc_settings.bin` (`Documents\Rockstar Games\GTAV Enhanced\Profiles`) and its cloud files in `%TEMP%` through DirectStorage, too;
   - It hooks the factory's `OpenFile` while the game creates the factory, before its first file, so it needs no game patterns. A summary 10 seconds later counts the files opened and refused;
-  - With `DIAGNOSTIC_MODE=1` (1.6.0 had `LOG_CALLS` and `LOG_FILE_OPENS`) it logs the game's calls into `dstorage.dll` and every `OpenFile`, the factory's functions and the configuration values, and every open of a file or folder inside the game folder, with the access, sharing, result and caller - 20,000 lines at most, then the opens are only counted - plus a summary every minute;
+  - With `DIAGNOSTIC_MODE=1` it logs the game's calls into `dstorage.dll` and every `OpenFile`, the factory's functions and the configuration values, and every open of a file or folder inside the game folder, with the access, sharing, result and caller - 20,000 lines at most, then the opens are only counted - plus a summary every minute;
   - alloc8or's `DirectStorageFix.asi` counts as an old plugin: with it installed, this part is switched off;
-  - It supports DRY_RUN and DIAGNOSTIC_MODE;
   - Confirmed on 1.0.1158.16: of the 454 files the game asked DirectStorage for at start-up, the 180 `.rpf` and `.cache` files were opened and the other 274 refused (among them `TweaksV.asi`, `ScriptHookV.dll`, `xinput1_4.dll` and the text and INI files). The save loaded, the game ran normally, and a text file in the game folder could be renamed while playing.
 
 - **Hook:** `TweaksV.asi` stays loaded once enabled until the game exits.
@@ -125,7 +111,6 @@
   - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four. Control Flow Guard and CET only take effect in a game that turns them on itself, which GTA V Enhanced 1.0.1158.16 does not; TweaksV carries them so that it never leaves a gap in a game that does, nor is refused by one.
 
 - **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from; the mod page carries the credits and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
-  - Provenance: RageOpenV's README asks that its binaries not be redistributed - a request, not a license term (the GPL-3.0 allows redistribution and forbids further restrictions), so the credits stay prominent; martonp96's original ClosedIV repository is no longer public, and RageOpenV's README is the source of that credit.
 
 - **Tests:** `test\` holds fake-game test suites (429 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
@@ -138,6 +123,12 @@ Known bugs and open issues in TweaksV.
 - **What:** MinHook, the hook library, keeps the trampolines of TweaksV's hooks in memory that is writable and executable at once. That only helps an attack that can already write to the game's memory. The rest of the code review's hardening is done: links, the user name and the size limit of `TweaksV.log`, problems after the start-up summary, the exploit mitigations.
 - **Status:** accepted. It is MinHook's own design, and `vendor\MinHook` stays unchanged; TweaksV's own stubs are never writable and executable at once.
 - **When it goes:** when MinHook keeps its trampolines read and execute only, or TweaksV moves to a hook library that does.
+
+### T-TRY: the two summary threads have no try
+
+- **What:** the thread that shows the start-up summary and the one that shows a late problem build their strings and show their box without a `try`; every hook and every measurement thread puts what can throw inside one. An exception there - only memory exhaustion while building a short string could raise one - would end the game instead of one message box.
+- **Status:** open; found while writing SPECIFICATIONS.md.
+- **When it goes:** with the next code change: the two thread bodies wrapped the way the measurement threads' are.
 
 ## Bugs Found in the Originals
 
@@ -173,10 +164,10 @@ What the merge found in the five original projects, with the file and line in th
 | B-PACK-02 | robust | `EnhancedPatch`, line 120: the second `VirtualProtect` passes `PAGE_EXECUTE_READWRITE` instead of the old protection, leaving the page writable and executable | every page gets its own protection back |
 | B-PACK-03 | corrupt, latent | `RelocateRelativePackFileArray`, line 178: an assert-only consistency check, as B-MOD-01 | a real check |
 | B-PACK-04 | crash, latent | `initializeGame`, lines 51-53: the allocation is not checked before the `memset` | checked |
-| B-PACK-05 | corrupt, latent | lines 55-64 and 325-335: the limits are raised before the array is moved, so a failed move leaves raised limits on the small array; `FatalErrorExit` exits inside DllMain | the array is moved first, always at full size; two passes; a failure is reported, never fatal |
+| B-PACK-05 | corrupt, latent | lines 55-64 and 325-335: the limits are raised before the array is moved, so a failed move leaves raised limits on the small array; `FatalErrorExit` exits inside DllMain | one all-or-nothing write of the references, the limits and the call; a failure is reported, never fatal |
 | B-PACK-06 | corrupt, latent | line 182: every reference is pointed at the new array's start without checking that it pointed at the old array's start | every reference must point at the same array, inside the game |
 | B-PACK-07 | robust | line 40: no clamp; the code's default 12000 differs from the released INI's 13000 | clamped; the default is 13000 |
-| B-PACK-08 | build break | `Logging.h` line 5 defines a non-inline global in a header every .cpp includes: linking fails with LNK2005 "LOGFILE already defined" and LNK1169 (MSVC 14.51), so the published project does not build; `Game.h` declares static functions in a header | the global is gone; the static functions are declared in `Game.cpp` |
+| B-PACK-08 | build break | `Logging.h` line 5 defines a non-inline global in a header every .cpp includes: linking fails with LNK2005 "LOGFILE already defined" and LNK1169 (MSVC 14.51), so the published project does not build; `Game.h` declares static functions in a header | none of that code remains |
 
 ### StraightToStoryMode (`Game.cpp`)
 
@@ -203,13 +194,13 @@ What the merge found in the five original projects, with the file and line in th
 | B-ROV-09 | robust | `memory.h` lines 153-159, `memory::hook`: `MH_EnableHook(MH_ALL_HOOKS)` after every hook, freezing all threads each time | hooks are queued, one apply per group |
 | B-ROV-10 | robust | `main.cpp` lines 3-10: the one-time guard is a plain `bool` | an atomic, claimed with `exchange` before the start-up runs; the hook switches itself off afterwards |
 | B-ROV-11 | robust | `utils\log.cpp` lines 16, 33 and 35: a 256-byte line buffer truncates paths; `printf` on every line even without a console; INI lookups and a file open per line | lines go to `TweaksV.log`; the switches are read once |
-| B-ROV-12 | robust | `fiDevice.cpp`: a "device" log line is formatted on every device call even when device logging is off | the switch is checked first |
-| B-ROV-13 | corrupt | `fiDevice.cpp` lines 51 and 92-98, `Open` and `Close`: `Open` allocates an `ifstream` that `Close` never deletes - memory and a file handle leak per file | deleted in `Close` |
-| B-ROV-14 | corrupt | `fiDevice.cpp` line 46: the `handleNames` map is used from several game threads without a lock, and `operator[]` in log calls inserts entries | a shared mutex; log calls insert nothing |
-| B-ROV-15 | robust | `fiDevice.cpp` line 156, `FindFileBegin`: `wprintf_s(fileName, 256, ...)` prints to stdout with the name as the format string instead of formatting into it, so the search always fails | formatted into a buffer of the real length |
-| B-ROV-16 | corrupt | `fiDevice.cpp` line 402, `ConvertFoundData`: `*(uint64*)&nFileSizeHigh` swaps the halves of the file size | `(high << 32) \| low` |
-| B-ROV-17 | hang | `fiDevice.cpp` lines 232-240, `SafeRead`: `bytesRead` is unsigned, so `bytesRead < 0` is never true and the loop never ends at the end of a file | stops when 0 bytes are read |
-| B-ROV-18 | robust | `fiDevice.cpp` line 86, `Seek64`: `SEEK_END` subtracts the distance; Win32 adds it | newmods, and this bug with it, is gone in 2.0.0 |
-| B-ROV-19 | corrupt | `fiDevice.cpp` lines 56-70, `ReadFile` and `ReadBulk`: after a short read the stream's failbit is set and every later `seekg` and `read` silently fails | the stream is cleared before seeking |
-| B-ROV-20 | hygiene | dead code: `memory::HookIAT`, `memory::ret`, `memory::make_jmp_ret`, `memory::call`, `rage::fiDeviceRelative`, the "rpf" log key; lazy scans inside game calls | removed; `Mount` and `SetPath` are resolved at start-up |
-| B-ROV-21 | robust | paths relative to the current directory (`CustomDevice.cpp` line 36, `fiDevice.h` line 138, `FileReadHooks.cpp` line 22); `ToFullPath` ignores each device's `SetPath`; DllMain writes `RageOpenV.ini` and uses `std::filesystem` calls that can throw | absolute paths, logged at start-up; `TweaksV.ini`; non-throwing calls |
+| B-ROV-12 | robust | `fiDevice.cpp`: a "device" log line is formatted on every device call even when device logging is off | gone with newmods; 1.x checked the switch first |
+| B-ROV-13 | corrupt | `fiDevice.cpp` lines 51 and 92-98, `Open` and `Close`: `Open` allocates an `ifstream` that `Close` never deletes - memory and a file handle leak per file | gone with newmods; 1.x deleted it in `Close` |
+| B-ROV-14 | corrupt | `fiDevice.cpp` line 46: the `handleNames` map is used from several game threads without a lock, and `operator[]` in log calls inserts entries | gone with newmods; 1.x used a shared mutex, and its log calls inserted nothing |
+| B-ROV-15 | robust | `fiDevice.cpp` line 156, `FindFileBegin`: `wprintf_s(fileName, 256, ...)` prints to stdout with the name as the format string instead of formatting into it, so the search always fails | gone with newmods; 1.x formatted into a buffer of the real length |
+| B-ROV-16 | corrupt | `fiDevice.cpp` line 402, `ConvertFoundData`: `*(uint64*)&nFileSizeHigh` swaps the halves of the file size | gone with newmods; 1.x: `(high << 32) \| low` |
+| B-ROV-17 | hang | `fiDevice.cpp` lines 232-240, `SafeRead`: `bytesRead` is unsigned, so `bytesRead < 0` is never true and the loop never ends at the end of a file | gone with newmods; 1.x stopped when 0 bytes were read |
+| B-ROV-18 | robust | `fiDevice.cpp` line 86, `Seek64`: `SEEK_END` subtracts the distance; Win32 adds it | gone with newmods |
+| B-ROV-19 | corrupt | `fiDevice.cpp` lines 56-70, `ReadFile` and `ReadBulk`: after a short read the stream's failbit is set and every later `seekg` and `read` silently fails | gone with newmods; 1.x cleared the stream before seeking |
+| B-ROV-20 | hygiene | dead code: `memory::HookIAT`, `memory::ret`, `memory::make_jmp_ret`, `memory::call`, `rage::fiDeviceRelative`, the "rpf" log key; lazy scans inside game calls | none of that code remains |
+| B-ROV-21 | robust | paths relative to the current directory (`CustomDevice.cpp` line 36, `fiDevice.h` line 138, `FileReadHooks.cpp` line 22); `ToFullPath` ignores each device's `SetPath`; DllMain writes `RageOpenV.ini` and uses `std::filesystem` calls that can throw | the mods folder is read once at start-up, its lookups never touch the file system; `TweaksV.ini`; non-throwing calls |

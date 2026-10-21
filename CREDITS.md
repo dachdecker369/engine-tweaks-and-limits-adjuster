@@ -13,7 +13,7 @@ TweaksV's parts are rewritten from the projects below; the research and the orig
 
 ## The work those plugins build on
 
-- **martonp96** - the original ClosedIV, the basis of RageOpenV - https://github.com/martonp96
+- **martonp96** - the original ClosedIV, the basis of RageOpenV (its repository is no longer public; RageOpenV's README is the source of this credit) - https://github.com/martonp96
 - **CitizenFX Collective** - the original GTA V heap adjuster - https://github.com/citizenfx/gtav-heap-adjuster
 - **Dilapidated** - the INI-configurable heap adjuster - https://github.com/Dilapidated/gtav-HeapAdjuster-ini
 - **alloc8or ("Unknown Modder")** - the original Packfile Limit Adjuster and the Enhanced landing-page patch - https://github.com/alloc8or
