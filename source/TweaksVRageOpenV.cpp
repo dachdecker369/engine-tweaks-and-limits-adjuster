@@ -403,8 +403,9 @@ namespace TweaksV
 				fail("the file functions could not be hooked (details in TweaksV.log).");
 				return;
 			}
-			for (const FunctionHook& hook : hooks)
-				WriteLog(kTag, std::string(hook.what) + " hooked at " + DescribeAddress(hook.function) + ".");
+			if (g_diagnostic)
+				for (const FunctionHook& hook : hooks)
+					WriteLog(kTag, "DIAGNOSTIC: " + std::string(hook.what) + " hooked at " + DescribeAddress(hook.function) + ".");
 			WriteLog(kTag, "Files in the mods folder are used (8 file functions hooked).");
 			g_filesHooked = true;
 		}
