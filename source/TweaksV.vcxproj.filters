@@ -5,9 +5,6 @@
     <Filter Include="TweaksV">
       <UniqueIdentifier>{E237D3E8-FFA3-4BB3-A59E-AEA4FAB6295D}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shared">
-      <UniqueIdentifier>{82CD2E76-CA21-4C93-940E-10F7C0B761D4}</UniqueIdentifier>
-    </Filter>
     <Filter Include="MinHook">
       <UniqueIdentifier>{F39B3B09-5489-40B0-B40A-92558779CAF3}</UniqueIdentifier>
     </Filter>
@@ -37,6 +34,9 @@
     <ClCompile Include="TweaksVFiles.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVGame.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVHeapAdjuster.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -61,6 +61,9 @@
     <ClCompile Include="TweaksVRelocation.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVScanner.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVSettings.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -69,15 +72,6 @@
     </ClCompile>
     <ClCompile Include="TweaksVSummary.cpp">
       <Filter>TweaksV</Filter>
-    </ClCompile>
-    <ClCompile Include="ClearLog.cpp">
-      <Filter>Shared</Filter>
-    </ClCompile>
-    <ClCompile Include="MemScanner.cpp">
-      <Filter>Shared</Filter>
-    </ClCompile>
-    <ClCompile Include="StubMemory.cpp">
-      <Filter>Shared</Filter>
     </ClCompile>
     <ClCompile Include="..\vendor\MinHook\src\buffer.c">
       <Filter>MinHook</Filter>
@@ -114,6 +108,9 @@
     <ClInclude Include="TweaksVFiles.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <ClInclude Include="TweaksVGame.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVHeapAdjuster.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
@@ -141,6 +138,9 @@
     <ClInclude Include="TweaksVRelocation.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <ClInclude Include="TweaksVScanner.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVSettings.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
@@ -149,21 +149,6 @@
     </ClInclude>
     <ClInclude Include="TweaksVSummary.h">
       <Filter>TweaksV</Filter>
-    </ClInclude>
-    <ClInclude Include="ClearLog.h">
-      <Filter>Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="GameVersion.h">
-      <Filter>Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="IsEnhanced.h">
-      <Filter>Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="MemScanner.h">
-      <Filter>Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="StubMemory.h">
-      <Filter>Shared</Filter>
     </ClInclude>
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h">
       <Filter>MinHook</Filter>

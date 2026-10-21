@@ -25,10 +25,10 @@
 #include <string>
 #include <vector>
 
-#include "MemScanner.h"
 #include "TweaksVConflicts.h"
 #include "TweaksVLog.h"
 #include "TweaksVPatch.h"
+#include "TweaksVScanner.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
 
@@ -91,7 +91,7 @@ namespace TweaksV
 				WriteLog(kTag, "SKIP_SPLASH_SCREEN=0 - the splash screen is not skipped.");
 				return;
 			}
-			uint8_t* const match = MemScanner::Find(Pattern("S-E1"));
+			uint8_t* const match = Scanner::Find(Pattern("S-E1"));
 			if (!match)
 			{
 				Fail(kScreen, "S-E1 was not found.");
@@ -136,7 +136,7 @@ namespace TweaksV
 				WriteLog(kTag, "SKIP_LEGAL_SCREEN=0 - the legal screen is not skipped.");
 				return;
 			}
-			uint8_t* const match = MemScanner::Find(Pattern("S-E2"));
+			uint8_t* const match = Scanner::Find(Pattern("S-E2"));
 			if (!match)
 			{
 				Fail(kScreen, "S-E2 was not found.");
@@ -167,7 +167,7 @@ namespace TweaksV
 				WriteLog(kTag, "SKIP_LANDING_PAGE=0 - the landing page is not skipped.");
 				return;
 			}
-			uint8_t* const match = MemScanner::Find(Pattern("S-E3"));
+			uint8_t* const match = Scanner::Find(Pattern("S-E3"));
 			if (!match)
 			{
 				Fail(kScreen, "S-E3 was not found.");

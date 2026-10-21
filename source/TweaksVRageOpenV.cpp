@@ -41,12 +41,12 @@
 #include <unordered_set>
 #include <vector>
 
-#include "MemScanner.h"
 #include "TweaksVConflicts.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
 #include "TweaksVPatch.h"
 #include "TweaksVPatterns.h"
+#include "TweaksVScanner.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
 
@@ -351,7 +351,7 @@ namespace TweaksV
 					const FileFunction& function = functions[device][i];
 					const char* const name = kFunctionNames[device][i];
 					const std::string label = function.pattern->label;
-					uint8_t* const match = MemScanner::Find(*function.pattern);
+					uint8_t* const match = Scanner::Find(*function.pattern);
 					if (!match)
 					{
 						fail(label + " was not found (" + name + ").");
@@ -534,7 +534,7 @@ namespace TweaksV
 			{
 				const ArchiveCall& call = kCalls[i];
 				const std::string label = call.pattern->label;
-				uint8_t* const match = MemScanner::Find(*call.pattern);
+				uint8_t* const match = Scanner::Find(*call.pattern);
 				if (!match)
 				{
 					fail(label + " was not found (the " + call.name + ").");
@@ -585,7 +585,7 @@ namespace TweaksV
 				return;
 			}
 			const auto fail = [](const std::string& why) { ReportFailure(kTag, "The RPF cache check is not skipped this session: " + why); };
-			uint8_t* const call = MemScanner::Find(Pattern("R-E-K1"));
+			uint8_t* const call = Scanner::Find(Pattern("R-E-K1"));
 			if (!call)
 			{
 				fail("R-E-K1 was not found.");
@@ -622,7 +622,7 @@ namespace TweaksV
 				return;
 			constexpr size_t kCallOffset = 16;
 			constexpr size_t kCallSizeIndirect = 6;	// "call [rip+disp32]": FF 15 disp32
-			uint8_t* const match = MemScanner::Find(Pattern("R-E-C1"));
+			uint8_t* const match = Scanner::Find(Pattern("R-E-C1"));
 			if (!match)
 			{
 				WriteLog(kTag, "Console: R-E-C1 was not found - the game may hide the console.");

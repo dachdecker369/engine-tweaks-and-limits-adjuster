@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // TweaksV - the one place that patches the game's code: WriteCode writes bytes, RedirectCalls sends
 // calls to TweaksV. Both are all or nothing, give every page its own protection back and honour
-// DRY_RUN and DIAGNOSTIC_MODE, so no part of TweaksV has to. Plus small helpers for reading code.
+// DRY_RUN and DIAGNOSTIC_MODE, so no part of TweaksV has to. Plus small helpers for reading code, and
+// memory near the game for what the parts put there.
 // A hook on a function's start - RageOpenV's file functions, DirectStorage's OpenFile - is MinHook's,
 // through HookFunctions and HookExport below (TweaksVDirectStorage.cpp still calls MinHook itself).
 #pragma once
@@ -83,6 +84,10 @@ namespace TweaksV
 	// True if the size bytes at address are committed memory that can be read. A site that lies before or
 	// after a pattern's match is read only after this check: the scan read the match alone.
 	bool IsReadable(const void* address, size_t size);
+
+	// size bytes of memory near the game - read/write, committed, zeroed, within 1 GB below the game's image,
+	// where a rel32 in the game's code reaches - or nullptr. For the moved arrays and the call stubs.
+	void* AllocateNearGame(size_t size);
 
 	// ---- hooks on a function's start (MinHook)
 

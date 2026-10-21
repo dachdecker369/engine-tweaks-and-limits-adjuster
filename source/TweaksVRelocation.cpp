@@ -8,10 +8,9 @@
 #include <cstring>
 #include <string>
 
-#include "MemScanner.h"
-#include "StubMemory.h"
 #include "TweaksVConflicts.h"
 #include "TweaksVLog.h"
+#include "TweaksVScanner.h"
 #include "TweaksVSummary.h"
 
 namespace TweaksV
@@ -79,7 +78,7 @@ namespace TweaksV
 			const Anchor& anchor = spec.anchors[a];
 			const std::string label = anchor.pattern->label;
 			std::vector<uint8_t*>& matches = plan.matches[a];
-			matches = MemScanner::FindAll(*anchor.pattern, anchor.matches + 1);
+			matches = Scanner::FindAll(*anchor.pattern, anchor.matches + 1);
 			if (matches.size() != anchor.matches)
 			{
 				if (matches.empty())
@@ -209,7 +208,7 @@ namespace TweaksV
 		}
 		else
 		{
-			const std::vector<uint8_t*> loads = MemScanner::FindRipRelativeLeas(plan.array, spec.scannedReferences + 1);
+			const std::vector<uint8_t*> loads = Scanner::FindRipRelativeLeas(plan.array, spec.scannedReferences + 1);
 			if (diagnostic)
 				for (const uint8_t* load : loads)
 					WriteLog(spec.tag, "DIAGNOSTIC: reference at " + DescribeAddress(load) + " -> " + DescribeAddress(plan.array) + " (lea scan)");
@@ -260,7 +259,7 @@ namespace TweaksV
 
 		// the new array: always the full maxEntries, read/write data near the game (a lea reaches +-2 GB),
 		// zeroed by Windows
-		uint8_t* const newArray = static_cast<uint8_t*>(AllocateStubMemory(spec.entrySize * spec.maxEntries, PAGE_READWRITE));
+		uint8_t* const newArray = static_cast<uint8_t*>(AllocateNearGame(spec.entrySize * spec.maxEntries));
 		if (!newArray)
 		{
 			RelocationFailed(spec, "the new " + name + " could not be allocated near the game.");

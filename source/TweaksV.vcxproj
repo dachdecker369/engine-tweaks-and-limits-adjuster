@@ -31,8 +31,8 @@
   </ImportGroup>
   <PropertyGroup>
     <!-- TweaksV's version: in BuildInfo.h (the log header) and version.rc (the file's version info) -->
-    <TweaksVVersionMajor>1</TweaksVVersionMajor>
-    <TweaksVVersionMinor>6</TweaksVVersionMinor>
+    <TweaksVVersionMajor>2</TweaksVVersionMajor>
+    <TweaksVVersionMinor>0</TweaksVVersionMinor>
     <TweaksVVersionPatch>0</TweaksVVersionPatch>
     <TweaksVRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..'))</TweaksVRoot>
     <TargetName>TweaksV</TargetName>
@@ -130,6 +130,7 @@
     <ClCompile Include="TweaksVDump.cpp" />
     <ClCompile Include="TweaksVFeatures.cpp" />
     <ClCompile Include="TweaksVFiles.cpp" />
+    <ClCompile Include="TweaksVGame.cpp" />
     <ClCompile Include="TweaksVHeapAdjuster.cpp" />
     <ClCompile Include="TweaksVIni.cpp" />
     <ClCompile Include="TweaksVLog.cpp" />
@@ -138,12 +139,10 @@
     <ClCompile Include="TweaksVPatch.cpp" />
     <ClCompile Include="TweaksVRageOpenV.cpp" />
     <ClCompile Include="TweaksVRelocation.cpp" />
+    <ClCompile Include="TweaksVScanner.cpp" />
     <ClCompile Include="TweaksVSettings.cpp" />
     <ClCompile Include="TweaksVStraightToStoryMode.cpp" />
     <ClCompile Include="TweaksVSummary.cpp" />
-    <ClCompile Include="ClearLog.cpp" />
-    <ClCompile Include="MemScanner.cpp" />
-    <ClCompile Include="StubMemory.cpp" />
     <!-- MinHook v1.3.4, compiled unchanged from vendor\MinHook (x64 only: hde64, not hde32), at warning
          level 3, which it builds without a warning: its code is not TweaksV's to change, and /W4 finds
          its own warnings -->
@@ -168,6 +167,7 @@
     <ClInclude Include="TweaksVDump.h" />
     <ClInclude Include="TweaksVFeatures.h" />
     <ClInclude Include="TweaksVFiles.h" />
+    <ClInclude Include="TweaksVGame.h" />
     <ClInclude Include="TweaksVHeapAdjuster.h" />
     <ClInclude Include="TweaksVIni.h" />
     <ClInclude Include="TweaksVLog.h" />
@@ -177,14 +177,10 @@
     <ClInclude Include="TweaksVPatterns.h" />
     <ClInclude Include="TweaksVRageOpenV.h" />
     <ClInclude Include="TweaksVRelocation.h" />
+    <ClInclude Include="TweaksVScanner.h" />
     <ClInclude Include="TweaksVSettings.h" />
     <ClInclude Include="TweaksVStraightToStoryMode.h" />
     <ClInclude Include="TweaksVSummary.h" />
-    <ClInclude Include="ClearLog.h" />
-    <ClInclude Include="GameVersion.h" />
-    <ClInclude Include="IsEnhanced.h" />
-    <ClInclude Include="MemScanner.h" />
-    <ClInclude Include="StubMemory.h" />
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h" />
   </ItemGroup>
   <ItemGroup>

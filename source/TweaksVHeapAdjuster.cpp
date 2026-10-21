@@ -19,9 +19,9 @@
 #include <cstring>
 #include <string>
 
-#include "MemScanner.h"
 #include "TweaksVLog.h"
 #include "TweaksVPatch.h"
+#include "TweaksVScanner.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
 
@@ -46,7 +46,7 @@ namespace TweaksV
 	void InitHeapAdjuster()
 	{
 		// 1. the site: the imm32 of "mov edx, imm32" (BA imm32), one byte into the match
-		uint8_t* const match = MemScanner::Find(Pattern("H-E1"));
+		uint8_t* const match = Scanner::Find(Pattern("H-E1"));
 		if (!match)
 		{
 			Fail("H-E1 was not found.");

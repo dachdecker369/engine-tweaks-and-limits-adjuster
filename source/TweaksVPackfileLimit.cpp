@@ -24,8 +24,8 @@
 #include <string>
 #include <vector>
 
-#include "GameVersion.h"
 #include "TweaksVConflicts.h"
+#include "TweaksVGame.h"
 #include "TweaksVLog.h"
 #include "TweaksVPatch.h"
 #include "TweaksVRelocation.h"
@@ -40,8 +40,8 @@ namespace TweaksV
 		constexpr uint32_t kMaxEntries = 65535;	// archive indices are 16-bit
 		static_assert(kMaxEntries == static_cast<uint32_t>(kPackfileArraySize.maxValue), "TweaksV: PACKFILEARRAY_SIZE's maximum must be the array's size");
 
-		constexpr FileVersion kVersion1013_17{ 1, 0, 1013, 17 };	// the Mansions DLC: the second direct size pattern
-		constexpr FileVersion kVersion1158_13{ 1, 0, 1158, 13 };	// the Kortz Center DLC: the third, and the other reference
+		constexpr GameVersion kVersion1013_17{ 1, 0, 1013, 17 };	// the Mansions DLC: the second direct size pattern
+		constexpr GameVersion kVersion1158_13{ 1, 0, 1158, 13 };	// the Kortz Center DLC: the third, and the other reference
 
 		constexpr char kCmpRcx[] = "\x48\x81\xF9";	// cmp rcx, imm32: the direct size
 		constexpr size_t kCallOffset = 0x10;		// of the streaming configuration call in P-E-H1's match
@@ -105,15 +105,15 @@ namespace TweaksV
 	void InitPackfileLimit()
 	{
 		// the patterns of this game build: without its file version they cannot be chosen
-		const uint64_t version = GetCurrentProcessVersionComparable();
+		const uint64_t version = GameVersionNumber();
 		if (version == 0)
 		{
 			RelocationFailed(kSpecBase, "the game's file version could not be read, so the patterns for this game build cannot be chosen.");
 			return;
 		}
 		std::vector<Anchor> anchors(std::begin(kReferences), std::end(kReferences));
-		anchors.push_back(version >= kVersion1158_13.ToComparable() ? kReference31a : kReference31b);
-		anchors.push_back(version >= kVersion1158_13.ToComparable() ? kDirect3 : version >= kVersion1013_17.ToComparable() ? kDirect2 : kDirect1);
+		anchors.push_back(version >= kVersion1158_13.Number() ? kReference31a : kReference31b);
+		anchors.push_back(version >= kVersion1158_13.Number() ? kDirect3 : version >= kVersion1013_17.Number() ? kDirect2 : kDirect1);
 		anchors.push_back(kIndirect);
 		anchors.push_back(kCall);
 		RelocationSpec spec = kSpecBase;

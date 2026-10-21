@@ -38,9 +38,9 @@
 #include <utility>
 #include <vector>
 
-#include "MinHook.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
+#include "TweaksVPatch.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
 
@@ -784,15 +784,8 @@ namespace TweaksV
 				return;
 			}
 
-			MH_STATUS status = MH_CreateHook(target, reinterpret_cast<LPVOID>(&HookOpenFile), reinterpret_cast<LPVOID*>(&g_originalOpenFile));
-			if (status == MH_OK)
-			{
-				status = MH_EnableHook(target);
-				if (status != MH_OK)
-					MH_RemoveHook(target);
-			}
-			if (status != MH_OK)
-				fail("OpenFile (" + DescribeCode(target) + ") could not be hooked (MinHook: " + MH_StatusToString(status) + ")");
+			if (!HookFunctions({ { target, reinterpret_cast<const void*>(&HookOpenFile), reinterpret_cast<void**>(&g_originalOpenFile), "OpenFile" } }, kTag))
+				fail("OpenFile (" + DescribeCode(target) + ") could not be hooked (details in TweaksV.log)");
 			else if (g_unlockFiles)
 				WriteLog(kTag, "UNLOCK_FILES: from now on DirectStorage may open only the .rpf and .cache files in the game "
 					"folder (OpenFile at " + DescribeCode(target) + " hooked); files outside it are not touched.");
@@ -920,20 +913,7 @@ namespace TweaksV
 
 		bool InstallHook(const wchar_t* module, const char* function, LPVOID detour, LPVOID* original)
 		{
-			LPVOID target = nullptr;
-			MH_STATUS status = MH_CreateHookApiEx(module, function, detour, original, &target);
-			if (status == MH_OK)
-			{
-				status = MH_EnableHook(target);
-				if (status != MH_OK)
-					MH_RemoveHook(target);
-			}
-			if (status != MH_OK)
-			{
-				WriteLog(kTag, std::string(function) + " could not be hooked (MinHook: " + MH_StatusToString(status) + ").");
-				return false;
-			}
-			return true;
+			return HookExport(module, function, detour, original, nullptr, kTag);
 		}
 
 		// DirectStorageFix.asi in a folder an ASI loader loads from, or empty
@@ -981,13 +961,6 @@ namespace TweaksV
 				WriteLog(kTag, "DRY_RUN: would hook dstorage.dll to log the game's DirectStorage calls.");
 			if (logOpens)
 				WriteLog(kTag, "DRY_RUN: would hook NtCreateFile to log the opens in the game folder.");
-			return;
-		}
-
-		const MH_STATUS init = MH_Initialize();
-		if (init != MH_OK && init != MH_ERROR_ALREADY_INITIALIZED)
-		{
-			WriteLog(kTag, std::string("MinHook could not be initialised (") + MH_StatusToString(init) + ") - nothing is unlocked or logged.");
 			return;
 		}
 

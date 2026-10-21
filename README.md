@@ -1,42 +1,56 @@
 # TweaksV
 
-TweaksV merges five GTA V Enhanced ASI plugins by [Chiheb-Bacha](https://github.com/Chiheb-Bacha) into one plugin, `TweaksV.asi`, and adds three parts of its own: a DirectStorage fix, a larger traversal list for the game's box streamer and a larger array of decal definitions.
+TweaksV is one ASI plugin for GTA V Enhanced, `TweaksV.asi`, with eight parts: a larger memory heap, room for more vehicle modkits and more RPF archives, a larger traversal list for the game's box streamer, more decal definitions, a mods folder with unencrypted archives, a start straight into Story Mode, and the files DirectStorage keeps locked set free. Five of the parts are written anew from plugins by [Chiheb-Bacha](https://github.com/Chiheb-Bacha), which TweaksV 1.x merged as they were; since 2.0.0 every part is TweaksV's own code, built on the patterns and the research of the originals. Each part has its own section in `TweaksV.ini` and can be switched off there.
 
-## Plugins Merged
+## Parts
 
-| Original plugin |
-|---|
-| [HeapAdjusterEnhanced](https://github.com/Chiheb-Bacha/HeapAdjusterEnhanced) |
-| [ModkitLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced) |
-| [PackfileLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/PackfileLimitAdjusterEnhanced) |
-| [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV) |
-| [StraightToStoryMode](https://github.com/Chiheb-Bacha/StraightToStoryMode) |
+### HeapAdjuster
 
-## DirectStorage
+`HEAP_SIZE` under `[HEAP_ADJUSTER]` (default 2000 MB, 1 to 2047) sets the size of the game's memory heap, one number in its start-up code; the game's own is 646 MB. A value below the game's own is raised to it. A heap of 1024 MB or more is not the game's own: another heap adjuster set it, and TweaksV leaves it as it is and says so in the log. Replaces HeapAdjusterEnhanced.
 
-With DirectStorage on, GTA V Enhanced opens the files in its folder at start-up, not just its archives, and keeps them open. Other programs can then only read them: while the game runs, mods can't write their own files there and scripts can't be reloaded.
+### ModkitLimit
 
-`UNLOCK_FILES=1` under `[DIRECTSTORAGE]` in `TweaksV.ini` (on by default) lets DirectStorage open only the `.rpf` and `.cache` files in the game folder, the ones it reads there. Every other file in the game folder stays free. Files outside the game folder are never refused: the game reads its saves and settings through DirectStorage, too.
+`MODKITARRAY_SIZE` under `[MODKIT_LIMIT]` (default 65536, up to 65536) moves the game's array of vehicle modkit IDs, 1024 entries, to a larger one and raises the eight limits the game's code carries for it, so more add-on vehicles with modkits of their own fit. Replaces ModkitLimitAdjusterEnhanced.
 
-With `DIAGNOSTIC_MODE=1` the part logs the game's calls into DirectStorage, including every file it asks DirectStorage to open, and every file and folder in the game folder that is opened, with its access, sharing, result and caller (see "TweaksV.ini" below).
+### PackfileLimit
 
-The idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/DirectStorageFix); TweaksV's code is its own. With `DirectStorageFix.asi` installed, TweaksV switches its own DirectStorage part off.
+`PACKFILEARRAY_SIZE` under `[PACKFILE_LIMIT]` (default 13000, up to 65535) moves the game's array of RPF archives, 7260 entries, to a larger one, raises both limits the game's code carries for it, and replaces the archive count of `gameconfig.xml` with the same number when the game reads its configuration, so more add-on archives load. Replaces PackfileLimitAdjusterEnhanced.
 
-## Box streamer
+### BoxStreamer
 
 The game's box streamer finds the map boxes to stream for the area around the player and keeps what one search returns in a list of 1000 entries. With heavy map mods a search returns more: the boxes the list has no room for are never streamed, and their LODs are missing.
 
-`TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER]` in `TweaksV.ini` (default 10000, up to 100000) moves the list to a larger one. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own.
+`TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER]` (default 10000, up to 100000) moves the list to a larger one. TweaksV's own part; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy, and none of their code is used.
 
 With `DIAGNOSTIC_MODE=1` the part counts the searches and logs, 10 seconds in and then every minute, how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all.
 
-## Decal definitions
+### Decals
 
 The game reads its decal definitions - the kinds of bullet holes, blood, scorch and tyre marks, liquids, graffiti and so on - from the `decals.dat` files into an array of 260 entries. Once 260 are registered, every further definition is dropped silently; the files are read in order, so it is the definitions of the last files - add-on and mod content - that go missing, and the decals that use them never appear. This is a limit on the kinds of decal, not on the decals on screen. Vanilla 1.0.1158.16 already registers 259 of the 260, so a mod that adds two definitions is one too many for the game's own array.
 
-`DECALDEFS_SIZE` under `[DECALS]` in `TweaksV.ini` (default 2048, up to 16384) moves the array to a larger one and raises the limit everywhere the game uses it. The idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy; TweaksV's code is its own, written from TweaksV's own findings about the game. The published patches were known as the idea and as a guide to what to look for; no line of their code was read for the build or went into TweaksV.
+`DECALDEFS_SIZE` under `[DECALS]` (default 2048, up to 16384) moves the array to a larger one and raises the limit everywhere the game uses it. TweaksV's own part, written from TweaksV's own findings about the game; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy. The published patches were known as the idea and as a guide to what to look for; no line of their code was read for the build or went into TweaksV.
 
 With `DIAGNOSTIC_MODE=1` the part logs how many decal definitions are registered - 10 seconds in and then every minute while the number changes - and whether the game's own array of 260 would have dropped some, so you can see whether your load needs the larger array at all. With `DRY_RUN=1` as well, it measures the game as it is.
+
+### RageOpenV
+
+Three switches under `[RAGEOPENV]`. With `MODS_FOLDER=1`, a file that exists under the `mods` folder in the game folder is served instead of the game's own, by the same path (`mods\update\update.rpf` for `update\update.rpf`); the folder is read once at start-up, so a file added while the game runs is seen at the next start. With `OPEN_RPF=1`, RPF archives that are not encrypted - the kind OpenIV writes, marked OPEN - load. With `SKIP_RPF_CACHE_CHECK=1`, the game's check of its RPF cache is skipped, which modified archives need. Replaces RageOpenV; OpenIV's `OpenIV.asi` and `OpenRPF.asi` do the same job and must not be installed next to TweaksV. The experimental newmods folder of the original is not carried over.
+
+With `DIAGNOSTIC_MODE=1` the part logs every file the game asks for, every file served from the mods folder and every archive header read, 20,000 lines of each kind at most, with a summary 10 seconds in and then every minute.
+
+### StraightToStoryMode
+
+`SKIP_SPLASH_SCREEN`, `SKIP_LEGAL_SCREEN` and `SKIP_LANDING_PAGE` under `[STRAIGHTTOSTORYMODE]` (all on) skip the splash screen, the legal screen and the landing page, so the game goes straight into Story Mode. Replaces StraightToStoryMode.
+
+### DirectStorage
+
+With DirectStorage on, GTA V Enhanced opens the files in its folder at start-up, not just its archives, and keeps them open. Other programs can then only read them: while the game runs, mods can't write their own files there and scripts can't be reloaded.
+
+`UNLOCK_FILES=1` under `[DIRECTSTORAGE]` (on by default) lets DirectStorage open only the `.rpf` and `.cache` files in the game folder, the ones it reads there. Every other file in the game folder stays free. Files outside the game folder are never refused: the game reads its saves and settings through DirectStorage, too.
+
+With `DIAGNOSTIC_MODE=1` the part logs the game's calls into DirectStorage, including every file it asks DirectStorage to open, and every file and folder in the game folder that is opened, with its access, sharing, result and caller (see "TweaksV.ini" below).
+
+TweaksV's own part; the idea comes from alloc8or's [DirectStorageFix](https://github.com/alloc8or/DirectStorageFix), and none of its code is used. With `DirectStorageFix.asi` installed, TweaksV switches its own DirectStorage part off.
 
 ## TweaksV.ini
 
@@ -68,17 +82,17 @@ TweaksV writes `TweaksV.ini` next to `TweaksV.asi` on the first start - or in `%
 
 **Coming from TweaksV 1.x:** the 1.x file has another layout and is not migrated. On the first start, TweaksV renames it to `TweaksV.old.ini`, writes a fresh `TweaksV.ini` with the defaults and says so in the start-up message - set your values again, the old file still holds them. You can also delete the old file before the first start. The same happens to any `TweaksV.ini` without `VERSION` under `[TWEAKSV]`, so leave that line in. What changed: the sections lost their `_SETTINGS` ending and `[DECALDEFS_SETTINGS]` is `[DECALS]`; `LOG_TO_FILE`, `SHOW_ERROR_POPUPS`, `CHECK_FOR_CONFLICTS` and `INI_VERSION` are `LOG`, `ERROR_POPUP`, `CONFLICT_CHECK` and `VERSION`; the testing switches `LOG_SEARCHES`, `LOG_DECALDEFS`, `LOG_INFO`, `LOG_MODS`, `LOG_CALLS` and `LOG_FILE_OPENS` are all `DIAGNOSTIC_MODE` now; `NEWMODS` and `LOG_DEVICE` are gone with the newmods folder.
 
-**Diagnostics:** `DIAGNOSTIC_MODE=1` makes every part that is on log every pattern it looks for (address, number of matches, bytes), every site it finds and every write, and run its measurement: the box streamer counts its searches, the decals part reads how many definitions are registered, RageOpenV logs every file request and every file served from `mods`, DirectStorage logs the game's calls into it and every file opened in the game folder. A part with `ENABLED=0` does nothing, so it logs nothing. Two ways to use it: with `DRY_RUN=1` nothing is hooked or written - the quiet check after a game update, which shows the patterns, the sites and the decal count of the unpatched game; alone, it is the full measurement of the running game with the mods folder served, and it hooks a little more than a normal boot (the box streamer's four search calls, the file opens). The file-open lines stop after 20,000; the opens are then only counted, with a summary every minute.
+**Diagnostics:** `DIAGNOSTIC_MODE=1` makes every part that is on log every pattern it looks for (address, number of matches, bytes), every site it finds and every write, and run its measurement: the box streamer counts its searches, the decals part reads how many definitions are registered, RageOpenV logs every file request, every file served from `mods` and every archive header read, DirectStorage logs the game's calls into it and every file opened in the game folder. A part with `ENABLED=0` does nothing, so it logs nothing. Two ways to use it: with `DRY_RUN=1` nothing is hooked or written - the quiet check after a game update, which shows the patterns, the sites and the decal count of the unpatched game; alone, it is the full measurement of the running game with the mods folder served, and it hooks a little more than a normal boot (the box streamer's four search calls, the file opens). Every kind of line that comes per event stops after 20,000; the events are then only counted, with a summary every minute.
 
 ## Design
 
-- **GTA V Enhanced Only:** TweaksV does nothing in Legacy.
-- **Generated Files:** `TweaksV.ini` and `TweaksV.log` are created on the first boot. Every feature can be switched off or on.
+- **GTA V Enhanced only:** TweaksV does nothing in Legacy.
+- **Generated files:** `TweaksV.ini` and `TweaksV.log` are created on the first boot. Every part can be switched off or on.
   - They go in the game folder, or in `%LOCALAPPDATA%\TweaksV` if the game folder is read-only.
   - The files in the game folder have priority.
-- **Merged Code:** Every original function keeps its name, each plugin lives in its own C++ namespace, and every change is marked `// TweaksV:`. Files keep their names, except each plugin's `Game` and `Logging` files, which get the plugin's name in front (`StraightToStoryMode_Game.cpp`). TweaksV's own code, the DirectStorage, box streamer and decal definitions parts included, is in the `TweaksV*` files and `dllmain.cpp`.
-- **Shared Code:** Each setting is one entry in the table in `TweaksVSettings.h`, each byte pattern one in `TweaksVPatterns.h` (listed in [PATTERNS.md](PATTERNS.md)), and each feature one in `TweaksVFeatures.cpp`. Patches to the game's code go through `TweaksVPatch`, hooks on its functions through MinHook. A new feature is an entry in these tables, plus its own code.
-- **Upstream:** `upstream/` folder holds the original code as zip archives - makes future updates easier to compare.
+- **Own code:** every part is TweaksV's own, in the `TweaksV*` files and `dllmain.cpp`; nothing of the original plugins' code is carried. What TweaksV knows about the game - the byte patterns and what each site holds - is in [PATTERNS.md](PATTERNS.md), and that is the one place to work when the game changes.
+- **Tables:** each setting is one entry in `TweaksVSettings.h`, each byte pattern one in `TweaksVPatterns.h`, each part one in `TweaksVFeatures.cpp`. A new part is an entry in these tables plus its own file.
+- **Shared code:** patches to the game's code go through `TweaksVPatch` - one writer for bytes, one for redirected calls, the hooks on a function's start through MinHook - which writes all or nothing and gives every page its own protection back; `TweaksVScanner` finds the patterns in the running game's code; the four parts that move one of the game's arrays describe it in a table and share the relocation core, `TweaksVRelocation`, which finds and checks every site before anything is written and then writes all of it in one go.
 
 ## Building
 
@@ -134,7 +148,7 @@ Please report a security problem privately, not in a public issue: [SECURITY.md]
 
 ## Credits
 
-All credit for the merged plugins' research and code, and for the ideas behind TweaksV's own parts, goes to the authors listed in [CREDITS.md](CREDITS.md).
+TweaksV's parts are rewritten from the five plugins by Chiheb-Bacha and build on the research of everyone listed in [CREDITS.md](CREDITS.md), which also credits the ideas behind TweaksV's own parts. All credit for the original research and code goes to them.
 
 Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

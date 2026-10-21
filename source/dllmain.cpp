@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - merges HeapAdjusterEnhanced, ModkitLimitAdjusterEnhanced,
-// PackfileLimitAdjusterEnhanced, RageOpenV and StraightToStoryMode (by
-// Chiheb-Bacha) into one ASI plugin for GTA V Enhanced.
+// TweaksV - Engine Tweaks and Limits Adjuster, one ASI plugin for GTA V Enhanced: its parts raise the
+// game's limits, serve a mods folder and unencrypted archives, skip the start-up screens and free the
+// files DirectStorage keeps locked. Written anew from plugins by Chiheb-Bacha and others (CREDITS.md).
 // License: GPL-3.0-only (see LICENSE).
 //
-// The one real DllMain. The features - the five plugins and TweaksV's own parts, in TweaksVFeatures.cpp -
-// are started at step 8 below.
+// The one real DllMain. The parts - the feature table in TweaksVFeatures.cpp - are started at step 8
+// below.
 
 #include <windows.h>
 
-#include "ClearLog.h"		// Shared: ClearLog()
-#include "IsEnhanced.h"		// Shared: IsEnhanced()
 #include "TweaksVConflicts.h"
 #include "TweaksVDump.h"		// test builds: TEST_DUMP_CODE
 #include "TweaksVFeatures.h"
+#include "TweaksVGame.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
 #include "TweaksVSettings.h"
@@ -29,7 +28,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 	case DLL_PROCESS_ATTACH:
 		try	// no exception may leave DllMain
 		{
-			if (!IsEnhanced())										// 1. GTA V Enhanced only
+			if (!TweaksV::IsGtaVEnhanced())										// 1. GTA V Enhanced only
 				break;
 			TweaksV::CreateOrUpdateIni();							// 2. TweaksV.ini exists from here on
 			TweaksV::LoadSettings();								// 3. every setting, read once
@@ -40,7 +39,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 			HMODULE self = nullptr;
 			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
 				reinterpret_cast<LPCWSTR>(&DllMain), &self);
-			ClearLog();												// 5. once, for TweaksV.log
+			TweaksV::ClearLogFile();												// 5. once, for TweaksV.log
 			TweaksV::WriteLogHeader();
 			if (TweaksV::IsOn(TweaksV::kConsole))					// 6.
 				TweaksV::OpenConsole();

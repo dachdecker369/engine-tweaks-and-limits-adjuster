@@ -1,6 +1,6 @@
 # Credits
 
-TweaksV merges the projects below. All credit for the original research and code goes to their authors.
+TweaksV's parts are rewritten from the projects below; the research and the original code are theirs. All credit for them goes to their authors.
 
 ## Chiheb-Bacha - https://github.com/Chiheb-Bacha
 

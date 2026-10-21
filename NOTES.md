@@ -22,13 +22,13 @@
 
 - **Problems on screen:** every problem at start-up is listed in one message box, the start-up summary (`ERROR_POPUP=1`, the default). A part that stops working later, such as the DirectStorage hook a few seconds in, gets a message box of its own, at most three per session.
 
-- **MemScanner fixes:**
+- **Scanner:** TweaksV's own search for its patterns in the running game's code (`TweaksVScanner`); the pattern parser is an altered version of ScriptHookVDotNet's (THIRD_PARTY_NOTICES.md):
   - A pattern miss is logged and returns null instead of exiting the game;
-  - Malformed patterns no longer throw;
+  - A malformed pattern is refused instead of throwing;
   - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match;
-  - A new search: only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. It compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than the original search, which went through the whole image almost byte by byte;
-  - A second search, built the same way, finds every `lea` that loads one address - for a static list the game loads in places no pattern can tell apart (the box streamer's);
-  - A pattern can be asked for every match instead of the first, for a site the game repeats - the check seven decal-placing functions share (the decal definitions part).
+  - Only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. The search compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than the originals' search, which went through the whole image almost byte by byte;
+  - A second search, built the same way, finds every `lea` that loads one address - for a static array the game loads in places no pattern can tell apart (the box streamer's list, the decal definitions array);
+  - A pattern can be asked for every match instead of the first, for a site the game repeats - the check seven decal-placing functions share (the decals part).
 
 - **One patch module:** every patch to the game's code goes through `TweaksVPatch`, one writer for bytes and one for redirected calls (a hook on a function's start - RageOpenV's file and archive functions, DirectStorage's - is MinHook's, see T-HARDEN):
   - A group of writes is all or nothing: every page is made writable first, so a page that cannot be changed leaves the game as it was;
@@ -121,7 +121,7 @@
 
 - **Hook:** `TweaksV.asi` stays loaded once enabled until the game exits.
 
-- **Build:** all of TweaksV's code, its own and the merged plugins', builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
+- **Build:** all of TweaksV's code builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
   - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four. Control Flow Guard and CET only take effect in a game that turns them on itself, which GTA V Enhanced 1.0.1158.16 does not; TweaksV carries them so that it never leaves a gap in a game that does, nor is refused by one.
 
 - **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from; the mod page carries the credits and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
@@ -141,7 +141,7 @@ Known bugs and open issues in TweaksV.
 
 ## Bugs Found in the Originals
 
-What the merge found in the five original projects, with the file and line in the originals (the archives in `upstream\`) and what TweaksV does instead - the list to work from if they are ever reported upstream. An open issue that carries one of these bugs uses its ID; B-ROV-18 did, until newmods went in 2.0.0. Severity: crash = could crash or close the game, corrupt = could silently corrupt memory or behaviour, robust = fragile or unsafe practice, hygiene = cleanliness; "latent" = only reached in some situations, such as a pattern miss after a game update. Two entries concerned the Legacy code, which TweaksV does not carry.
+What the merge found in the five original projects, with the file and line in the originals as they were when merged, and what TweaksV does instead - the list to work from if they are ever reported upstream. Since 2.0.0 TweaksV carries none of the originals' code, so this is history: what the rewrite had to do better. An open issue that carries one of these bugs uses its ID; B-ROV-18 did, until newmods went in 2.0.0. Severity: crash = could crash or close the game, corrupt = could silently corrupt memory or behaviour, robust = fragile or unsafe practice, hygiene = cleanliness; "latent" = only reached in some situations, such as a pattern miss after a game update. Two entries concerned the Legacy code, which TweaksV does not carry.
 
 ### HeapAdjusterEnhanced (`Heap Adjuster\Game.cpp`)
 
@@ -199,7 +199,7 @@ What the merge found in the five original projects, with the file and line in th
 | B-ROV-05 | corrupt, latent | `hooks\PackfileEncryptionHooks.cpp` lines 73-77: the second DecryptHeader2 call is redirected without checking that it calls the same function as the first | both must lead to the same function |
 | B-ROV-06 | corrupt | `PackfileEncryptionHooks.cpp` line 5: `currentEncryption` is one global, written by one hook and read by the later ones; archives opened on different threads mix up their tags | `thread_local`; `ParseHeaderHook` checks the entry table and the file count |
 | B-ROV-07 | crash | `utils\config.h` with `inicpp.h`: inicpp throws on a line without `=` (a `;` comment), on section errors and on a missing or non-boolean key - reached from DllMain and from every log write | the settings come from `TweaksV.ini` through the Win32 INI functions |
-| B-ROV-08 | crash, latent | `utils\memory.h` line 65, `memory::init`: the trampoline area is requested at the fixed address exe+0x20000000 without a failure check | memory near the game from `AllocateStubMemory`, checked |
+| B-ROV-08 | crash, latent | `utils\memory.h` line 65, `memory::init`: the trampoline area is requested at the fixed address exe+0x20000000 without a failure check | memory near the game from `AllocateNearGame`, checked |
 | B-ROV-09 | robust | `memory.h` lines 153-159, `memory::hook`: `MH_EnableHook(MH_ALL_HOOKS)` after every hook, freezing all threads each time | hooks are queued, one apply per group |
 | B-ROV-10 | robust | `main.cpp` lines 3-10: the one-time guard is a plain `bool` | an atomic, claimed with `exchange` before the start-up runs; the hook switches itself off afterwards |
 | B-ROV-11 | robust | `utils\log.cpp` lines 16, 33 and 35: a 256-byte line buffer truncates paths; `printf` on every line even without a console; INI lookups and a file open per line | lines go to `TweaksV.log`; the switches are read once |

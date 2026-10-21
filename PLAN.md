@@ -60,9 +60,9 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 
 ### 5. Shared code and docs
 
-- [ ] `TweaksVPatch` absorbs `StubMemory` (`AllocateNearGame`); `MemScanner` becomes `TweaksVScanner`; `GameVersion.h` and `IsEnhanced.h` become `TweaksVGame.h`; `ClearLog` goes; the project and the filters list only `TweaksV*`, `dllmain.cpp`, `version.rc` and MinHook, in two filters.
-- [ ] `upstream\` deleted (`git rm`); UPSTREAM.md rewritten; CREDITS.md and `version.rc` reworded; README.md, NOTES.md and PATTERNS.md as section 7; the check count in NOTES.md.
-- [ ] Version 2.0.0 in `source\TweaksV.vcxproj`.
+- [x] `TweaksVPatch` absorbs `StubMemory` (`AllocateNearGame`); `MemScanner` becomes `TweaksVScanner`; `GameVersion.h` and `IsEnhanced.h` become `TweaksVGame.h`; `ClearLog` goes; the project and the filters list only `TweaksV*`, `dllmain.cpp`, `version.rc` and MinHook, in two filters.
+- [x] `upstream\` deleted (`git rm`); UPSTREAM.md rewritten; CREDITS.md and `version.rc` reworded; README.md, NOTES.md and PATTERNS.md as section 7; the check count in NOTES.md.
+- [x] Version 2.0.0 in `source\TweaksV.vcxproj`.
 - Checkpoint: the whole of section 8 - the three builds from scratch, the suites, my boots.
 
 ### 6. Release
@@ -83,6 +83,6 @@ The order of work for TweaksV 2.0.0: the five merged plugins rewritten as Tweaks
 
 ## Next steps
 
-1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phases 1 to 4 are built, committed and booted (phase 4's boot with my mods folder and my OPEN test archive checked out, the log half the size of 1.6.0's), the suites green with 429 checks; then phase 5.
+1. The work session has read this file, SPECIFICATIONS.md, the code, the tests and the docs, and recorded what they left open under the decisions above; it works through phases 1 to 5 in order, each phase ending with the suites green, the three builds clean, a local commit, and my boot where the phase changes what the game sees. It starts each phase on my go. Phases 1 to 5 are built and committed, phases 1 to 4 booted; phase 5's checkpoint is the whole of section 8, of which the three builds from scratch and the suites (429 checks) are done and my boots are next; then phase 6.
 2. Phase 6: the 2.0.0 commit, my boots of SPECIFICATIONS.md section 8, then push and tag on my word, then Nexus, then the removal of these two files.
 3. Open: nothing; the session asks me again whenever something new comes up.

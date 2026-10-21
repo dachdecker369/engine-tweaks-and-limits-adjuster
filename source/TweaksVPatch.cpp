@@ -7,7 +7,6 @@
 #include <cstring>
 
 #include "MinHook.h"
-#include "StubMemory.h"
 #include "TweaksVConflicts.h"
 #include "TweaksVLog.h"
 #include "TweaksVSettings.h"
@@ -175,7 +174,7 @@ namespace TweaksV
 
 		// the stubs, in a block of their own near the game: written, then read+execute only
 		const size_t blockSize = redirects.size() * kStubSize;
-		uint8_t* const block = static_cast<uint8_t*>(AllocateStubMemory(blockSize, PAGE_READWRITE));
+		uint8_t* const block = static_cast<uint8_t*>(AllocateNearGame(blockSize));
 		if (!block)
 		{
 			WriteLog(tag, "No memory near the game could be had for the call stubs - nothing is changed.");
@@ -324,7 +323,7 @@ namespace TweaksV
 			}
 			if (status != MH_OK)
 			{
-				failed = std::string("The ") + hook.what + " could not be hooked";
+				failed = std::string(hook.what) + " could not be hooked";
 				break;
 			}
 		}
@@ -338,7 +337,8 @@ namespace TweaksV
 		{
 			for (size_t i = 0; i < made; i++)	// a hook that is on is switched off first
 				MH_RemoveHook(hooks[i].function);
-			WriteLog(tag, failed + " (MinHook: " + MH_StatusToString(status) + ") - none of the " + std::to_string(hooks.size()) + " hooks is on.");
+			WriteLog(tag, failed + " (MinHook: " + MH_StatusToString(status) + ")" +
+				(hooks.size() > 1 ? " - none of the " + std::to_string(hooks.size()) + " hooks is on." : std::string(".")));
 			return false;
 		}
 		return true;
@@ -374,5 +374,38 @@ namespace TweaksV
 		WriteLog(tag, "The hook on the function at " + DescribeAddress(function) + " could not be switched off (MinHook: " + MH_StatusToString(status) +
 			") - it stays and passes the calls on.");
 		return false;
+	}
+
+	// The search walks the free regions below the game's image, as MinHook's own allocator does (see
+	// THIRD_PARTY_NOTICES.md), and takes the first one that gives size bytes.
+	void* AllocateNearGame(size_t size)
+	{
+		constexpr uintptr_t kReach = 0x40000000;	// 1 GB: well inside a rel32's range
+		SYSTEM_INFO info{};
+		GetSystemInfo(&info);
+		const uintptr_t granularity = info.dwAllocationGranularity ? info.dwAllocationGranularity : 0x10000;
+		const uintptr_t image = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+		uintptr_t lowest = reinterpret_cast<uintptr_t>(info.lpMinimumApplicationAddress);
+		if (image > kReach && lowest < image - kReach)
+			lowest = image - kReach;
+		uintptr_t at = image - image % granularity;
+		while (at >= lowest + granularity)
+		{
+			at -= granularity;
+			MEMORY_BASIC_INFORMATION region{};
+			if (VirtualQuery(reinterpret_cast<const void*>(at), &region, sizeof(region)) != sizeof(region))
+				break;
+			if (region.State == MEM_FREE)
+			{
+				if (void* memory = VirtualAlloc(reinterpret_cast<void*>(at), size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE))
+					return memory;
+				continue;	// too small for size: the next granularity below
+			}
+			const uintptr_t base = reinterpret_cast<uintptr_t>(region.AllocationBase);
+			if (base < granularity || base > at)
+				break;
+			at = base;	// the next step goes below this allocation
+		}
+		return nullptr;
 	}
 }

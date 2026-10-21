@@ -22,7 +22,7 @@ BEGIN
       VALUE "OriginalFilename", "TweaksV.asi"
       VALUE "FileVersion", TWEAKSV_VERSION
       VALUE "ProductVersion", TWEAKSV_VERSION
-      VALUE "Comments", "Merges plugins by Chiheb-Bacha and others - see CREDITS.md"
+      VALUE "Comments", "Based on plugins by Chiheb-Bacha and others - see CREDITS.md"
     END
   END
   BLOCK "VarFileInfo"

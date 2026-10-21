@@ -14,8 +14,8 @@
 #include <vector>
 
 #include "BuildInfo.h"
-#include "GameVersion.h"
 #include "TweaksVFiles.h"
+#include "TweaksVGame.h"
 #include "TweaksVIni.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
@@ -177,11 +177,11 @@ namespace TweaksV
 		// "1.0.1158.13" or "unknown"
 		std::string GameFileVersion()
 		{
-			FileVersion version{};
-			if (!ReadCurrentProcessFileVersion(version))
+			GameVersion version;
+			if (!ReadGameVersion(version))
 				return "unknown";
-			return std::to_string(version.Major) + "." + std::to_string(version.Minor) + "." +
-				std::to_string(version.Build) + "." + std::to_string(version.Revision);
+			return std::to_string(version.major) + "." + std::to_string(version.minor) + "." +
+				std::to_string(version.build) + "." + std::to_string(version.revision);
 		}
 
 		// "0x6870ABCD (YYYY-MM-DD hh:mm:ss UTC)" from the exe's PE header.
