@@ -110,9 +110,27 @@ What each part does and the checks it makes, the measurements, the open issues a
 - **Build:** all of TweaksV's code builds at the strictest warning level (`/W4`) without a warning, and the code analysis finds nothing. MinHook, compiled unchanged, builds at level 3 (`/W3`) without a warning; at `/W4` its own code warns, and that code is not TweaksV's to change.
   - `TweaksV.asi` carries Windows' exploit mitigations: ASLR with high entropy, DEP, Control Flow Guard, and it is marked compatible with CET, the processor's shadow stack. The tests check all four. Control Flow Guard and CET only take effect in a game that turns them on itself, which GTA V Enhanced 1.0.1158.16 does not; TweaksV carries them so that it never leaves a gap in a game that does, nor is refused by one.
 
-- **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from; the mod page carries the credits and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
+- **Releasing:** a release zip carries `TweaksV.asi`, `TweaksV.pdb` (it reads crash dumps), `LICENSE` and `THIRD_PARTY_NOTICES.md`; the release notes name the tag the build came from and link the repository, which `THIRD_PARTY_NOTICES.md` in the zip names too, so the source is one step from the binary wherever the zip goes (GPL-3.0, section 6d); the mod page carries the credits, links the repository and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
 
 - **Tests:** `test\` holds fake-game test suites (432 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+
+## Versions
+
+Newest first; the tags carry the same numbers. One line per version with what it brought.
+
+- **2.0.0:** every part rewritten as TweaksV's own code on shared code - the scanner, the patch module, the relocation core, the three tables; `TweaksV.ini` layout 2 (28 keys, `DIAGNOSTIC_MODE` as the one testing switch, a 1.x file renamed to `TweaksV.old.ini`); the newmods folder and the originals' archives gone; the lock guard; the mods list on a UTF-8 code page, a guard for the patched pages, the game's entries copied into a moved array, a named copyright holder.
+- **1.6.0:** the Decals part - the decal definitions array moved and its limit raised; `DecalPatch.asi` as an old plugin.
+- **1.5.0:** the box streamer's measurement, and the list's loads found by its address instead of a pattern.
+- **1.4.0:** the BoxStreamer part - the traversal list moved and its capacity raised; `TEST_DUMP_CODE` in test builds.
+- **1.3.0:** the own-file checks (links, junctions), SECURITY.md, the exploit mitigations checked by the tests.
+- **1.2.2:** the pattern table checked against PATTERNS.md by a suite; test builds with `TEST_BREAK_PATTERN`; the integration suite.
+- **1.2.1:** the patch module - every write to the game's code through one place that gives the pages their protection back.
+- **1.2.0:** the settings table - every setting of `TweaksV.ini` defined once.
+- **1.1.1:** the test harness - fake games that load `TweaksV.asi` and report what it changed.
+- **1.1.0:** `UNLOCK_FILES` - DirectStorage may open only the `.rpf` and `.cache` files in the game folder, on by default.
+- **1.0.2:** the DirectStorage part, logging only at first; the ASI loader file named in the documents.
+- **1.0.1:** scanner and pattern fixes.
+- **1.0.0:** the five plugins by Chiheb-Bacha merged into one `TweaksV.asi` with one `TweaksV.ini` and one `TweaksV.log`.
 
 ## Open Issues
 
@@ -126,7 +144,7 @@ Known bugs and open issues in TweaksV.
 
 ## Bugs Found in the Originals
 
-What the merge found in the five original projects, with the file and line in the originals as they were when merged, and what TweaksV does instead - the list to work from if they are ever reported upstream. Since 2.0.0 TweaksV carries none of the originals' code, so this is history: what the rewrite had to do better. An open issue that carries one of these bugs uses its ID; B-ROV-18 did, until newmods went in 2.0.0. Severity: crash = could crash or close the game, corrupt = could silently corrupt memory or behaviour, robust = fragile or unsafe practice, hygiene = cleanliness; "latent" = only reached in some situations, such as a pattern miss after a game update. Two entries concerned the Legacy code, which TweaksV does not carry.
+What the merge found in the five original projects, with the file and line in the originals as they were when merged, and what TweaksV does instead - the list to work from if they are ever reported upstream. Since 2.0.0 TweaksV carries none of the originals' code but RageOpenV's console opener, so this is history: what the rewrite had to do better. An open issue that carries one of these bugs uses its ID; B-ROV-18 did, until newmods went in 2.0.0. Severity: crash = could crash or close the game, corrupt = could silently corrupt memory or behaviour, robust = fragile or unsafe practice, hygiene = cleanliness; "latent" = only reached in some situations, such as a pattern miss after a game update. Two entries concerned the Legacy code, which TweaksV does not carry.
 
 ### HeapAdjusterEnhanced (`Heap Adjuster\Game.cpp`)
 

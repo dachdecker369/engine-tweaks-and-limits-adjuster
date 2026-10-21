@@ -6,7 +6,7 @@ TweaksV's parts are rewritten from the projects below; the research and the orig
 
 The five plugins TweaksV 1.x merged and 2.0.0 rewrote as its own parts, each taken from its main branch as it was when TweaksV merged it (the copies held no git data, so no commit is known). When a pattern stops matching after a game update, these projects are where it came from and worth a look ([PATTERNS.md](PATTERNS.md), "When Game Updates").
 
-- [HeapAdjusterEnhanced](https://github.com/Chiheb-Bacha/HeapAdjusterEnhanced) - the HeapAdjuster part
+- [HeapAdjusterEnhanced](https://github.com/Chiheb-Bacha/HeapAdjusterEnhanced) - the HeapAdjuster part. Its LICENSE file says "licensed under LGPLv2" but holds the text of the MIT license; TweaksV 1.x carried its code under that text, 2.0.0 carries none of it
 - [ModkitLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced) - the ModkitLimit part
 - [PackfileLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/PackfileLimitAdjusterEnhanced) - the PackfileLimit part
 - [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV) - the RageOpenV part; its newmods folder was never carried over
@@ -19,7 +19,7 @@ The five plugins TweaksV 1.x merged and 2.0.0 rewrote as its own parts, each tak
 - **CitizenFX Collective** - the original GTA V heap adjuster - https://github.com/citizenfx/gtav-heap-adjuster
 - **Dilapidated** - the INI-configurable heap adjuster - https://github.com/Dilapidated/gtav-HeapAdjuster-ini
 - **alloc8or ("Unknown Modder")** - the original Packfile Limit Adjuster and the Enhanced landing-page patch - https://github.com/alloc8or
-- **Tanuki / 0x-FADED** - the original ModkitLimit Extender - https://github.com/0x-FADED/GTA5-VehicleModKitLimit-Fix
+- **Tanuki / 0x-FADED** - the original ModkitLimit Extender - https://github.com/0x-FADED/GTA5-VehicleModKitLimit-Fix. Its LICENSE places one part, the `ModKitIdRelocation` code for the weapon components limit, under the CitizenFX Collective's FiveM terms and the rest under the MIT license; nothing of that part was ever in TweaksV, and 2.0.0 carries none of the project's code
 - **ChaosModV team** - the splash and legal screen skip patches - https://github.com/gta-chaos-mod/ChaosModV
 - **CamxxCore** - the PauseMenuHelper pattern helper - https://github.com/CamxxCore/PauseMenuHelper
 - **Bas Timmer (NTAuthority) et al.** - the stub allocator

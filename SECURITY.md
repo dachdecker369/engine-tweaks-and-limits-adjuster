@@ -9,7 +9,7 @@ Please report it privately, not in a public issue:
 1. Open the repository's **Security** tab and choose **Report a vulnerability**, or go straight to the [report form](https://github.com/dachdecker369/engine-tweaks-and-limits-adjuster/security/advisories/new).
 2. Say what happens and how to make it happen, with the files or settings it needs, the TweaksV version and the game version (both are at the top of `TweaksV.log`).
 
-Only you and the maintainer can see the report. The answer comes there, and the report stays private until a version with the fix is out.
+Only you and I can see the report. The answer comes there, and the report stays private until a version with the fix is out.
 
 ## Supported Versions
 
@@ -17,6 +17,6 @@ Security fixes go into the latest version only.
 
 ## Scope
 
-- **This repository:** TweaksV's own code and the merged plugins' code.
+- **This repository:** TweaksV's own code and the two pieces of third-party code it carries ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 - **Elsewhere:** a problem in MinHook itself goes to [its authors](https://github.com/TsudaKageyu/minhook); one in the game, the ASI loader or Script Hook V goes to theirs.
 - **Known:** MinHook keeps its trampolines in memory that is writable and executable. This is accepted; see T-HARDEN in [NOTES.md](NOTES.md).

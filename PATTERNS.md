@@ -11,7 +11,7 @@ Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game bui
 | **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-F1..F8` run only with a mods folder in the game directory (with `DIAGNOSTIC_MODE=1`, also without one). A part with `ENABLED=0` looks for none of its patterns. |
 | **Matches** | All match exactly once, except `D-E-L12`, which matches exactly 7 times (the check seven decal-placing functions share). To check: boot once with `DIAGNOSTIC_MODE=1` and `CONSOLE=1`, every part on. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once (`D-E-L12`: exactly 7 times). |
 
-Build uses 87 of 96 patterns:
+The build uses 87 of the table's 90 patterns; six more rows below are kept as removed:
 - Packfile picks one of three direct size patterns and one of two references by game build.
 - `R-E-D3` belonged to code that was never used. Removed.
 - `R-E-M0`, `R-E-M1`, `R-E-M2`, `R-E-D1` and `R-E-D2` belonged to the newmods folder, which 2.0.0 drops. Removed.
@@ -24,6 +24,7 @@ The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstor
 2. Check whether the project the pattern came from has changed it (`CREDITS.md` names them).
 3. Update the pattern in `source\TweaksVPatterns.h` and in this file - the tests check that both agree - and confirm that it matches exactly once. `GTA5_Enhanced.exe` is encrypted on disk, so look for the code in a copy of the running game: a test build with `TEST_DUMP_CODE=60` saves one (README, Test Builds).
 4. DirectStorage: if `UNLOCK_FILES=1` reports a problem (another interface, or an `OpenFile` outside DirectStorage's DLLs), look at the factory's functions with `DIAGNOSTIC_MODE=1`.
+5. The game facts no pattern protects, to check in the dump even when every pattern still matches, because a change in them would go wrong silently: RageOpenV's `fiPackfile` fields (8 bytes further on than Legacy's: the entry table at +0x20, its count at +0x28, the current file offset at +0xB4; entries of 16 bytes with the name offset at +0, the type at +4 and the encryption at +12) and the fixed distances of its sites (GetFileTime and GetFileSize 0x10D before `R-E-F2` and `R-E-F3`, 0x15D before `R-E-F6` and `R-E-F7`; the ParseHeader call 19 bytes into `R-E-E5`; the console call 16 bytes into `R-E-C1`); the archive count at offset 24 of the streaming configuration that `P-E-H1`'s call reads, and that call's single argument; the tree-search calls 30, 34, 42 and 30 bytes into `B-E-L1..L4` and their fifth argument on the stack; the decal manager's loop (the start offset at +1 and the lea at +5 of `D-E-L10`, the pass and the end at +2 and +8 of `D-E-L11`); the heap adjuster's rule that a heap of 1024 MB or more is another adjuster's (a build whose own heap is that large would be left alone, with only a log line).
 
 ## HeapAdjuster
 
