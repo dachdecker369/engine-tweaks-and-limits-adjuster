@@ -24,12 +24,12 @@ check "TweaksV.ini is created" '[ -f TweaksV.ini ]'
 check "it is exactly the new default text (CRLF)" 'cmp -s TweaksV.ini expected.ini'
 check "the log says it was created" 'grep -q "Created TweaksV.ini with the default settings" TweaksV.log'
 check "log header: HEAP_SIZE=2000, PACKFILEARRAY_SIZE=13000, TRAVERSAL_LIST_SIZE=10000, DECALDEFS_SIZE=2048, the [TWEAKSV] line with VERSION=2" 'grep -q "HeapAdjuster: HEAP_SIZE=2000" TweaksV.log && grep -q "PackfileLimit: PACKFILEARRAY_SIZE=13000" TweaksV.log && grep -q "BoxStreamer: TRAVERSAL_LIST_SIZE=10000" TweaksV.log && grep -q "Decals: DECALDEFS_SIZE=2048" TweaksV.log && grep -q "TweaksV: LOG=1 DIAGNOSTIC_MODE=0 DRY_RUN=0 CONSOLE=0 ERROR_POPUP=1 CONFLICT_CHECK=1 VERSION=2" TweaksV.log'
-check "log header: no newmods line, no testing switch of a part" '! grep -qi "newmods" TweaksV.log && ! grep -q "LOG_DUMP\|LOG_SEARCHES\|LOG_DECALDEFS\|LOG_CALLS\|LOG_FILE_OPENS\|LOG_INFO\|LOG_MODS" TweaksV.log'
+check "log header: no newmods line, no testing switch of a part" 'log_lacks -i "newmods" && log_lacks "LOG_DUMP\|LOG_SEARCHES\|LOG_DECALDEFS\|LOG_CALLS\|LOG_FILE_OPENS\|LOG_INFO\|LOG_MODS"'
 check "the heap is set to 2000 MB" 'grep -q "heap: 2000 MB" harness.out'
-check "the packfile limit is 13000" 'grep -q "I=12996" harness.out'
-check "the box streamer list capacity is 10000" 'grep -q "box caps: 10000 10000 10000 10000" harness.out'
+check "the packfile limit is 13000" 'grep -q "I=12996 |" harness.out'
+check "the box streamer list capacity is 10000" 'grep -q "box caps: 10000 10000 10000 10000 |" harness.out'
 check "the decal definitions limit is 2048" 'grep -q "decal limits: 2047 2048 0x28198, 23 agree" harness.out'
-check "no message box was needed (harness finished), no problem" 'grep -q "heap:" harness.out && ! grep -q "PROBLEM" TweaksV.log'
+check "no message box was needed (harness finished), no problem" 'grep -q "heap:" harness.out && log_lacks "PROBLEM"'
 
 echo "== a deleted key comes back with its default"
 for k in HEAP_SIZE PACKFILEARRAY_SIZE OPEN_RPF CONSOLE; do sed -b -i "/^$k=/d" TweaksV.ini; done
@@ -43,20 +43,20 @@ check "the log names all 4 re-added keys" '[ "$(grep -c "added the missing key" 
 echo "== a file with VERSION alone: every other key is added back"
 printf '[TWEAKSV]\r\nVERSION=2\r\n' > TweaksV.ini
 out=$(game full_game.exe); echo "      ${out:0:160}"
-check "27 keys added, the defaults used, nothing renamed" '[ $(grep -c "added the missing key" TweaksV.log) -eq 27 ] && grep -q "heap: 2000 MB" harness.out && ! grep -q "TweaksV.old.ini" TweaksV.log && [ ! -e TweaksV.old.ini ]'
+check "27 keys added, the defaults used, nothing renamed" '[ $(grep -c "added the missing key" TweaksV.log) -eq 27 ] && grep -q "heap: 2000 MB" harness.out && log_lacks "TweaksV.old.ini" && [ ! -e TweaksV.old.ini ]'
 
 echo "== crafted values: each one is reported for the start-up summary, its default or nearest limit used"
 cp expected.ini TweaksV.ini; setkey ERROR_POPUP 0
 setkey HEAP_SIZE 5000; setkey CONSOLE maybe; setkey PACKFILEARRAY_SIZE -5; setkey VERSION 3
-setkey MODKITARRAY_SIZE "$(printf '9%.0s' $(seq 1 300))"	# longer than TweaksV reads
+setkey MODKITARRAY_SIZE "$(printf '0%.0s' $(seq 1 250))99999$(printf 'x%.0s' $(seq 1 45))"	# 300 characters, longer than TweaksV reads
 setkey SKIP_SPLASH_SCREEN '  TRUE  '; setkey UNLOCK_FILES 'Off'	# spaces and capitals are fine
 out=$(game full_game.exe); echo "      ${out:0:160}"
 check "HEAP_SIZE=5000: outside 1..2047, 2047 used" "grep -q 'PROBLEM: TweaksV.ini: \[HEAP_ADJUSTER\] HEAP_SIZE=5000 is outside 1..2047 - using 2047.' TweaksV.log && grep -q 'heap: 2047 MB' harness.out"
-check "MODKITARRAY_SIZE of 300 digits: not a number, the default used" "grep -q 'PROBLEM: TweaksV.ini: \[MODKIT_LIMIT\] MODKITARRAY_SIZE=9* is not a number - using 65536.' TweaksV.log"
-check "PACKFILEARRAY_SIZE=-5: outside, raised to the game's own size" "grep -q 'PACKFILEARRAY_SIZE=-5 is outside 1..65535 - using 1.' TweaksV.log && grep -q 'I=4496' harness.out"
+check "MODKITARRAY_SIZE of 300 characters: only the first 255 are read, 250 zeros and 99999 - a number outside its limits, 65536 used (all 300 would be no number)" "grep -q 'PROBLEM: TweaksV.ini: \[MODKIT_LIMIT\] MODKITARRAY_SIZE=99999 is outside 1..65536 - using 65536.' TweaksV.log && log_lacks 'MODKITARRAY_SIZE=.* is not a number'"
+check "PACKFILEARRAY_SIZE=-5: outside, raised to the game's own size" "grep -q 'PACKFILEARRAY_SIZE=-5 is outside 1..65535 - using 1.' TweaksV.log && grep -q 'I=4496 |' harness.out"
 check "CONSOLE=maybe: not on/off, off" "grep -q 'PROBLEM: TweaksV.ini: \[TWEAKSV\] CONSOLE=maybe is not a valid on/off value - using 0.' TweaksV.log"
 check "VERSION=3: a newer layout is reported" "grep -q 'PROBLEM: TweaksV.ini comes from a newer TweaksV (layout 3; this TweaksV knows layout 2)' TweaksV.log"
-check "'  TRUE  ' and 'Off' are read, not reported" "grep -q 'SKIP_SPLASH_SCREEN=1' TweaksV.log && grep -q 'UNLOCK_FILES=0' TweaksV.log && ! grep -q 'PROBLEM: .*SKIP_SPLASH_SCREEN\|PROBLEM: .*UNLOCK_FILES' TweaksV.log"
+check "'  TRUE  ' and 'Off' are read, not reported" "grep -q 'SKIP_SPLASH_SCREEN=1' TweaksV.log && grep -q 'UNLOCK_FILES=0' TweaksV.log && log_lacks 'PROBLEM: .*SKIP_SPLASH_SCREEN\|PROBLEM: .*UNLOCK_FILES'"
 check "all five in one start-up summary, nothing written back" "grep -q 'Start-up summary not shown (ERROR_POPUP=0): 5 problem' TweaksV.log && grep -q '^HEAP_SIZE=5000' TweaksV.ini"
 
 echo "== a 1.x TweaksV.ini (the 1.6.0 default with HEAP_SIZE=1500): renamed, replaced, reported once, nothing of it read"
@@ -65,7 +65,7 @@ out=$(ASI=TweaksV_test.asi game full_game.exe); echo "      ${out:0:160}"
 check "the old file is TweaksV.old.ini now, byte for byte" 'cmp -s TweaksV.old.ini old.before'
 check "TweaksV.ini is the fresh default text" 'cmp -s TweaksV.ini expected.ini'
 check "reported once, for the start-up summary (a message box in a release build)" "[ \$(count \"$RENAMED\") -eq 1 ] && grep -q 'PROBLEM: TweaksV.ini had the layout' TweaksV.log && grep -q 'message box not shown (TWEAKSV_TEST_NO_BOXES=1): TweaksV could not apply everything' TweaksV.log"
-check "nothing of the old file was read: the heap is 2000 MB, not 1500" 'grep -q "heap: 2000 MB" harness.out && ! grep -q "HEAP_SIZE=1500" TweaksV.log'
+check "nothing of the old file was read: the heap is 2000 MB, not 1500" 'grep -q "heap: 2000 MB" harness.out && log_lacks "HEAP_SIZE=1500"'
 check "the log header says so" 'grep -q "TweaksV.ini: .*TweaksV.ini (the 1.x file was renamed to TweaksV.old.ini and this fresh file written)" TweaksV.log'
 
 echo "== a second 1.x file while TweaksV.old.ini is there (HEAP_SIZE=1600): the old one is replaced"
@@ -98,24 +98,23 @@ rm -f TweaksV.old.ini victim.txt TweaksV.ini
 echo "== a read-only game folder: a 1.x file in %LOCALAPPDATA%\\TweaksV is renamed and replaced there"
 rm -rf ro appdata/TweaksV; mkdir -p ro appdata/TweaksV; cp full_game.exe ro/GTA5_Enhanced.exe; cp TweaksV_test.asi ro/TweaksV.asi
 sed 's/$/\r/' "$T/layout1.ini" > appdata/TweaksV/TweaksV.ini
-sid=$(MSYS_NO_PATHCONV=1 "$(cygpath -S)/whoami.exe" /user /fo csv /nh | tr -d '\r' | sed -n 's/.*,"\(S-[0-9-]*\)"$/\1/p')
-MSYS_NO_PATHCONV=1 icacls "$(cygpath -w ro)" /deny "*$sid:(WD,AD)" > /dev/null
-ro_run() { rm -f harness.out; (cd ro && LOCALAPPDATA="$AW" timeout 60 ./GTA5_Enhanced.exe TweaksV.asi > ../harness.out 2>&1); out=$(tr -d '\r' < harness.out); }
+deny_writes ro
+ro_run() { run_fake -C ro GTA5_Enhanced.exe TweaksV.asi; out=$(tr -d '\r' < harness.out); }
 fb=appdata/TweaksV
 check "the folder is read-only (a check of the test itself)" "[ -n '$sid' ] && ! touch ro/probe.txt 2>/dev/null"
 ro_run
 check "renamed and replaced in %LOCALAPPDATA%\\TweaksV, reported once, nothing in the game folder" "grep -q '^\[HEAP_SETTINGS\]' $fb/TweaksV.old.ini && cmp -s $fb/TweaksV.ini expected.ini && [ \$(grep -c \"$RENAMED\" $fb/TweaksV.log) -eq 1 ] && [ ! -e ro/TweaksV.ini ] && [ ! -e ro/TweaksV.old.ini ]"
-check "the game is patched with the defaults" "has 'heap: 2000 MB' && has 'splash: E9 86 01 00 00 90'"
-MSYS_NO_PATHCONV=1 icacls "$(cygpath -w ro)" /remove:d "*$sid" > /dev/null
+check "the game is patched with the defaults" "has 'heap: 2000 MB' && has 'splash: E9 86 01 00 00 90 |'"
+allow_writes ro
 
 echo "== a 1.x file inside the read-only game folder: cannot be renamed, reported in its own words, not read"
-rm -rf appdata/TweaksV; sed 's/$/\r/' "$T/layout1.ini" > ro/TweaksV.ini; sed -b -i 's/^HEAP_SIZE=.*\r$/HEAP_SIZE=1500\r/' ro/TweaksV.ini
-MSYS_NO_PATHCONV=1 icacls "$(cygpath -w ro)" /deny "*$sid:(WD,AD)" > /dev/null
+rm -rf appdata/TweaksV; sed 's/$/\r/' "$T/layout1.ini" > ro/TweaksV.ini; setkey HEAP_SIZE 1500 "" ro/TweaksV.ini
+deny_writes ro
 ro_run
 check "the 1.x file is still there, unchanged; no fresh file anywhere" "grep -q '^HEAP_SIZE=1500' ro/TweaksV.ini && [ ! -e ro/TweaksV.old.ini ] && [ ! -e $fb/TweaksV.ini ]"
 check "reported, the defaults used" "grep -q 'PROBLEM: TweaksV.ini (.*ro.TweaksV.ini) has the layout of TweaksV 1.x and could not be renamed to TweaksV.old.ini (Windows error 5, access denied). Delete or rename it yourself - TweaksV uses its built-in defaults until then.' $fb/TweaksV.log && has 'heap: 2000 MB'"
 check "the log header says it is not used" "grep -q 'TweaksV.ini: .*ro.TweaksV.ini (not used: it has the layout of TweaksV 1.x and could not be renamed' $fb/TweaksV.log"
-MSYS_NO_PATHCONV=1 icacls "$(cygpath -w ro)" /remove:d "*$sid" > /dev/null
+allow_writes ro
 check "the folder is writable again (the test's clean-up)" "touch ro/probe.txt"
 rm -rf ro appdata/TweaksV
 

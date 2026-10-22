@@ -37,10 +37,12 @@
 //   decalmany      300 decal definitions are registered
 //   dstorage       loads the stand-in dstorage.dll (fake_dstorage.cpp) before TweaksV, calls it after
 //   dsotherinterface  with dstorage: first asks for a DirectStorage interface TweaksV does not know
-//   fileopens      opens files in its folder (and one outside) after TweaksV has started
+//   fileopens      opens files in its folder (and one outside, in %TEMP%) after TweaksV has started
 //   nodyncode      no code may be changed or made once TweaksV loads (Windows' dynamic code policy)
 //   lockedlog      while TweaksV starts, holds the TweaksV.log in its folder open as another program
 //                  might: for reading, shared for reading only
+//   unload         frees TweaksV.asi once it has started (an ASI loader that unloads it), says whether it
+//                  is still loaded, and reports as usual - which calls the hooked functions
 //   wait           stays 11 seconds longer before it reports
 #include <windows.h>
 #include <cstdint>
@@ -981,6 +983,12 @@ int wmain(int argc, wchar_t** argv)
 	}
 	RovFirstTimeRequest();	// the game asks for the time: RageOpenV's hook runs its one-time start-up
 	Sleep(1500); // the start-up summary thread runs
+	if (HasOption(argc, argv, L"unload"))	// TweaksV pins itself: freed, it must stay, and its hooks with it
+	{
+		FreeLibrary(module);
+		Sleep(300);
+		wprintf(L"unload: %ls | ", GetModuleHandleW(asi) ? L"still loaded" : L"unloaded");
+	}
 	CallBoxSearches();	// the box streamer searches, as the game would call them
 	if (dstorage)
 		CallDStorage(dstorage, HasOption(argc, argv, L"dsotherinterface"));

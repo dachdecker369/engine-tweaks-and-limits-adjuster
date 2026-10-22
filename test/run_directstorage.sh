@@ -13,8 +13,8 @@ rm -f DirectStorageFix.asi	# an old plugin another suite may have left
 
 FACTORY='the game asked for the DirectStorage factory (call #1, interface {6924EA0C-C3CD-4826-B10A-F64F4ED927C1}) -> ok, from RVA 0x'
 # the 9 OpenFile results: 3 archives, 3 other files in the game folder, a save, a temp file and a \\?\UNC\ path outside it
-UNLOCKED='open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x80070002, asi 0x80070002, none 0x80070002, save 0x0, temp 0x0, unc 0x0, reached 6'
-ALL_OPEN='open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x0, asi 0x0, none 0x0, save 0x0, temp 0x0, unc 0x0, reached 9'
+UNLOCKED='open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x80070002, asi 0x80070002, none 0x80070002, save 0x0, temp 0x0, unc 0x0, reached 6 |'
+ALL_OPEN='open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x0, asi 0x0, none 0x0, save 0x0, temp 0x0, unc 0x0, reached 9 |'
 
 echo "== D1 defaults (UNLOCK_FILES=1, DIAGNOSTIC_MODE=0): in the game folder only .rpf and .cache files reach DirectStorage"
 fresh_ini; out=$(game full_game.exe dstorage fileopens); echo "      $out"
@@ -22,7 +22,7 @@ check "header: DirectStorage on, its line holds UNLOCK_FILES=1 and nothing else"
 check "the factory hooked, then OpenFile" "log_has 'UNLOCK_FILES: when the game creates its DirectStorage factory, OpenFile is hooked so that in the game folder only .rpf and .cache files can be opened.' && log_has 'UNLOCK_FILES: from now on DirectStorage may open only the .rpf and .cache files in the game folder (OpenFile at dstorage.dll+0x[0-9A-F]*.* hooked); files outside it are not touched.'"
 check "3 archives opened (also .RPF and a full path), 3 other files in the game folder refused as not found, never reaching DirectStorage" "has 'open: rpf 0x0, RPF 0x0, cache 0x0, txt 0x80070002, asi 0x80070002, none 0x80070002, '"
 check "a save, a temp file and a network path outside the game folder still reach DirectStorage" "has '$UNLOCKED'"
-check "no call or open lines without DIAGNOSTIC_MODE, no problem" "! log_has 'OpenFile #' && ! log_has 'the game asked for the DirectStorage factory' && ! log_has 'open #' && ! log_has 'PROBLEM'"
+check "no call or open lines without DIAGNOSTIC_MODE, no problem" "log_lacks 'OpenFile #' && log_lacks 'the game asked for the DirectStorage factory' && log_lacks 'open #' && log_lacks 'PROBLEM'"
 check "the game runs on" "has 'dstorage: configuration 0x0/0x0, factory 0x0 set' && has 'file opens: missing file error 2' && has 'protect: all restored'"
 
 echo "== D1b UNLOCK_FILES=0 and DIAGNOSTIC_MODE=0: nothing hooked"
@@ -54,14 +54,14 @@ echo "== D3b UNLOCK_FILES=0 and DIAGNOSTIC_MODE=1: OpenFile only logged"
 fresh_ini; setkey UNLOCK_FILES 0 DIRECTSTORAGE; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe dstorage)
 check "OpenFile hooked for the log only" "log_has 'DIAGNOSTIC: the game.s OpenFile calls are logged (OpenFile at dstorage.dll+0x[0-9A-F]*.* hooked); UNLOCK_FILES=0, so every file is opened.'"
 check "every file opened, and logged as ok" "has '$ALL_OPEN' && log_has 'OpenFile #4: locktest.txt -> ok'"
-check "no UNLOCK_FILES lines" "! log_has 'UNLOCK_FILES:'"
+check "no UNLOCK_FILES lines" "log_lacks 'UNLOCK_FILES:'"
 
 echo "== D4 dstorage.dll not loaded: said so, no problem"
 fresh_ini; setkey UNLOCK_FILES 0 DIRECTSTORAGE; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
 check "DIAGNOSTIC_MODE: not loaded, nothing to log" "log_has 'dstorage.dll is not loaded.' && log_has 'dstorage.dll is not loaded, so the game does not use DirectStorage here: there is nothing to log.'"
 fresh_ini; out=$(game full_game.exe)
 check "UNLOCK_FILES: not loaded, nothing to unlock" "log_has 'dstorage.dll is not loaded, so the game does not use DirectStorage here: there is nothing to unlock.'"
-check "no problem, game runs on" "! log_has 'PROBLEM' && has 'protect: all restored'"
+check "no problem, game runs on" "log_lacks 'PROBLEM' && has 'protect: all restored'"
 
 echo "== D5 DIAGNOSTIC_MODE=1: the opens inside the game folder"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe fileopens); echo "      $out"
@@ -70,8 +70,8 @@ check "a created file: share R--, overwrite-if, from the game's code" "log_has '
 check "6 opens the same way: 2 lines" "[ \$(count ': ds_test.txt | .*share R--') -eq 2 ] && log_has 'open #[0-9]*: ds_test.txt | ok | access 0x[0-9A-F]*, share R--, open, '"
 check "a missing file: not found, and the game still gets ERROR_FILE_NOT_FOUND" "log_has ': ds_missing.txt | 0xC0000034 not found | ' && has 'file opens: missing file error 2'"
 check "the game folder itself and a file in a subfolder" "log_has 'open #[0-9]*: \. | ok | access 0x[0-9A-F]*, share RWD, open, ' && log_has ': ds_sub.inner.rpf | ok | access 0x[0-9A-F]*, share RW-, overwrite-if'"
-check "a file outside the game folder: not logged" "! log_has 'tweaksv_ds_outside'"
-check "the game runs on" "has 'protect: all restored' && ! log_has 'PROBLEM'"
+check "a file outside the game folder: not logged" "log_lacks 'tweaksv_ds_outside'"
+check "the game runs on" "has 'protect: all restored' && log_lacks 'PROBLEM'"
 
 echo "== D6 everything on, with dstorage.dll and the file opens"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe dstorage fileopens)
@@ -81,17 +81,17 @@ check "unlocked, the game runs on" "has '$UNLOCKED' && has 'file opens: missing 
 echo "== D7 DIAGNOSTIC_MODE=1 and DRY_RUN=1: nothing hooked, nothing refused, nothing logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; setkey DRY_RUN 1; out=$(game full_game.exe dstorage fileopens)
 check "three 'would' lines" "log_has 'DRY_RUN: would let DirectStorage open only .rpf and .cache files (UNLOCK_FILES).' && log_has 'DRY_RUN: would hook dstorage.dll to log the game.s DirectStorage calls.' && log_has 'DRY_RUN: would hook NtCreateFile to log the opens in the game folder.'"
-check "every file opened, nothing logged" "has '$ALL_OPEN' && ! log_has 'OpenFile #' && ! log_has 'the game asked for the DirectStorage factory' && ! log_has 'open #'"
+check "every file opened, nothing logged" "has '$ALL_OPEN' && log_lacks 'OpenFile #' && log_lacks 'the game asked for the DirectStorage factory' && log_lacks 'open #'"
 
 echo "== D8 [DIRECTSTORAGE] ENABLED=0 with DIAGNOSTIC_MODE=1: nothing at all - a part that is off dumps nothing"
 fresh_ini; setkey ENABLED 0 DIRECTSTORAGE; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe dstorage fileopens)
-check "header: DirectStorage off; no DirectStorage lines" "log_has 'Features: .*, DirectStorage off' && ! log_has '\[DirectStorage\]'"
+check "header: DirectStorage off; no DirectStorage lines" "log_has 'Features: .*, DirectStorage off' && log_lacks '\[DirectStorage\]'"
 check "every file opened" "has '$ALL_OPEN'"
 
 echo "== D9 alloc8or's DirectStorageFix.asi in the game folder: an old plugin, this part is off"
 fresh_ini; touch DirectStorageFix.asi; out=$(game full_game.exe dstorage); rm -f DirectStorageFix.asi
 check "reported as an old plugin" "log_has 'PROBLEM: Old plugin found: .*DirectStorageFix.asi. TweaksV.s DirectStorage part is switched off for this session'"
-check "nothing hooked, every file opened" "! log_has '\[DirectStorage\]' && has '$ALL_OPEN'"
+check "nothing hooked, every file opened" "log_lacks '\[DirectStorage\]' && has '$ALL_OPEN'"
 
 echo "== D9b the same with CONFLICT_CHECK=0: noted, unlocked anyway"
 fresh_ini; setkey CONFLICT_CHECK 0; touch DirectStorageFix.asi; out=$(game full_game.exe dstorage); rm -f DirectStorageFix.asi

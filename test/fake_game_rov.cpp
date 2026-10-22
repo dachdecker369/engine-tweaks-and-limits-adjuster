@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-#pragma section(".fakefn", read, write, execute)
+#pragma section(".fakefn", read, execute)	// made writable while BuildFakeCode writes the functions
 __declspec(allocate(".fakefn")) unsigned char g_fakeCode[0x2000] = { 0xCC };
 
 // What the fake game functions were called with, and what they return: 1, or 0 for a path under mods/
@@ -140,7 +140,7 @@ static void EmitSimple(Asm& a)
 
 static void BuildFakeCode(bool notStart, bool missing, bool jump)
 {
-	DWORD old = 0;	// the compiler drops the section's "write" attribute
+	DWORD old = 0;	// the section is read+execute, as code is
 	VirtualProtect(g_fakeCode, sizeof(g_fakeCode), PAGE_EXECUTE_READWRITE, &old);
 	memset(g_fakeCode, 0xCC, sizeof(g_fakeCode));
 	Asm a{};
@@ -250,7 +250,8 @@ void RovReport()
 {
 	wprintf(L"rov api hook: %ls | ", g_apiHookedAtFirstRequest ? L"yes" : L"no");
 	wprintf(L"rov api hook afterwards: %ls | ", memcmp(TimeApi(), g_apiBefore, 5) != 0 ? L"still there" : L"removed");
-	wprintf(L"console: %02X %02X | ", g_rovConsole[16], g_rovConsole[17]);
+	wprintf(L"console: %02X %02X %02X %02X %02X %02X | ", g_rovConsole[16], g_rovConsole[17], g_rovConsole[18], g_rovConsole[19],
+		g_rovConsole[20], g_rovConsole[21]);	// the call that hides the console: 6 bytes
 	wprintf(L"rpf: %02X %02X %02X | ", g_rovCacheCallee[0], g_rovCacheCallee[1], g_rovCacheCallee[2]);
 
 	// The file functions (MinHook writes a jmp at their start).

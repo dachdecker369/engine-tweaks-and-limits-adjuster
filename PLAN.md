@@ -74,6 +74,7 @@ This file back to its heading, its first paragraph and "Next steps" with what wa
 
 ## Next steps
 
-- Phase 0 is committed; next is phase 1, the harness.
+- Phases 0 and 1 are committed (442 checks); next is phase 2, the scanner, the relocation core and the patterns.
 - Skipped so far: nothing.
+- Done differently from the plan, with the reason: the fakes' `TEMP` and `TMP` are `object\TestTemp`, next to `object\TestRun` and not inside it, because `object\TestRun` is the fake game's folder and the temp files must lie outside the game folder, as the real `%TEMP%` does (the DirectStorage scenarios open them as files outside it). `/WX` on the fakes showed a warning they always had (an ignored `write` attribute of `.fakefn`), now gone.
 - Waiting on me: nothing until the last phase is committed.

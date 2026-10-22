@@ -9,10 +9,10 @@ mkdir -p appdata
 
 MOVED='box refs: 8 new 0 game 0 other (RW, 784 KB)'
 UNMOVED='box refs: 0 new 8 game 0 other |'
-GAME_CAPS='box caps: 1000 1000 1000 1000'
-NEW_CAPS='box caps: 10000 10000 10000 10000'
-CALLS_GAME='box calls: 0 redirected 4 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000'
-CALLS_COUNTED='box calls: 4 redirected 0 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000'
+GAME_CAPS='box caps: 1000 1000 1000 1000 |'
+NEW_CAPS='box caps: 10000 10000 10000 10000 |'
+CALLS_GAME='box calls: 0 redirected 4 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000 |'
+CALLS_COUNTED='box calls: 4 redirected 0 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000 |'
 NOT_ENLARGED='PROBLEM: The box streamer.s traversal list is not enlarged this session'
 
 echo "== B1 defaults: list moved, capacity 10000, the other plugins still fine"
@@ -23,11 +23,11 @@ check "status line" "log_has 'The box streamer.s traversal list moved and its li
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack refs: 30 new 0 game 0 other'"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
 check "the tree-search calls untouched (DIAGNOSTIC_MODE=0): the game's own searches run" "has '$CALLS_GAME'"
-check "no problems" "! log_has 'PROBLEM'"
+check "no problems" "log_lacks 'PROBLEM'"
 
 echo "== B2 TRAVERSAL_LIST_SIZE=50000: capacities 50000, the list still full size"
 fresh_ini; setkey TRAVERSAL_LIST_SIZE 50000 BOXSTREAMER; out=$(game full_game.exe)
-check "capacities 50000, list 784 KB" "has 'box caps: 50000 50000 50000 50000' && has '$MOVED'"
+check "capacities 50000, list 784 KB" "has 'box caps: 50000 50000 50000 50000 |' && has '$MOVED'"
 
 echo "== B3 TRAVERSAL_LIST_SIZE=500 is below the game's own 1000: 1000 used, reported for the start-up summary"
 fresh_ini; setkey TRAVERSAL_LIST_SIZE 500 BOXSTREAMER; out=$(game full_game.exe)
@@ -36,7 +36,7 @@ check "reported" "log_has 'PROBLEM: TweaksV.ini: \[BOXSTREAMER\] TRAVERSAL_LIST_
 
 echo "== B4 TRAVERSAL_LIST_SIZE=200000 is clamped to 100000"
 fresh_ini; setkey TRAVERSAL_LIST_SIZE 200000 BOXSTREAMER; out=$(game full_game.exe)
-check "capacities 100000" "has 'box caps: 100000 100000 100000 100000'"
+check "capacities 100000" "has 'box caps: 100000 100000 100000 100000 |'"
 check "reported" "log_has 'PROBLEM: TweaksV.ini: \[BOXSTREAMER\] TRAVERSAL_LIST_SIZE=200000 is outside 1000..100000 - using 100000.'"
 
 echo "== B5 TRAVERSAL_LIST_SIZE=abc falls back to the default 10000"
@@ -63,11 +63,11 @@ check "the log says what is counted" "log_has 'DIAGNOSTIC: the 4 tree-search cal
 echo "== B8 [BOXSTREAMER] ENABLED=0"
 fresh_ini; setkey ENABLED 0 BOXSTREAMER; out=$(game full_game.exe)
 check "nothing changed" "has '$UNMOVED' && has '$GAME_CAPS'"
-check "header: BoxStreamer off; no BoxStreamer lines" "log_has 'Features: .*, BoxStreamer off' && ! log_has '\[BoxStreamer\]'"
+check "header: BoxStreamer off; no BoxStreamer lines" "log_has 'Features: .*, BoxStreamer off' && log_lacks '\[BoxStreamer\]'"
 
 echo "== B8b [BOXSTREAMER] ENABLED=0 with DIAGNOSTIC_MODE=1: a part that is off dumps nothing, its patterns are not looked for"
 fresh_ini; setkey ENABLED 0 BOXSTREAMER; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
-check "nothing changed, no BoxStreamer line, no B-E pattern looked for" "has '$UNMOVED' && has '$GAME_CAPS' && has '$CALLS_GAME' && ! log_has '\[BoxStreamer\]' && ! log_has 'Pattern B-E-'"
+check "nothing changed, no BoxStreamer line, no B-E pattern looked for" "has '$UNMOVED' && has '$GAME_CAPS' && has '$CALLS_GAME' && log_lacks '\[BoxStreamer\]' && log_lacks 'Pattern B-E-'"
 
 echo "== B9 another mod already moved the list (every reference points outside the game): nothing written"
 fresh_ini; out=$(game full_game.exe boxmoved); echo "      $out"
@@ -87,12 +87,12 @@ check "reason logged and reported" "log_has 'loads the box streamer.s traversal 
 
 echo "== B12 one capacity disagrees about the game's own size (1001): nothing written"
 fresh_ini; out=$(game full_game.exe boxmismatch); echo "      $out"
-check "nothing changed" "has '$UNMOVED' && has 'box caps: 1000 1000 1001 1000'"
+check "nothing changed" "has '$UNMOVED' && has 'box caps: 1000 1000 1001 1000 |'"
 check "reason logged and reported" "log_has 'limits of the box streamer.s traversal list disagree about the game.s own size: 1000 and 1001 (B-E-L3)' && log_has '$NOT_ENLARGED'"
 
 echo "== B13 implausible capacities (200000): nothing written"
 fresh_ini; out=$(game full_game.exe boxbadsize); echo "      $out"
-check "nothing changed" "has '$UNMOVED' && has 'box caps: 200000 200000 200000 200000'"
+check "nothing changed" "has '$UNMOVED' && has 'box caps: 200000 200000 200000 200000 |'"
 check "reason logged and reported" "log_has 'box streamer traversal list size, 200000, is not plausible' && log_has '$NOT_ENLARGED'"
 
 echo "== B14 none of the game code present (plain fake game): logged and skipped, no crash"
@@ -104,7 +104,7 @@ echo "== B15 DIAGNOSTIC_MODE=1 with the game running on: the searches are counte
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe wait); echo "      $out"
 check "list moved and capacities raised as before, all four calls redirected" "has '$MOVED' && has '$NEW_CAPS' && has '$CALLS_COUNTED'"
 check "the summary: 4 searches, the largest 1000 of 10000, one more than the game's own list could hold" "log_has 'DIAGNOSTIC: 4 searches so far; the largest returned 1000 of 10000 entries; 1 returned more than the game.s own list (1000 entries) could hold.'"
-check "no problems" "! log_has 'PROBLEM'"
+check "no problems" "log_lacks 'PROBLEM'"
 
 echo "== B16 DIAGNOSTIC_MODE=1, another mod already hooked a tree-search call: nothing written"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe boxcallhooked); echo "      $out"
@@ -123,7 +123,7 @@ check "the 'would' line names the calls" "log_has 'DRY_RUN: would move the box s
 
 echo "== B19 DIAGNOSTIC_MODE=0 with a hooked call: the calls are not looked at, the list is moved all the same"
 fresh_ini; out=$(game full_game.exe boxcallhooked)
-check "list moved, the other mod's call kept, no problem" "has '$MOVED' && has 'box calls: 0 redirected 3 game 1 other' && ! log_has 'PROBLEM'"
+check "list moved, the other mod's call kept, no problem" "has '$MOVED' && has 'box calls: 0 redirected 3 game 1 other' && log_lacks 'PROBLEM'"
 
 echo
 echo "BOXSTREAMER SCENARIOS: $pass passed, $fail failed"

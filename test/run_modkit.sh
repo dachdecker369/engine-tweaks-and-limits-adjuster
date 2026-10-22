@@ -7,8 +7,8 @@ cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" .
 mkdir -p appdata
 
-GAME_LIMITS='limits: 1023 1027 1027 1027 1027 2048 1023 1023'
-MAX_LIMITS='limits: 65535 65539 65539 65539 65539 131072 65535 65535'
+GAME_LIMITS='limits: 1023 1027 1027 1027 1027 2048 1023 1023 |'
+MAX_LIMITS='limits: 65535 65539 65539 65539 65539 131072 65535 65535 |'
 NEW_ARRAY='modkit refs: new array (RW, 128 KB)'
 
 echo "== K1 defaults: array moved, limits raised to 65536, the other plugins still fine"
@@ -17,12 +17,12 @@ check "all six references -> one new 128 KB read/write array outside the game" "
 check "limits written for 65536 (size-1, size+3, size*2)" "[[ \"\$out\" == *\"$MAX_LIMITS\"* ]]"
 check "the game's own entries are copied into the new array" "has 'modkit copy: ok'"
 check "status line" "log_has 'The modkit array moved and its limit raised from 1024 to 65536 entries.'"
-check "heap and story mode still applied" "[[ \"\$out\" == *'heap: 1024 MB'* && \"\$out\" == *'splash: E9 86 01 00 00 90'* ]]"
-check "no problems" "! log_has 'PROBLEM'"
+check "heap and story mode still applied" "[[ \"\$out\" == *'heap: 1024 MB'* && \"\$out\" == *'splash: E9 86 01 00 00 90 |'* ]]"
+check "no problems" "log_lacks 'PROBLEM'"
 
 echo "== K2 MODKITARRAY_SIZE=4096: limits for 4096, array still full size"
 fresh_ini; setkey MODKITARRAY_SIZE 4096 MODKIT_LIMIT; out=$(game full_game.exe); echo "      $out"
-check "limits 4095/4099/8192" "[[ \"\$out\" == *'limits: 4095 4099 4099 4099 4099 8192 4095 4095'* ]]"
+check "limits 4095/4099/8192" "[[ \"\$out\" == *'limits: 4095 4099 4099 4099 4099 8192 4095 4095 |'* ]]"
 check "array still 128 KB" "[[ \"\$out\" == *\"$NEW_ARRAY\"* ]]"
 
 echo "== K3 MODKITARRAY_SIZE=500 is raised to the game's own 1024"
@@ -56,7 +56,7 @@ check "the 14 writes logged" "[ \$(count 'ModkitLimit\] DIAGNOSTIC: modkit array
 echo "== K8 [MODKIT_LIMIT] ENABLED=0"
 fresh_ini; setkey ENABLED 0 MODKIT_LIMIT; out=$(game full_game.exe)
 check "nothing changed" "[[ \"\$out\" == *'modkit refs: game array'* && \"\$out\" == *\"$GAME_LIMITS\"* ]]"
-check "header: ModkitLimit off; no ModkitLimit lines" "log_has 'Features: .*, ModkitLimit off' && ! log_has '\[ModkitLimit\]'"
+check "header: ModkitLimit off; no ModkitLimit lines" "log_has 'Features: .*, ModkitLimit off' && log_lacks '\[ModkitLimit\]'"
 
 echo "== K9 an old ModkitLimitAdjusterEnhanced.asi in the folder: skipped"
 fresh_ini; touch ModkitLimitAdjusterEnhanced.asi; out=$(game full_game.exe); rm -f ModkitLimitAdjusterEnhanced.asi
@@ -65,7 +65,7 @@ check "old plugin reported" "log_has 'Old plugin found: .*ModkitLimitAdjusterEnh
 
 echo "== K10 one limit disagrees about the game's size: nothing written"
 fresh_ini; out=$(game full_game.exe modkitmismatch); echo "      $out"
-check "limits unchanged" "[[ \"\$out\" == *'limits: 1023 1027 1027 1027 1027 2050 1023 1023'* ]]"
+check "limits unchanged" "[[ \"\$out\" == *'limits: 1023 1027 1027 1027 1027 2050 1023 1023 |'* ]]"
 check "the array not moved" "[[ \"\$out\" == *'modkit refs: game array'* ]]"
 check "reason logged and reported" "log_has 'the limits of the modkit array disagree about the game.s own size: 1024 and 1025 (M-E-L6)' && log_has 'PROBLEM: The modkit limit is not changed'"
 

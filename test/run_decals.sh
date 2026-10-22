@@ -21,7 +21,7 @@ check "all 23 constants: 13 x 2047, 9 x 2048, the loop end 0x7D8 + 80 x 2028" "h
 check "status line" "log_has 'The decal definitions array moved and its limit raised from 260 to 2048 entries.'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack refs: 30 new 0 game 0 other' && has 'box refs: 8 new 0 game 0 other'"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
-check "nothing is measured with DIAGNOSTIC_MODE=0, no problems" "! log_has 'registered decal definitions' && ! log_has 'PROBLEM'"
+check "nothing is measured with DIAGNOSTIC_MODE=0, no problems" "log_lacks 'registered decal definitions' && log_lacks 'PROBLEM'"
 
 echo "== D2 DECALDEFS_SIZE=16384: the limit 16384, the loop end 0x7D8 + 80 x 16380, the array still full size"
 fresh_ini; setkey DECALDEFS_SIZE 16384 DECALS; out=$(game full_game.exe)
@@ -55,12 +55,12 @@ check "22 limits logged: 13 holding 259, 9 holding 260; the loop end 22808" "[ \
 check "the 31 places that load the array logged" "[ \$(count 'Decals\] DIAGNOSTIC: reference at RVA .* (lea scan)') -eq 31 ]"
 check "the 54 writes logged" "[ \$(count 'Decals\] DIAGNOSTIC: decal definitions array reference at RVA') -eq 31 ] && [ \$(count 'Decals\] DIAGNOSTIC: decal definitions array limit at RVA') -eq 22 ] && [ \$(count 'Decals\] DIAGNOSTIC: decal definitions array loop end at RVA') -eq 1 ]"
 check "still applied" "has '$MOVED' && has '$NEW_LIMITS'"
-check "the measurement announced, no summary within the first seconds (nothing registered yet)" "log_has '$ANNOUNCED.' && ! log_has 'decal definitions registered'"
+check "the measurement announced, no summary within the first seconds (nothing registered yet)" "log_has '$ANNOUNCED.' && log_lacks 'decal definitions registered'"
 
 echo "== D8 [DECALS] ENABLED=0"
 fresh_ini; setkey ENABLED 0 DECALS; out=$(game full_game.exe)
 check "nothing changed" "has '$UNMOVED' && has '$GAME_LIMITS'"
-check "header: Decals off; no Decals lines" "log_has 'Features: .*, Decals off' && ! log_has '\[Decals\]'"
+check "header: Decals off; no Decals lines" "log_has 'Features: .*, Decals off' && log_lacks '\[Decals\]'"
 
 echo "== D9 another mod already moved the array (every reference points outside the game): nothing written"
 fresh_ini; out=$(game full_game.exe decalmoved); echo "      $out"
@@ -108,7 +108,7 @@ fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe decalmany wait); e
 check "array moved and limit raised as before; no call stub added for it (the 10 are the other parts': the packfile hook, RageOpenV's 5 calls, the box streamer's 4 counted calls)" "has '$MOVED' && has '$NEW_LIMITS' && has 'stubs: 10, all RX'"
 check "the log says what is logged" "log_has '$ANNOUNCED.'"
 check "the summary: 300 registered, 40 more than the game's own array holds" "log_has 'DIAGNOSTIC: 300 decal definitions registered (the game.s own array holds 260, this one 2048) - the game.s own array would have dropped 40 of them.'"
-check "no problems" "! log_has 'PROBLEM'"
+check "no problems" "log_lacks 'PROBLEM'"
 
 echo "== D18 DIAGNOSTIC_MODE=1 and DRY_RUN=1 with the game's own array full: nothing written, the count is still logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; setkey DRY_RUN 1; out=$(game full_game.exe decalfull wait)
@@ -120,7 +120,7 @@ echo "== D19 DecalPatch.asi next to TweaksV: this part and the box streamer part
 fresh_ini; touch DecalPatch.asi; out=$(game full_game.exe); rm -f DecalPatch.asi; echo "      $out"
 check "neither part applied, the rest is" "has '$UNMOVED' && has '$GAME_LIMITS' && has 'box refs: 0 new 8 game 0 other' && has 'heap: 1024 MB' && has 'modkit refs: new array (RW, 128 KB)'"
 check "reported once per part, one start-up summary" "[ \$(count 'PROBLEM: Old plugin found: .*DecalPatch.asi. TweaksV.s BoxStreamer part is switched off') -eq 1 ] && [ \$(count 'PROBLEM: Old plugin found: .*DecalPatch.asi. TweaksV.s Decals part is switched off') -eq 1 ] && [ \$(count 'Start-up summary not shown (ERROR_POPUP=0)') -eq 1 ]"
-check "neither part ran: no line of either" "! log_has '\[Decals\]' && ! log_has '\[BoxStreamer\]'"
+check "neither part ran: no line of either" "log_lacks '\[Decals\]' && log_lacks '\[BoxStreamer\]'"
 
 echo
 echo "DECALS SCENARIOS: $pass passed, $fail failed"
