@@ -66,7 +66,7 @@
       <PreprocessorDefinitions>WIN32;_WINDOWS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
-      <!-- strict warnings for all of TweaksV's code, its own and the merged plugins' (MinHook: below) -->
+      <!-- strict warnings for all of TweaksV's own code (MinHook: below) -->
       <WarningLevel>Level4</WarningLevel>
       <!-- exploit mitigations: Control Flow Guard and the exception data CET needs (with CETCompat below) -->
       <ControlFlowGuard>Guard</ControlFlowGuard>

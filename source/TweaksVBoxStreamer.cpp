@@ -71,7 +71,7 @@ namespace TweaksV
 		static_assert(std::size(kCalls) == std::size(kAnchors), "TweaksV: one tree-search call per capacity site");
 
 		constexpr RelocationSpec kSpec = { kTag, "box streamer's traversal list", "box streamer traversal list size",
-			"The box streamer's traversal list is not enlarged", kEntrySize, kMaxListSize, &kTraversalListSize, kAnchors, kListReferences, nullptr, 0 };
+			"The box streamer's traversal list is not enlarged", kEntrySize, kMaxListSize, &kTraversalListSize, kAnchors, kListReferences, nullptr, 0, 0 };
 
 		// ---- the measurement (DIAGNOSTIC_MODE)
 

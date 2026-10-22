@@ -5,6 +5,7 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -17,7 +18,7 @@ namespace TweaksV
 {
 	namespace
 	{
-		constexpr size_t kLeaSize = 7;	// REX.W, 8D, ModRM, disp32
+		constexpr size_t kLeaSize = 7;	// REX.W, 8D (or 89 for a mov), ModRM, disp32
 
 		// "the modkit array" -> "The modkit array", for the start of a line
 		std::string Capitalised(std::string text)
@@ -205,6 +206,33 @@ namespace TweaksV
 		if (spec.scannedReferences == 0)
 		{
 			plan.references = anchorReferences;
+			// the anchors' references must be every one the game has: one they do not name would keep the
+			// game's own, smaller array while the limits are raised
+			if (spec.expectedReferences != 0)
+			{
+				const std::vector<uint8_t*> found = Scanner::FindRipRelativeReferences(plan.array, spec.expectedReferences + 1);
+				if (diagnostic)
+					for (const uint8_t* site : found)
+						WriteLog(spec.tag, "DIAGNOSTIC: reference at " + DescribeAddress(site + kLeaSize - sizeof(int32_t)) + " -> " +
+							DescribeAddress(plan.array) + " (scan)");
+				if (found.size() != spec.expectedReferences)
+				{
+					RelocationFailed(spec, "the game code holds " + std::to_string(found.size()) + (found.size() > spec.expectedReferences ? " or more" : "") +
+						" references to the " + name + ", not the expected " + std::to_string(spec.expectedReferences) +
+						" (another mod may have moved some of them, or the game has changed).");
+					return false;
+				}
+				for (const uint8_t* site : found)
+				{
+					const uint8_t* const field = site + kLeaSize - sizeof(int32_t);
+					if (std::find(anchorReferences.begin(), anchorReferences.end(), field) == anchorReferences.end())
+					{
+						RelocationFailed(spec, "the reference to the " + name + " at " + DescribeAddress(site) + " is not one its patterns name "
+							"(another mod may have moved some of them, or the game has changed).");
+						return false;
+					}
+				}
+			}
 		}
 		else
 		{

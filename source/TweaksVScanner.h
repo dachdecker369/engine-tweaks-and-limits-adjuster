@@ -14,8 +14,9 @@ namespace TweaksV
 {
 	namespace Scanner
 	{
-		// The first match of a pattern in GTA5_Enhanced.exe's code, or nullptr; a miss is logged with the
-		// pattern's label.
+		// The one match of a pattern in GTA5_Enhanced.exe's code, or nullptr: a miss is logged with the
+		// pattern's label, and so is a pattern that matches twice or more, which is not used - the site it
+		// is meant for must be unique.
 		uint8_t* Find(const GamePattern& pattern);
 
 		// Every match of a pattern, in address order, at most limit of them (a site the game must have
@@ -28,5 +29,10 @@ namespace TweaksV
 		// game loads in places the bytes around them cannot tell apart (the relocation core): one unique
 		// site gives the address, this finds every load of it. Nothing is logged.
 		std::vector<uint8_t*> FindRipRelativeLeas(const void* target, size_t limit);
+
+		// The same for every "lea r64, [rip+disp32]" and every "mov [rip+disp32], r64" (opcode 8D or 89, the
+		// same prefix and ModRM): for an array whose patterns name its references, the relocation core checks
+		// that they are all the game has. Nothing is logged.
+		std::vector<uint8_t*> FindRipRelativeReferences(const void* target, size_t limit);
 	}
 }

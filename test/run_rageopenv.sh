@@ -144,5 +144,10 @@ echo "== R17 the mods file cannot be opened: OpenBulk hands the game its own pat
 fresh_ini; out=$(game full_game.exe rovopenfail); echo "      $out"
 check "the fall-back: the mods path first, the game's own path next; the other six hooks redirect as before" "has 'fallback ok' && has 'redirect 6/8, pass 8/8,' && has '$OPEN_OK'"
 
+echo "== R18 R-E-K1 matches twice (a second copy of the cache check's call site): not used, the cache check left on, the rest on"
+fresh_ini; out=$(game full_game.exe tworovk1)
+check "the cache check left on; the file and OPEN hooks on" "has 'rpf: 48 89 5C |' && has '$FILES_OK' && has '$OPEN_OK'"
+check "the scanner says why; the problem names the pattern" "log_has 'Scanner\] Pattern R-E-K1 matches 2 or more times - not used (the site must be unique).' && log_has 'PROBLEM: The RPF cache check is not skipped this session: R-E-K1 was not found.'"
+
 echo
 echo "RAGEOPENV SCENARIOS: $pass passed, $fail failed"

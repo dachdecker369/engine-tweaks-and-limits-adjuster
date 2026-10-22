@@ -2,7 +2,8 @@
 // TweaksV - the packfile limit (see TweaksVPackfileLimit.h).
 //
 // The game keeps its RPF archives in one static array - 7260 entries of 8 bytes on the current build -
-// that 31 instructions reference (P-E-R01..R30, and R31a or R31b by game build) and two limits size: an
+// that 33 instructions reference (P-E-R01..R30, R32, R33, and R31a or R31b by game build: every reference
+// the game's code has, which the relocation core checks with a scan) and two limits size: an
 // immediate (P-E-D3, D2 or D1 by game build) and a variable the game compares an archive index against,
 // which holds four less than the array's size (P-E-I1; 1.x wrote the full size over it, this keeps the margin).
 // PACKFILEARRAY_SIZE in [PACKFILE_LIMIT] moves the array to one of 65535 entries, always allocated in
@@ -44,21 +45,26 @@ namespace TweaksV
 		constexpr GameVersion kVersion1158_13{ 1, 0, 1158, 13 };	// the Kortz Center DLC: the third, and the other reference
 
 		constexpr char kCmpRcx[] = "\x48\x81\xF9";	// cmp rcx, imm32: the direct size
+		constexpr char kLeaRcx[] = "\x48\x8D\x0D";	// lea rcx, [rip+disp32]: a reference past its pattern
 		constexpr size_t kCallOffset = 0x10;		// of the streaming configuration call in P-E-H1's match
 		constexpr size_t kCountOffset = 24;			// of the archive count in the configuration the call reads
+		constexpr size_t kGameReferences = 33;		// every rip-relative reference to the array the game's code has, on 1.0.1158.16
 
-		// the 30 references every build has
+		// the 32 references every build has
 		constexpr Anchor kReferences[] = {
 			Reference(Pattern("P-E-R01"), Rel32(3)), Reference(Pattern("P-E-R02"), Rel32(3)), Reference(Pattern("P-E-R03"), Rel32(3)),
 			Reference(Pattern("P-E-R04"), Rel32(5)), Reference(Pattern("P-E-R05"), Rel32(5)), Reference(Pattern("P-E-R06"), Rel32(3)),
-			Reference(Pattern("P-E-R07"), Rel32(3)), Reference(Pattern("P-E-R08"), Rel32(3)), Reference(Pattern("P-E-R09"), Rel32(39)),
+			Reference(Pattern("P-E-R07"), Rel32(3)), Reference(Pattern("P-E-R08"), Rel32(3)), Reference(Pattern("P-E-R09"), Rel32(39, kLeaRcx, 3)),
 			Reference(Pattern("P-E-R10"), Rel32(7)), Reference(Pattern("P-E-R11"), Rel32(3)), Reference(Pattern("P-E-R12"), Rel32(3)),
 			Reference(Pattern("P-E-R13"), Rel32(3)), Reference(Pattern("P-E-R14"), Rel32(3)), Reference(Pattern("P-E-R15"), Rel32(3)),
-			Reference(Pattern("P-E-R16"), Rel32(3)), Reference(Pattern("P-E-R17"), Rel32(41)), Reference(Pattern("P-E-R18"), Rel32(3)),
+			Reference(Pattern("P-E-R16"), Rel32(3)), Reference(Pattern("P-E-R17"), Rel32(41, kLeaRcx, 3)), Reference(Pattern("P-E-R18"), Rel32(3)),
 			Reference(Pattern("P-E-R19"), Rel32(3)), Reference(Pattern("P-E-R20"), Rel32(3)), Reference(Pattern("P-E-R21"), Rel32(3)),
 			Reference(Pattern("P-E-R22"), Rel32(3)), Reference(Pattern("P-E-R23"), Rel32(3)), Reference(Pattern("P-E-R24"), Rel32(3)),
 			Reference(Pattern("P-E-R25"), Rel32(3)), Reference(Pattern("P-E-R26"), Rel32(3)), Reference(Pattern("P-E-R27"), Rel32(3)),
 			Reference(Pattern("P-E-R28"), Rel32(3)), Reference(Pattern("P-E-R29"), Rel32(3)), Reference(Pattern("P-E-R30"), Rel32(3)),
+			// the load in the function that hashes a collection's entries (lea r15), and the one in the bytes
+			// after P-E-R20's int3 trap, never run (lea rcx): moved so that the count stays exact
+			Reference(Pattern("P-E-R32"), Rel32(8, "\x4C\x8D\x3D", 3)), Reference(Pattern("P-E-R33"), Rel32(6, kLeaRcx, 3)),
 		};
 		// the reference that depends on the build
 		constexpr Anchor kReference31a = Reference(Pattern("P-E-R31a"), Rel32(13));
@@ -73,7 +79,7 @@ namespace TweaksV
 		constexpr Anchor kCall = Site(Pattern("P-E-H1"));
 
 		constexpr RelocationSpec kSpecBase = { kTag, "packfile array", "packfile list size", "The packfile limit is not changed",
-			sizeof(void*), kMaxEntries, &kPackfileArraySize, {}, 0, nullptr, 0 };
+			sizeof(void*), kMaxEntries, &kPackfileArraySize, {}, 0, nullptr, 0, kGameReferences };
 
 		// ---- the streaming configuration call
 

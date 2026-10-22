@@ -49,7 +49,7 @@ check "the 'would' line" "log_has 'DRY_RUN: would move the modkit array (6 refer
 echo "== K7 DIAGNOSTIC_MODE=1: every pattern, reference and limit logged"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
 check "the 14 modkit patterns each found exactly once" "[ \$(grep -c -E 'Pattern M-E-(R[1-6]|L[1-8]) found: .* 1 match,' TweaksV.log) -eq 14 ]"
-check "6 references logged" "[ \$(count 'ModkitLimit\] DIAGNOSTIC: reference at RVA') -eq 6 ]"
+check "6 references logged, and the scan finds the same 6 and no other" "[ \$(count 'ModkitLimit\] DIAGNOSTIC: reference at RVA .* (M-E-R[1-6])') -eq 6 ] && [ \$(count 'ModkitLimit\] DIAGNOSTIC: reference at RVA .* (scan)') -eq 6 ]"
 check "8 limits logged, all decoding to 1024; the array logged" "[ \$(count 'ModkitLimit\] DIAGNOSTIC: limit at RVA .* -> game size 1024') -eq 8 ] && log_has 'DIAGNOSTIC: the modkit array is at RVA .* - 1024 entries of 2 bytes'"
 check "the 14 writes logged" "[ \$(count 'ModkitLimit\] DIAGNOSTIC: modkit array reference at RVA') -eq 6 ] && [ \$(count 'ModkitLimit\] DIAGNOSTIC: modkit array limit at RVA') -eq 8 ]"
 
@@ -83,6 +83,11 @@ echo "== K13 none of the game code present (plain fake game): logged and skipped
 fresh_ini; out=$(game plain_game.exe)
 check "harness survived" "grep -q 'loaded' harness.out"
 check "reported" "log_has 'PROBLEM: The modkit limit is not changed this session: M-E-R1 was not found.'"
+
+echo "== K14 a seventh reference to the array that no pattern names (a changed game): nothing written"
+fresh_ini; out=$(game full_game.exe modkitextra); echo "      $out"
+check "nothing changed" "[[ \"\$out\" == *'modkit refs: game array'* && \"\$out\" == *\"$GAME_LIMITS\"* ]]"
+check "reason logged and reported" "log_has 'the game code holds 7 or more references to the modkit array, not the expected 6 (another mod may have moved some of them, or the game has changed).' && log_has 'PROBLEM: The modkit limit is not changed'"
 
 echo
 echo "MODKIT SCENARIOS: $pass passed, $fail failed"

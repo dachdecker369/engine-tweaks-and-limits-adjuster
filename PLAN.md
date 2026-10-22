@@ -74,7 +74,9 @@ This file back to its heading, its first paragraph and "Next steps" with what wa
 
 ## Next steps
 
-- Phases 0 and 1 are committed (442 checks); next is phase 2, the scanner, the relocation core and the patterns.
+- Phases 0, 1 and 2 are committed (450 checks); next is phase 3, RageOpenV.
 - Skipped so far: nothing.
-- Done differently from the plan, with the reason: the fakes' `TEMP` and `TMP` are `object\TestTemp`, next to `object\TestRun` and not inside it, because `object\TestRun` is the fake game's folder and the temp files must lie outside the game folder, as the real `%TEMP%` does (the DirectStorage scenarios open them as files outside it). `/WX` on the fakes showed a warning they always had (an ignored `write` attribute of `.fakefn`), now gone.
+- Done differently from the plan, decided and kept:
+  - Phase 1: the fakes' `TEMP` and `TMP` are `object\TestTemp`, next to `object\TestRun` and not inside it, because `object\TestRun` is the fake game's folder and the temp files must lie outside the game folder, as the real `%TEMP%` does (the DirectStorage scenarios open them as files outside it); `run_all.sh` deletes it with `object\TestRun` and `object\Test`. `/WX` on the fakes showed a warning they always had (an ignored `write` attribute of `.fakefn`), now gone.
+  - Phase 2: past the expected number the reference count's refusal says `N or more` (the scan stops one past it), as the core's line for the scanned loads does; a scan that finds the right number but a site no anchor names gets a refusal of its own, `the reference to the <array> at RVA ... is not one its patterns name (...)`; the scan's `DIAGNOSTIC: reference at RVA ... (scan)` lines give the RVA of the rel32, as the anchors' lines do, so that the two lists pair up.
 - Waiting on me: nothing until the last phase is committed.

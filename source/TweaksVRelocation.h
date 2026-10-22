@@ -132,6 +132,9 @@ namespace TweaksV
 											// [rip+disp32]" load the array, found by its address, and those are moved
 		const char* leaPrefixes;			// the REX bytes a scanned lea may start with ("\x48\x4C"); nullptr: any with REX.W
 		size_t leaPrefixCount;
+		size_t expectedReferences;			// with the anchors' references moved: 0, not checked; else the game's code reaches the
+											// array in exactly this many places ("lea r64, [rip+disp32]" and "mov [rip+disp32],
+											// r64", found by its address), every one of them an anchor's reference
 	};
 
 	// A limit as found: where its value lies (the imm32, or the variable itself) and how it encodes N.
@@ -158,8 +161,9 @@ namespace TweaksV
 
 	// Finds every site of spec and checks it: every anchor matches as often as it must, every reference
 	// points at one array inside the game, every limit is the expected instruction and decodes to the
-	// same plausible size, the scanned loads are exactly as many as expected. Clamps the setting to the
-	// game's own size..maxEntries. False, reported, if the part must leave the game as it is.
+	// same plausible size, the scanned loads are exactly as many as expected, and with expectedReferences
+	// the anchors' references are every one the game has. Clamps the setting to the game's own
+	// size..maxEntries. False, reported, if the part must leave the game as it is.
 	bool FindRelocation(const RelocationSpec& spec, RelocationPlan& plan);
 
 	// DRY_RUN: logs what would change (with also, the part's own addition to the line) and returns true.

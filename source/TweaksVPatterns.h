@@ -38,7 +38,7 @@ namespace TweaksV
 
 		// PackfileLimit: the direct size (one pattern per range of game builds), the
 		// indirect size, the streaming configuration call, then the references to the packfile array -
-		// the last one again per range of game builds
+		// R31 again per range of game builds
 		{ "P-E-D3", "48 83 C6 ? 48 81 F9" },
 		{ "P-E-D2", "49 83 c3 ? 48 81 f9 ? ? ? ? 75 ? eb" },
 		{ "P-E-D1", "48 81 f9 ? ? ? ? 74 ? 48 83 3c ca 00" },
@@ -76,6 +76,8 @@ namespace TweaksV
 		{ "P-E-R30", "48 89 35 ? ? ? ? b9 ? ? ? ? ba ? ? ? ? e8 ? ? ? ? b9 ? ? ? ? 48 c7 44 08" },
 		{ "P-E-R31a", "BF 08 00 00 00 BE 10 00 00 00 4C 8D 05" },
 		{ "P-E-R31b", "41 ? ? ? ? ? ? ? ? ? ? 41 bb ? ? ? ? ? 8d" },
+		{ "P-E-R32", "48 89 cf 31 f6 4c 8d 3d ? ? ? ? eb 10" },
+		{ "P-E-R33", "75 0c cc 48 8d 0d ? ? ? ? 48 8b 0c d1" },
 
 		// BoxStreamer: the four sites that hand the traversal list's capacity to the tree search; the three
 		// that end in "4C 8D 2D" are followed by the lea that loads the list, whose other loads are found by
@@ -109,7 +111,7 @@ namespace TweaksV
 		{ "D-E-L16", "89 C3 31 C0 81 FB 03 01 00 00 0F 8F" },
 
 		// RageOpenV: the console, the RPF cache check, the 8 file functions and the 5 encryption calls (the
-		// five newmods patterns went with the newmods folder; PATTERNS.md keeps their rows as removed)
+		// newmods patterns went with the newmods folder; PATTERNS.md keeps the removed rows)
 		{ "R-E-C1", "ff 15 ? ? ? ? 48 85 c0 74 ? 48 89 c1 31 d2" },
 		{ "R-E-K1", "e8 ? ? ? ? 48 8d 0d ? ? ? ? 48 8d 15 ? ? ? ? 48 8d 35" },
 		{ "R-E-F1", "41 56 56 57 53 48 81 ec ? ? ? ? 4c 89 c7 66 c7 ? ? ? ? ? 4c 8d 74 24" },

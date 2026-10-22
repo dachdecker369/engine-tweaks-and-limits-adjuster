@@ -347,7 +347,12 @@ namespace TweaksV
 
 		uint8_t* Find(const GamePattern& gamePattern)
 		{
-			const std::vector<uint8_t*> found = FindAll(gamePattern, 1);
+			const std::vector<uint8_t*> found = FindAll(gamePattern, 2);
+			if (found.size() > 1)	// what would be written over cannot be known
+			{
+				WriteLog(kTag, std::string("Pattern ") + gamePattern.label + " matches 2 or more times - not used (the site must be unique).");
+				return nullptr;
+			}
 			return found.empty() ? nullptr : found[0];
 		}
 
@@ -385,51 +390,67 @@ namespace TweaksV
 			return found;
 		}
 
-		// The loads are looked for the way Find looks for a pattern: the opcode and the ModRM at 16
-		// positions at a time, the prefix and the displacement only where both match.
+		namespace
+		{
+			// Every "<REX.W> <opcode> <ModRM mod 00 r/m 101> disp32" whose displacement leads to target, the
+			// opcode one of the two given, looked for the way Find looks for a pattern: the opcode and the
+			// ModRM at 16 positions at a time, the prefix and the displacement only where both match.
+			std::vector<uint8_t*> FindRipRelative(const void* target, size_t limit, uint8_t opcodeA, uint8_t opcodeB)
+			{
+				constexpr size_t kLength = 7;
+				std::vector<uint8_t*> found;
+				const auto wanted = reinterpret_cast<intptr_t>(target);
+				const auto loads = [&found, wanted](uint8_t* at)	// at[1] is the opcode, at[2] a ModRM 00 ... 101
+				{
+					if ((at[0] & 0xF8) != 0x48)	// a REX prefix with W
+						return;
+					int32_t disp = 0;
+					memcpy(&disp, at + 3, sizeof(disp));
+					if (reinterpret_cast<intptr_t>(at + kLength) + disp == wanted)
+						found.push_back(at);
+				};
+				const __m128i a = _mm_set1_epi8(static_cast<char>(opcodeA));
+				const __m128i b = _mm_set1_epi8(static_cast<char>(opcodeB));
+				const __m128i modrmBits = _mm_set1_epi8(static_cast<char>(0xC7));
+				const __m128i modrm = _mm_set1_epi8(0x05);
+				for (const Range& range : ReadableCode())
+				{
+					const size_t available = static_cast<size_t>(range.end - range.begin);
+					if (available < kLength)
+						continue;
+					const size_t lastStart = available - kLength;	// the whole instruction stays inside the range
+					size_t at = 0;
+					for (; at + 15 <= lastStart && found.size() < limit; at += 16)
+					{
+						const __m128i x = _mm_loadu_si128(reinterpret_cast<const __m128i*>(range.begin + at + 1));
+						const __m128i y = _mm_loadu_si128(reinterpret_cast<const __m128i*>(range.begin + at + 2));
+						const __m128i opcode = _mm_or_si128(_mm_cmpeq_epi8(x, a), _mm_cmpeq_epi8(x, b));
+						unsigned mask = static_cast<unsigned>(_mm_movemask_epi8(_mm_and_si128(opcode,
+							_mm_cmpeq_epi8(_mm_and_si128(y, modrmBits), modrm))));
+						while (mask && found.size() < limit)
+						{
+							unsigned long bit = 0;
+							_BitScanForward(&bit, mask);
+							loads(range.begin + at + bit);
+							mask &= mask - 1;
+						}
+					}
+					for (; at <= lastStart && found.size() < limit; at++)
+						if ((range.begin[at + 1] == opcodeA || range.begin[at + 1] == opcodeB) && (range.begin[at + 2] & 0xC7) == 0x05)
+							loads(range.begin + at);
+				}
+				return found;
+			}
+		}
+
 		std::vector<uint8_t*> FindRipRelativeLeas(const void* target, size_t limit)
 		{
-			constexpr size_t kLength = 7;
-			std::vector<uint8_t*> found;
-			const auto wanted = reinterpret_cast<intptr_t>(target);
-			const auto loads = [&found, wanted](uint8_t* at)	// at[1] is the opcode 8D, at[2] a ModRM 00 ... 101
-			{
-				if ((at[0] & 0xF8) != 0x48)	// a REX prefix with W
-					return;
-				int32_t disp = 0;
-				memcpy(&disp, at + 3, sizeof(disp));
-				if (reinterpret_cast<intptr_t>(at + kLength) + disp == wanted)
-					found.push_back(at);
-			};
-			const __m128i opcode = _mm_set1_epi8(static_cast<char>(0x8D));
-			const __m128i modrmBits = _mm_set1_epi8(static_cast<char>(0xC7));
-			const __m128i modrm = _mm_set1_epi8(0x05);
-			for (const Range& range : ReadableCode())
-			{
-				const size_t available = static_cast<size_t>(range.end - range.begin);
-				if (available < kLength)
-					continue;
-				const size_t lastStart = available - kLength;	// the whole instruction stays inside the range
-				size_t at = 0;
-				for (; at + 15 <= lastStart && found.size() < limit; at += 16)
-				{
-					const __m128i x = _mm_loadu_si128(reinterpret_cast<const __m128i*>(range.begin + at + 1));
-					const __m128i y = _mm_loadu_si128(reinterpret_cast<const __m128i*>(range.begin + at + 2));
-					unsigned mask = static_cast<unsigned>(_mm_movemask_epi8(_mm_and_si128(_mm_cmpeq_epi8(x, opcode),
-						_mm_cmpeq_epi8(_mm_and_si128(y, modrmBits), modrm))));
-					while (mask && found.size() < limit)
-					{
-						unsigned long bit = 0;
-						_BitScanForward(&bit, mask);
-						loads(range.begin + at + bit);
-						mask &= mask - 1;
-					}
-				}
-				for (; at <= lastStart && found.size() < limit; at++)
-					if (range.begin[at + 1] == 0x8D && (range.begin[at + 2] & 0xC7) == 0x05)
-						loads(range.begin + at);
-			}
-			return found;
+			return FindRipRelative(target, limit, 0x8D, 0x8D);
+		}
+
+		std::vector<uint8_t*> FindRipRelativeReferences(const void* target, size_t limit)
+		{
+			return FindRipRelative(target, limit, 0x8D, 0x89);	// lea r64, [rip+disp32]; mov [rip+disp32], r64
 		}
 	}
 }

@@ -4,7 +4,7 @@
 // DRY_RUN and DIAGNOSTIC_MODE, so no part of TweaksV has to. Plus small helpers for reading code, and
 // memory near the game for what the parts put there.
 // A hook on a function's start - RageOpenV's file functions, DirectStorage's OpenFile - is MinHook's,
-// through HookFunctions and HookExport below (TweaksVDirectStorage.cpp still calls MinHook itself).
+// through HookFunctions and HookExport below.
 #pragma once
 
 #include <windows.h>

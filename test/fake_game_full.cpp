@@ -10,15 +10,18 @@
 //   badlegal       unexpected bytes at the legal site
 //   jnzlegal       a jnz instead of the game's jz at the legal site
 //   hookedlanding  the landing page function starts with a jmp (another mod's hook)
+//   twos3          a second copy of the landing page's site (S-E3 matches twice)
 //   heapraised     the heap site already holds 2000 MB (another heap adjuster ran first)
 //   heapodd        the heap site holds a value that is not a whole number of MB
 //   modkitmoved / modkitsplit / modkitmismatch   see main()
+//   modkitextra    a seventh lea of the modkit array, which no pattern names (a changed game)
 //   packmoved      one packfile array reference points outside the game (another mod moved it)
 //   packhooked     the streaming configuration call already leads outside the game
 //   packbadsize    the direct size limit holds an implausible 70000
 //   packindirect   the indirect size variable holds the array's size itself, 4500, not 4 less (a changed margin)
 //   twor31a        a second, identical copy of the 1158.13+ packfile reference (its pattern matches twice)
 //   junkr31a       the game's obfuscated code that the old 1158.13+ reference pattern also matched
+//   packextra      a 34th reference to the packfile array, a mov no pattern names (a changed game)
 //   boxmoved       every reference to the box streamer's traversal list points outside the game (another mod moved it)
 //   boxsplit       one reference to the list points somewhere else in the game
 //   boxninth       a ninth lea loads the list (a changed game)
@@ -81,10 +84,13 @@ volatile unsigned char g_legalSite[] = {
 volatile unsigned char g_landingSite[] = { 0xE8, 0x00, 0x00, 0x00, 0x00, 0x8B, 0x0D, 0x10, 0x20, 0x30, 0x40,
 	0x83, 0xC1, 0x07, 0x84, 0xC0 };
 volatile unsigned char g_landingCallee[] = { 0x48, 0x89, 0x5C, 0x24, 0x08, 0x57, 0x48, 0x83, 0xEC, 0x20 };
+// a second copy of the landing page's site, its call to the same function: its first byte becomes E8 only
+// with the option "twos3"
+volatile unsigned char g_landingSiteCopy[] = { 0xCC, 0x00, 0x00, 0x00, 0x00, 0x8B, 0x0D, 0x10, 0x20, 0x30, 0x40,
+	0x83, 0xC1, 0x07, 0x84, 0xC0, 0xCC };
 
-// ModkitLimit: the game's own modkit array (1024 entries here), the six
-// "lea reg, [rip+disp32]" references to it and the eight hard-coded limits.
-uint16_t g_oldModkitArray[1024];
+// ModkitLimit: the six "lea reg, [rip+disp32]" references to the game's own modkit array (below, outside this
+// section) and the eight hard-coded limits.
 volatile unsigned char g_modkitRef1[] = { 0x31, 0xC9, 0x48, 0x8D, 0x05, 0, 0, 0, 0, 0xEB };
 volatile unsigned char g_modkitRef2[] = { 0x89, 0xC2, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0xEB };
 volatile unsigned char g_modkitRef3[] = { 0x41, 0x0F, 0xB7, 0xC2, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0x0F, 0xB7, 0x04, 0x41 };
@@ -95,9 +101,12 @@ struct Site { volatile unsigned char* bytes; int offset; size_t size; };
 #define SITE(a, off) { a, off, sizeof(a) }
 static Site g_modkitRefs[] = { SITE(g_modkitRef1, 5), SITE(g_modkitRef2, 5), SITE(g_modkitRef3, 7),
 	SITE(g_modkitRef4, 8), SITE(g_modkitRef5, 3), SITE(g_modkitRef6, 5) };
+// a seventh lea, which the game does not have: its first byte becomes 48 only with the option "modkitextra"
+volatile unsigned char g_modkitExtra[] = { 0xCC, 0x8D, 0x05, 0, 0, 0, 0, 0xCC };	// rel32 at +3
+static Site g_modkitExtraSite = SITE(g_modkitExtra, 3);
 
 volatile unsigned char g_modkitLimit1[] = { 0x0F, 0xB7, 0xC0, 0x66, 0xBA, 0xFF, 0xFF, 0x3D, 0xFF, 0x03, 0x00, 0x00, 0x77 };	// size-1
-volatile unsigned char g_modkitLimit2[] = { 0x48, 0x83, 0xC5, 0x04, 0x48, 0x83, 0xC0, 0x04, 0x48, 0x83, 0xC7, 0x04, 0x48, 0x81, 0xFD, 0x03, 0x04, 0x00, 0x00 };	// size+3
+volatile unsigned char g_modkitLimit2[] = { 0x48, 0x83, 0xC5, 0x04, 0x48, 0x83, 0xC0, 0x04, 0x48, 0x83, 0xC7, 0x04, 0x48, 0x81, 0xFF, 0x03, 0x04, 0x00, 0x00 };	// size+3
 volatile unsigned char g_modkitLimit3[] = { 0x74, 0x10, 0x48, 0x83, 0xC5, 0x04, 0x48, 0x83, 0xC3, 0x04, 0x48, 0x83, 0xC0, 0x04, 0x48, 0x3D, 0x03, 0x04, 0x00, 0x00 };	// size+3
 volatile unsigned char g_modkitLimit4[] = { 0x48, 0x83, 0xC7, 0x04, 0x48, 0x83, 0xC2, 0x04, 0x48, 0x83, 0xC5, 0x04, 0x48, 0x81, 0xFD, 0x03, 0x04, 0x00, 0x00 };	// size+3
 volatile unsigned char g_modkitLimit5[] = { 0x48, 0x83, 0xC7, 0x04, 0x48, 0x83, 0xC2, 0x04, 0x48, 0x83, 0xC6, 0x04, 0x48, 0x81, 0xFE, 0x03, 0x04, 0x00, 0x00 };	// size+3
@@ -107,10 +116,9 @@ volatile unsigned char g_modkitLimit8[] = { 0x41, 0x0F, 0xB7, 0xCA, 0x66, 0xB8, 
 static Site g_modkitLimits[] = { SITE(g_modkitLimit1, 8), SITE(g_modkitLimit2, 15), SITE(g_modkitLimit3, 16), SITE(g_modkitLimit4, 15),
 	SITE(g_modkitLimit5, 15), SITE(g_modkitLimit6, 2), SITE(g_modkitLimit7, 10), SITE(g_modkitLimit8, 10) };
 
-// PackfileLimit: the game's own packfile array (4500 entries here), its two size
-// limits, the call that reads the streaming configuration and the references to the array. Every
-// site ends in CC so no pattern can match across two neighbouring arrays.
-void* g_oldPackfileArray[4500];
+// PackfileLimit: the two size limits of the game's own packfile array (below, outside this section), the
+// call that reads the streaming configuration and the references to the array. Every site ends in CC so no
+// pattern can match across two neighbouring arrays.
 volatile uint32_t g_packIndirectSize = 4496;	// the variable "cmp eax, [rip+X]" reads: the array's size minus 4, as the game's own
 // direct size "cmp rcx, 4500", one per game build
 volatile unsigned char g_packD3[] = { 0x48, 0x83, 0xC6, 0x08, 0x48, 0x81, 0xF9, 0x94, 0x11, 0x00, 0x00, 0x75, 0xE0, 0xCC };			// >= 1.0.1158.13, +7
@@ -161,24 +169,34 @@ volatile unsigned char g_packR27[] = { PACK_WRITE(0x2D), 0x0F, 0x1F, 0x84, 0x00,
 volatile unsigned char g_packR28[] = { PACK_WRITE(0x3D), 0x66, 0x66, 0x66, 0x66, 0x2E, 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00, 0xCC };
 volatile unsigned char g_packR29[] = { PACK_WRITE(0x3D), 0x0F, 0x1F, 0x40, 0x00, 0xCC };
 volatile unsigned char g_packR30[] = { PACK_WRITE(0x35), 0x48, 0xC7, 0x44, 0x08, 0xCC };
-// the reference that depends on the build
+// the two more the game has: the load in the function that hashes a collection's entries, "lea r15" (+8),
+// and the one in P-E-R20's function, behind its int3 trap ("lea rcx": the pattern at +3, its rel32 at +9)
+volatile unsigned char g_packR32[] = { 0x48, 0x89, 0xCF, 0x31, 0xF6, 0x4C, 0x8D, 0x3D, 0, 0, 0, 0, 0xEB, 0x10, 0xCC };
+volatile unsigned char g_packR33[] = { 0x48, 0x85, 0xC9, 0x75, 0x0C, 0xCC, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0x48, 0x8B, 0x0C, 0xD1,
+	0x48, 0x8B, 0x19, 0xCC };
+// the reference that depends on the build. A game build has only its own: main makes the other build's one
+// no 64-bit lea (its 4C becomes 44), which TweaksV's scan for every reference to the array does not count
 volatile unsigned char g_packR31a[] = { 0xBF, 0x08, 0x00, 0x00, 0x00, 0xBE, 0x10, 0x00, 0x00, 0x00, 0x4C, 0x8D, 0x05, 0, 0, 0, 0, 0xCC };	// >= 1.0.1158.13, +13
 volatile unsigned char g_packR31b[] = { 0x41, 0xB8, 0x00, 0x10, 0x00, 0x00, 0xBA, 0x01, 0x00, 0x00, 0x00, 0x41, 0xBB, 0xFF, 0xFF, 0x00, 0x00,
 	0x4C, 0x8D, 0x05, 0, 0, 0, 0, 0xCC };																		// older builds, +20
-// a second, identical copy of the 1158.13+ reference: its first byte becomes BF only with the option
-// "twor31a", its reference points at the array too, so either match moves the same array. With the
-// option "junkr31a" it holds the game's obfuscated code that the old pattern "BF ? ? ? ? BE ? ? ? ?
-// 4C 8D 05" also matched (1.0.1158.16, RVA 0x582A227) instead.
-volatile unsigned char g_packR31aCopy[] = { 0xCC, 0x08, 0x00, 0x00, 0x00, 0xBE, 0x10, 0x00, 0x00, 0x00, 0x4C, 0x8D, 0x05, 0, 0, 0, 0, 0xCC };
+// a second, identical copy of the 1158.13+ reference: its first byte becomes BF and its lea a 64-bit one
+// (44 becomes 4C) only with the option "twor31a"; its reference points at the array too, so either match
+// moves the same array. With the option "junkr31a" it holds the game's obfuscated code that the old pattern
+// "BF ? ? ? ? BE ? ? ? ? 4C 8D 05" also matched (1.0.1158.16, RVA 0x582A227) instead.
+volatile unsigned char g_packR31aCopy[] = { 0xCC, 0x08, 0x00, 0x00, 0x00, 0xBE, 0x10, 0x00, 0x00, 0x00, 0x44, 0x8D, 0x05, 0, 0, 0, 0, 0xCC };
+// a 34th reference, which the game does not have, "mov [rip+X], rax": its first byte becomes 48 only with
+// the option "packextra"
+volatile unsigned char g_packExtra[] = { 0xCC, 0x89, 0x05, 0, 0, 0, 0, 0xCC };	// rel32 at +3
 static Site g_packRefs[] = { SITE(g_packR01, 3), SITE(g_packR02, 3), SITE(g_packR03, 3), SITE(g_packR04, 5), SITE(g_packR05, 5),
 	SITE(g_packR06, 3), SITE(g_packR07, 3), SITE(g_packR08, 3), SITE(g_packR09, 39), SITE(g_packR10, 7), SITE(g_packR11, 3),
 	SITE(g_packR12, 3), SITE(g_packR13, 3), SITE(g_packR14, 3), SITE(g_packR15, 3), SITE(g_packR16, 3), SITE(g_packR17, 41),
 	SITE(g_packR18, 3), SITE(g_packR19, 3), SITE(g_packR20, 3), SITE(g_packR21, 3), SITE(g_packR22, 3), SITE(g_packR23, 3),
 	SITE(g_packR24, 3), SITE(g_packR25, 3), SITE(g_packR26, 3), SITE(g_packR27, 3), SITE(g_packR28, 3), SITE(g_packR29, 3),
-	SITE(g_packR30, 3) };
+	SITE(g_packR30, 3), SITE(g_packR32, 8), SITE(g_packR33, 9) };
 static Site g_packR31aSite = SITE(g_packR31a, 13);
 static Site g_packR31bSite = SITE(g_packR31b, 20);
 static Site g_packR31aCopySite = SITE(g_packR31aCopy, 13);
+static Site g_packExtraSite = SITE(g_packExtra, 3);
 static Site g_packIndirectSite = SITE(g_packI1, 2);
 static Site g_packCallSite = SITE(g_packH1, 17);	// the rel32 of the E8 at +0x10
 
@@ -274,6 +292,14 @@ static DecalLimit g_decalLimits[23] = {
 	{ SITE(g_decalAddR8d, 6), 'L' }, { SITE(g_decalAddEsi, 4), 'L' }, { SITE(g_decalAddRel8, 6), 'L' }, { SITE(g_decalAddEbx, 6), 'L' } };
 #pragma data_seg()
 
+// The game's own modkit array (1024 entries of 2 bytes) and packfile array (4500 entries of 8 bytes). The
+// harness reaches them only through these pointers, set when the program is loaded: none of its own code
+// may load an array with a lea, which TweaksV's scan for every reference to the array would count.
+static uint16_t g_oldModkitArrayStorage[1024];
+static uint16_t* volatile g_oldModkitArray = g_oldModkitArrayStorage;
+static void* g_oldPackfileArrayStorage[4500];
+static void** volatile g_oldPackfileArray = g_oldPackfileArrayStorage;
+
 // The game's own traversal list (1000 entries of 8 bytes). The harness reaches it only through this
 // pointer, set when the program is loaded: none of its own code may load the list with a lea, which
 // TweaksV's scan for the game's loads of the list would count.
@@ -354,6 +380,24 @@ static const unsigned char* ImageBase()
 	return reinterpret_cast<const unsigned char*>(GetModuleHandleW(nullptr));
 }
 
+// The game build this program pretends to be, from its own version resource (fake_game_version.rc):
+// FILEVERSION 1,0,C,D gives (C << 16) | D; 0 without one.
+static uint32_t OwnBuild()
+{
+	const HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(VS_VERSION_INFO), RT_VERSION);
+	const HGLOBAL loaded = resource ? LoadResource(nullptr, resource) : nullptr;
+	const auto data = static_cast<const unsigned char*>(loaded ? LockResource(loaded) : nullptr);
+	const DWORD size = resource ? SizeofResource(nullptr, resource) : 0;
+	for (DWORD at = 0; data && at + sizeof(VS_FIXEDFILEINFO) <= size; at += 4)
+	{
+		VS_FIXEDFILEINFO info{};
+		memcpy(&info, data + at, sizeof(info));
+		if (info.dwSignature == VS_FFI_SIGNATURE)
+			return info.dwFileVersionLS;
+	}
+	return 0;
+}
+
 static const unsigned char* ImageEnd()
 {
 	const auto base = ImageBase();
@@ -420,15 +464,15 @@ static void PrintModkitCopy()
 	}
 	MEMORY_BASIC_INFORMATION info{};
 	if (VirtualQuery(first, &info, sizeof(info)) != sizeof(info) || info.State != MEM_COMMIT ||
-		static_cast<const unsigned char*>(info.BaseAddress) + info.RegionSize < first + sizeof(g_oldModkitArray))
+		static_cast<const unsigned char*>(info.BaseAddress) + info.RegionSize < first + sizeof(g_oldModkitArrayStorage))
 	{
 		wprintf(L"modkit copy: unreadable | ");
 		return;
 	}
-	wprintf(L"modkit copy: %ls | ", memcmp(first, g_oldModkitArray, sizeof(g_oldModkitArray)) == 0 ? L"ok" : L"MISSING");
+	wprintf(L"modkit copy: %ls | ", memcmp(first, g_oldModkitArray, sizeof(g_oldModkitArrayStorage)) == 0 ? L"ok" : L"MISSING");
 }
 
-// "pack refs: 30 new, R31a new, R31b game (RW, 512 KB)" - "new" is the common target of the
+// "pack refs: 32 new, R31a new, R31b game (RW, 512 KB)" - "new" is the common target of the
 // first reference when that is outside the game
 static void PrintPackfile(int argc, wchar_t** argv);
 
@@ -643,9 +687,9 @@ static void TouchSite(const Site& site)
 static void ForEachSite(void (*fn)(const Site&))
 {
 	static Site singles[] = { SITE(g_heapSite, 0), SITE(g_splashSite, 0), SITE(g_legalSite, 0), SITE(g_landingSite, 0),
-		SITE(g_landingCallee, 0), SITE(g_packI1, 0), SITE(g_packH1, 0), SITE(g_packR31a, 0), SITE(g_packR31b, 0),
-		SITE(g_packR31aCopy, 0), SITE(g_boxRef9, 0), SITE(g_decalFull, 0), SITE(g_decalParserLea, 0), SITE(g_decalFindById, 0),
-		SITE(g_decalPickVariant, 0), SITE(g_decalOverrideOne, 0), SITE(g_decalOverrideLoop, 0), SITE(g_decalOverrideCmp1, 0),
+		SITE(g_landingCallee, 0), SITE(g_landingSiteCopy, 0), SITE(g_modkitExtra, 0), SITE(g_packI1, 0), SITE(g_packH1, 0),
+		SITE(g_packR31a, 0), SITE(g_packR31b, 0), SITE(g_packR31aCopy, 0), SITE(g_packExtra, 0), SITE(g_boxRef9, 0),
+		SITE(g_decalFull, 0), SITE(g_decalParserLea, 0), SITE(g_decalFindById, 0), SITE(g_decalPickVariant, 0), SITE(g_decalOverrideOne, 0), SITE(g_decalOverrideLoop, 0), SITE(g_decalOverrideCmp1, 0),
 		SITE(g_decalOverrideCmpEbp, 0), SITE(g_decalOverrideCmp2, 0), SITE(g_decalLoopStart, 0), SITE(g_decalLoopEnd, 0),
 		SITE(g_decalAddR8d, 0), SITE(g_decalAddEsi, 0), SITE(g_decalAddRel8, 0), SITE(g_decalAddEbx, 0), SITE(g_decalLeaExtra, 0) };
 	for (const Site& site : singles) fn(site);
@@ -831,6 +875,13 @@ int wmain(int argc, wchar_t** argv)
 	const int32_t rel32 = static_cast<int32_t>(reinterpret_cast<intptr_t>(g_landingCallee) -
 		(reinterpret_cast<intptr_t>(g_landingSite) + 5));
 	memcpy(const_cast<unsigned char*>(g_landingSite) + 1, &rel32, 4);
+	if (HasOption(argc, argv, L"twos3"))	// a second site of the same shape, its call to the same function
+	{
+		const int32_t copyRel32 = static_cast<int32_t>(reinterpret_cast<intptr_t>(g_landingCallee) -
+			(reinterpret_cast<intptr_t>(g_landingSiteCopy) + 5));
+		g_landingSiteCopy[0] = 0xE8;
+		memcpy(const_cast<unsigned char*>(g_landingSiteCopy) + 1, &copyRel32, 4);
+	}
 
 	if (HasOption(argc, argv, L"prepatched"))
 	{
@@ -871,6 +922,9 @@ int wmain(int argc, wchar_t** argv)
 		SetRel32(g_modkitRefs[4], g_oldModkitArray + 8);
 	if (HasOption(argc, argv, L"modkitmismatch"))	// one limit decodes to 1025 instead of 1024
 		SetImm32(g_modkitLimits[5], 2050);
+	SetRel32(g_modkitExtraSite, g_oldModkitArray);
+	if (HasOption(argc, argv, L"modkitextra"))		// a seventh lea of the array, which no pattern names
+		g_modkitExtra[0] = 0x48;
 
 	// Every packfile reference points at the game's own array, the indirect size at its variable
 	// and the streaming configuration call at the game's function...
@@ -879,8 +933,18 @@ int wmain(int argc, wchar_t** argv)
 	SetRel32(g_packR31aSite, g_oldPackfileArray);
 	SetRel32(g_packR31bSite, g_oldPackfileArray);
 	SetRel32(g_packR31aCopySite, g_oldPackfileArray);
+	SetRel32(g_packExtraSite, g_oldPackfileArray);
+	if (OwnBuild() >= ((1158u << 16) | 13))	// only this build's own reference is one: the other build's lea is a 32-bit one
+		g_packR31b[17] = 0x44;
+	else
+		g_packR31a[10] = 0x44;
 	if (HasOption(argc, argv, L"twor31a"))		// ...and the 1158.13+ pattern matches twice
+	{
 		g_packR31aCopy[0] = 0xBF;
+		g_packR31aCopy[10] = 0x4C;
+	}
+	if (HasOption(argc, argv, L"packextra"))		// ...or a 34th reference no pattern names
+		g_packExtra[0] = 0x48;
 	if (HasOption(argc, argv, L"junkr31a"))		// ...or the code only the old pattern matched is there
 		SetBytes(g_packR31aCopy, "\xBF\x3D\xFC\xE9\xF3\xBE\x1E\x00\x41\x50\x4C\x8D\x05\x47\x06\x55\xFC\xCC", 18);
 	SetRel32(g_packIndirectSite, const_cast<uint32_t*>(&g_packIndirectSize));

@@ -27,11 +27,11 @@ What each part does and the checks it makes, the measurements, the open issues a
 - **Problems on screen:** every problem at start-up is listed in one message box, the start-up summary (`ERROR_POPUP=1`, the default). A part that stops working later, such as the DirectStorage hook a few seconds in, gets a message box of its own, at most three per session; more than 40 problems at once are counted as "... and N more".
 
 - **Scanner:** TweaksV's own search for its patterns in the running game's code (`TweaksVScanner`); the pattern parser is an altered version of ScriptHookVDotNet's (THIRD_PARTY_NOTICES.md):
-  - A pattern miss is logged and returns null instead of exiting the game;
+  - A pattern miss is logged and returns null instead of exiting the game; so does a pattern whose site must be unique and that matches twice, because what would be written over cannot be known;
   - A malformed pattern is refused instead of throwing;
   - DIAGNOSTIC_MODE logs the address, match count and original bytes, and for a pattern that matches more than once, the bytes around each match;
   - Only the game's executable sections are searched, and only memory that can be read, so a page the game protects is skipped instead of crashing it. The search compares a pattern's two rarest bytes at 16 positions at a time and checks the whole pattern only where both match - about ten times faster than a search through the whole image byte by byte;
-  - A second search, built the same way, finds every `lea` that loads one address - for a static array the game loads in places no pattern can tell apart (the box streamer's list, the decal definitions array);
+  - A second search, built the same way, finds every `lea` that loads one address - for a static array the game loads in places no pattern can tell apart (the box streamer's list, the decal definitions array) - and, with the `mov` stores to it, every reference to one, for an array whose patterns name its references (the modkit and packfile arrays);
   - A pattern can be asked for every match instead of the first, for a site the game repeats - the check seven decal-placing functions share (the decals part).
 
 - **One patch module:** every patch to the game's code goes through `TweaksVPatch`, one writer for bytes, one for redirected calls and one for hooks on a function's start (MinHook, see T-HARDEN):
@@ -49,7 +49,7 @@ What each part does and the checks it makes, the measurements, the open issues a
 - **One feature table:** `TweaksVFeatures.cpp` lists each feature once: its section of `TweaksV.ini`, the old stand-alone plugins that do its job and the function that starts it. DllMain starts the features from it and the conflict check takes their old plugins from it, so a new feature is one entry there, plus its settings.
 
 - **One relocation core:** the four parts that move one of the game's static arrays - the modkit array, the packfile array, the box streamer's traversal list, the decal definitions array - describe it in a table (`TweaksVRelocation.h`: each pattern, where its match holds a reference to the array or a limit, and how the limit encodes the size) and share one implementation:
-  - Every site is found and checked before anything is written: every reference must point at one array inside the game, every limit must be the expected instruction and decode to the same plausible size, and where the array's loads are found by its address (the box streamer's list, the decal definitions array) exactly as many must be found as the game has;
+  - Every site is found and checked before anything is written: every reference must point at one array inside the game, every limit must be the expected instruction and decode to the same plausible size, and where the array's loads are found by its address (the box streamer's list, the decal definitions array) exactly as many must be found as the game has; where the patterns name the references (the modkit and packfile arrays), a scan for every `lea` and `mov` that reaches the array must find exactly those, so that a reference a game update adds cannot stay on the old, smaller array while the limits rise;
   - The new array always has its full size, as read/write data near the game, the game's own entries copied into it and the rest zero; the setting is clamped to the game's own size..that size;
   - Every reference and every limit, with what the part adds (a redirected call, a loop end), is written in one go, all or nothing - a part either does its whole job or leaves the game as it was;
   - DRY_RUN logs one line with what would change; DIAGNOSTIC_MODE logs every site, the value it holds and every write, in one wording for all four parts.
@@ -65,15 +65,15 @@ What each part does and the checks it makes, the measurements, the open issues a
   - A missing pattern skips only that screen.
 
 - **ModkitLimit:** `[MODKIT_LIMIT] MODKITARRAY_SIZE` (default 65536) enlarges the game's array of vehicle modkit IDs - 1024 entries of 2 bytes, loaded by six `lea` (`M-E-R1..R6`) and sized by eight immediates that hold N-1, N+3 or 2N (`M-E-L1..L8`) - on the relocation core:
-  - All six references must point at one array inside the game, so an array another mod has moved is left alone, and all eight limits must decode to the same plausible size;
+  - All six references must point at one array inside the game, so an array another mod has moved is left alone, and they must be every reference the game's code has to it (a scan finds no seventh); all eight limits must be the expected instruction and decode to the same plausible size;
   - The new array always has the full 65536 entries, as read/write data; the limits are clamped to the game's own size..65536;
   - The six references and the eight limits are written together, all or nothing.
 
-- **PackfileLimit:** `[PACKFILE_LIMIT] PACKFILEARRAY_SIZE` (default 13000) enlarges the game's array of RPF archives - 7260 entries of 8 bytes on the current build, referenced by 31 instructions (`P-E-R01..R30` and, by game build, `R31a` or `R31b`) and sized by an immediate (`P-E-D3`, `D2` or `D1` by game build) and a variable the game compares an archive index against, which holds four less than the array's size (`P-E-I1`; the margin is kept) - on the relocation core, and replaces the archive count of the game's configuration:
-  - All references must point at one array inside the game, the limits must agree on a plausible size, and the streaming configuration call (`P-E-H1`) must lead into the game - one another mod has already redirected is left alone;
+- **PackfileLimit:** `[PACKFILE_LIMIT] PACKFILEARRAY_SIZE` (default 13000) enlarges the game's array of RPF archives - 7260 entries of 8 bytes on the current build, referenced by 33 instructions (`P-E-R01..R30`, `R32`, `R33` and, by game build, `R31a` or `R31b`) and sized by an immediate (`P-E-D3`, `D2` or `D1` by game build) and a variable the game compares an archive index against, which holds four less than the array's size (`P-E-I1`; the margin is kept) - on the relocation core, and replaces the archive count of the game's configuration:
+  - All references must point at one array inside the game and be every reference the game's code has to it (a scan finds no 34th; `P-E-R32`, the live load in the function that hashes a collection's entries, and `P-E-R33`, behind a trap that is never run, came from my code dump), the limits must agree on a plausible size, and the streaming configuration call (`P-E-H1`) must lead into the game - one another mod has already redirected is left alone;
   - The call goes through a read+execute call stub to TweaksV's function, which replaces the archive count read from `gameconfig.xml` with the new size and calls the game's own function; the log says what it replaced;
   - The new array always has the full 65535 entries, as read/write data; the limits are clamped to the game's own size..65535;
-  - The 31 references, the two limits and the redirected call are written together, all or nothing;
+  - The 33 references, the two limits and the redirected call are written together, all or nothing;
   - The game's file version chooses the patterns of its build; without one nothing is done, and the start-up summary says so.
 
 - **BoxStreamer:** `[BOXSTREAMER] TRAVERSAL_LIST_SIZE` (default 10000). The game's box streamer keeps the map boxes one search returns in a static list of 1000 entries; with heavy map mods it fills up, and the boxes it has no room for are never streamed, so their LODs are missing. TweaksV moves the list to a larger one and raises the capacity the game hands its tree searches, on the relocation core:
@@ -112,7 +112,7 @@ What each part does and the checks it makes, the measurements, the open issues a
 
 - **Releasing:** a release zip carries exactly five files, now and for every version to come: `TweaksV.asi`, `LICENSE`, `THIRD_PARTY_NOTICES.md`, `CREDITS.md` and `README.md` - the binary, its license, the notices it must travel with, the credits and the player's guide; nothing else, not the `.pdb`. The release notes name the tag the build came from and link the repository, which `THIRD_PARTY_NOTICES.md` and `README.md` in the zip name too, so the source is one step from the binary wherever the zip goes (GPL-3.0, section 6d); the mod page carries the credits, links the repository and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
 
-- **Tests:** `test\` holds fake-game test suites (442 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (450 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Versions
 

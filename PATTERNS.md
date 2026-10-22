@@ -7,11 +7,11 @@ Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game bui
 | | |
 |---|---|
 | **Game Build** | 1.0.1158.16 |
-| **Found** | 87 of the 87 patterns this build uses |
+| **Found** | 89 of the 89 patterns this build uses, 88 of them without `CONSOLE=1` (`P-E-R32` and `P-E-R33` by a scan of my dump of the running game, the others by the diagnostic start) |
 | **Untested** | None. The diagnostic start (`DIAGNOSTIC_MODE=1`, `CONSOLE=1`) also ran these: `R-E-C1` runs only with `CONSOLE=1`. `R-E-F1..F8` run only with a mods folder in the game directory (with `DIAGNOSTIC_MODE=1`, also without one). A part with `ENABLED=0` looks for none of its patterns. |
 | **Matches** | All match exactly once, except `D-E-L12`, which matches exactly 7 times (the check seven decal-placing functions share). To check: boot once with `DIAGNOSTIC_MODE=1` and `CONSOLE=1`, every part on. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once (`D-E-L12`: exactly 7 times). |
 
-The build uses 87 of the table's 90 patterns; six more rows below are kept as removed:
+The build uses 89 of the table's 92 patterns; six more rows below are kept as removed:
 - Packfile picks one of three direct size patterns and one of two references by game build.
 - `R-E-D3` belonged to code that was never used. Removed.
 - `R-E-M0`, `R-E-M1`, `R-E-M2`, `R-E-D1` and `R-E-D2` belonged to the newmods folder, which 2.0.0 drops. Removed.
@@ -24,7 +24,7 @@ The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstor
 2. Check whether the project the pattern came from has changed it (`CREDITS.md` names them).
 3. Update the pattern in `source\TweaksVPatterns.h` and in this file - the tests check that both agree - and confirm that it matches exactly once. `GTA5_Enhanced.exe` is encrypted on disk, so look for the code in a copy of the running game: a test build with `TEST_DUMP_CODE=60` saves one (README, Test Builds).
 4. DirectStorage: if `UNLOCK_FILES=1` reports a problem (another interface, or an `OpenFile` outside DirectStorage's DLLs), look at the factory's functions with `DIAGNOSTIC_MODE=1`.
-5. The game facts no pattern protects, to check in the dump even when every pattern still matches, because a change in them would go wrong silently: RageOpenV's `fiPackfile` fields (8 bytes further on than Legacy's: the entry table at +0x20, its count at +0x28, the current file offset at +0xB4; entries of 16 bytes with the name offset at +0, the type at +4 and the encryption at +12) and the fixed distances of its sites (GetFileTime and GetFileSize 0x10D before `R-E-F2` and `R-E-F3`, 0x15D before `R-E-F6` and `R-E-F7`; the ParseHeader call 19 bytes into `R-E-E5`; the console call 16 bytes into `R-E-C1`); the archive count at offset 24 of the streaming configuration that `P-E-H1`'s call reads, and that call's single argument; the tree-search calls 30, 34, 42 and 30 bytes into `B-E-L1..L4` and their fifth argument on the stack; the decal manager's loop (the start offset at +1 and the lea at +5 of `D-E-L10`, the pass and the end at +2 and +8 of `D-E-L11`); the heap adjuster's rule that a heap of 1024 MB or more is another adjuster's (a build whose own heap is that large would be left alone, with only a log line).
+5. The game facts no pattern protects, to check in the dump even when every pattern still matches, because a change in them would go wrong silently: RageOpenV's `fiPackfile` fields (8 bytes further on than Legacy's: the entry table at +0x20, its count at +0x28, the current file offset at +0xB4; entries of 16 bytes with the name offset at +0, the type at +4 and the encryption at +12) and the fixed distances of its sites (GetFileTime and GetFileSize 0x10D before `R-E-F2` and `R-E-F3`, 0x15D before `R-E-F6` and `R-E-F7`; the ParseHeader call 19 bytes into `R-E-E5`; the console call 16 bytes into `R-E-C1`); the archive count at offset 24 of the streaming configuration that `P-E-H1`'s call reads, and that call's single argument; the tree-search calls 30, 34, 42 and 30 bytes into `B-E-L1..L4` and their fifth argument on the stack; the decal manager's loop (the start offset at +1 and the lea at +5 of `D-E-L10`, the pass and the end at +2 and +8 of `D-E-L11`); each array's references are exactly the ones listed - the modkit array's 6 leas, the packfile array's 33 references (25 leas and the 8 stores of `P-E-R23..R30`), the box streamer list's 8 and the decal definitions array's 31 leas - and the scan refuses otherwise; the heap adjuster's rule that a heap of 1024 MB or more is another adjuster's (a build whose own heap is that large would be left alone, with only a log line).
 
 ## HeapAdjuster
 
@@ -34,7 +34,7 @@ The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstor
 
 ## ModkitLimit
 
-References to modkit array (rel32 of a `lea` - moved to new array):
+References to modkit array (rel32 of a `lea` - moved to new array). The six are every reference the game's code has to the array (RVA 0x471E610 on the current build: 1024 entries of 2 bytes): no other instruction reaches it or into it, and no stored pointer holds its address; the relocation core checks the count with a scan for every `lea` and `mov` that reaches it.
 
 | Label | Pattern | Use | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
@@ -50,7 +50,7 @@ Hard-coded limits (imm32 = size x mul + add; every one MUST decode to the same g
 | Label | Pattern | Offset, mul, add | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
 | M-E-L1 | `0f b7 c0 66 ba ? ? 3d ? ? ? ? 77` | 8, 1, -1 | found | 0x1E5045B |
-| M-E-L2 | `48 83 c5 ? 48 83 c0 ? 48 83 c7` | 15, 1, 3 | found | 0x137863F |
+| M-E-L2 | `48 83 c5 ? 48 83 c0 ? 48 83 c7` | 15, 1, 3 (the imm32 of `cmp rdi, imm32`, `48 81 FF` at 12) | found | 0x137863F |
 | M-E-L3 | `74 ? 48 83 c5 ? 48 83 c3 ? 48 83 c0 ? 48 3d` | 16, 1, 3 | found | 0x137868D |
 | M-E-L4 | `48 83 c7 ? 48 83 c2 ? 48 83 c5 ? 48 81 fd` | 15, 1, 3 | found | 0x134A603 |
 | M-E-L5 | `48 83 c7 ? 48 83 c2 ? 48 83 c6 ? 48 81 fe` | 15, 1, 3 | found | 0x134A657 |
@@ -70,7 +70,7 @@ Sizes and the streaming configuration call (the two limit sites and the call the
 | P-E-I1 | `3b 05 ? ? ? ? 0f 8d ? ? ? ? 89 c0` | +2: rel32 to the indirect size variable, which holds N-4 (7256 on the current build) | found | 0x1279156 |
 | P-E-H1 | `89 48 ? 48 8d 0d ? ? ? ? 48 89 08 48 89 c1 e8` | +0x10: the streaming configuration call; 8512 archive count on current build | found | 0x5093D5 |
 
-References to the packfile array (rel32 moved to the new array):
+References to the packfile array (rel32 moved to the new array). With the reference of the build (`R31a` or `R31b`) they are every reference the game's code has to the array (RVA 0x2C075B0 on the current build: 7260 entries of 8 bytes): 33 on 1.0.1158.16, 25 `lea` and the 8 `mov [rip+disp32], r64` of `P-E-R23..R30`; no other instruction reaches it or into it, and no stored pointer holds its address in the sections the dump holds. The relocation core checks the count with a scan for every `lea` and `mov` that reaches it.
 
 | Label | Pattern | Offset | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
@@ -82,7 +82,7 @@ References to the packfile array (rel32 moved to the new array):
 | P-E-R06 | `48 8d 0d ? ? ? ? 4a 8b 0c c9 48 85 c9 0f 84 ? ? ? ? 48 8b 01` | 3 | found | 0xCEE169 |
 | P-E-R07 | `48 8d 0d ? ? ? ? 48 8b 1c 08 48 8b 03` | 3 | found | 0xCF0D65 |
 | P-E-R08 | `48 8d 0d ? ? ? ? 4a 8b 0c c1 48 85 c9` | 3 | found | 0x127A36E |
-| P-E-R09 | `48 83 ec ? 48 89 ce 48 8d 05 ? ? ? ? 48 89 01 c6 81` | 39 | found | 0x10F781 |
+| P-E-R09 | `48 83 ec ? 48 89 ce 48 8d 05 ? ? ? ? 48 89 01 c6 81` | 39 (the rel32 of `lea rcx`, `48 8D 0D` at 36) | found | 0x10F781 |
 | P-E-R10 | `48 c1 e8 ? 48 8d 0d ? ? ? ? 48 8b 0c c1 48 8b 01` | 7 | found | 0x1276047 |
 | P-E-R11 | `48 8d 0d ? ? ? ? 48 83 3c c1 ? 40 0f 95 c6 eb` | 3 | found | 0x1276145 |
 | P-E-R12 | `48 8d 0d ? ? ? ? 48 8b 0c 08 48 8b 01 ff 90 ? ? ? ? 48 8b 48` | 3 | found | 0xCF0EDB |
@@ -90,7 +90,7 @@ References to the packfile array (rel32 moved to the new array):
 | P-E-R14 | `48 8d 0d ? ? ? ? 4c 8b 24 08 49 8b 04 24 4c 8d 44 24` | 3 | found | 0x1277E25 |
 | P-E-R15 | `48 8d 0d ? ? ? ? 48 8b 0c 08 48 85 c9 75` | 3 | found | 0xCEC3E0 |
 | P-E-R16 | `48 8d 0d ? ? ? ? 48 8b 0c c1 48 85 c9 0f 84 ? ? ? ? 48 89 f5` | 3 | found | 0xCE3431 |
-| P-E-R17 | `48 83 ec ? 89 d7 48 89 ce 48 8d 05 ? ? ? ? 48 89 01 c6 81 c1` | 41 | found | 0x113FB2 |
+| P-E-R17 | `48 83 ec ? 89 d7 48 89 ce 48 8d 05 ? ? ? ? 48 89 01 c6 81 c1` | 41 (the rel32 of `lea rcx`, `48 8D 0D` at 38) | found | 0x113FB2 |
 | P-E-R18 | `48 8d 0d ? ? ? ? 48 8b 3c 08 48 8b 07 48 89 f9` | 3 | found | 0x127AFB5 |
 | P-E-R19 | `48 8d 0d ? ? ? ? 48 8b 0c 08 48 8b 01 ff 90 ? ? ? ? 48 8b 40` | 3 | found | 0xCF1384 |
 | P-E-R20 | `48 8d 0d ? ? ? ? 48 8b 0c d1 48 85 c9 75` | 3 | found | 0x1275F75 |
@@ -106,6 +106,8 @@ References to the packfile array (rel32 moved to the new array):
 | P-E-R30 | `48 89 35 ? ? ? ? b9 ? ? ? ? ba ? ? ? ? e8 ? ? ? ? b9 ? ? ? ? 48 c7 44 08` | 3 | found | 0x1276ED5 |
 | P-E-R31a | `BF 08 00 00 00 BE 10 00 00 00 4C 8D 05` | 13 (builds 1.0.1158.13 and later). The two constants are TweaksV's: the original's `BF ? ? ? ? BE ? ? ? ? 4C 8D 05` also matched obfuscated code at 0x582A227 | found | 0x10F163 |
 | P-E-R31b | `41 ? ? ? ? ? ? ? ? ? ? 41 bb ? ? ? ? ? 8d` | 20 (older builds) | not used on current build | - |
+| P-E-R32 | `48 89 cf 31 f6 4c 8d 3d ? ? ? ? eb 10` | 8 (RVA 0x13EA794): the rel32 of `lea r15` (`4C 8D 3D` at 5), the load in the function 0x13EA760..0x13EA9A4, which walks a collection's entries, looks each one's packfile up as array[handle >> 16], tolerates a null entry and folds a value per entry into a hash it returns - left on the old array, it would read the game's own, empty array for the whole session | found | 0x13EA78C |
+| P-E-R33 | `75 0c cc 48 8d 0d ? ? ? ? 48 8b 0c d1` | 6 (RVA 0x1275F89): the rel32 of `lea rcx` (`48 8D 0D` at 3), in `P-E-R20`'s function 0x1275F10..0x1275FF4, in the bytes after an `int3` trap - reached only when the index is at or past the N-4 variable or the entry is null, so never run; moved so that the count of references stays exact | found | 0x1275F83 |
 
 ## BoxStreamer
 

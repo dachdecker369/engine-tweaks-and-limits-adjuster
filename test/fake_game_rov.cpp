@@ -10,6 +10,7 @@
 //   rovdecrypt2        the two DecryptHeader2 calls lead to different functions
 //   rovredirected      the DecryptHeader call already leads outside the game
 //   rovcachepatched    the RPF cache check function already starts with a ret
+//   tworovk1           a second copy of the RPF cache check's call site (R-E-K1 matches twice)
 //   rovflood           20,000 file requests before the usual ones: more than the diagnostic lines' cap lets through
 //   rovopenfail        the fake OpenBulk functions fail for a path under mods/, so the hook must fall back to the game's own file
 #include <windows.h>
@@ -49,6 +50,9 @@ volatile unsigned char g_rovConsole[] = { 0xFF, 0x15, 0x11, 0x22, 0x33, 0x44, 0x
 	0xFF, 0x15, 0x55, 0x66, 0x77, 0x08, 0xCC };
 volatile unsigned char g_rovCacheSite[] = { 0xE8, 0, 0, 0, 0, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0x48, 0x8D, 0x15, 0, 0, 0, 0, 0x48, 0x8D, 0x35, 0xCC };
 volatile unsigned char g_rovCacheCallee[] = { 0x48, 0x89, 0x5C, 0x24, 0x08, 0xCC };
+// a second copy of the call site, to the same function: its first byte becomes E8 only with "tworovk1"
+volatile unsigned char g_rovCacheSiteCopy[] = { 0xCC, 0, 0, 0, 0, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0x48, 0x8D, 0x15, 0, 0, 0, 0, 0x48, 0x8D, 0x35,
+	0xCC };
 volatile unsigned char g_rovFindEnc[] = { 0xE8, 0, 0, 0, 0, 0x80, 0x7C, 0x24, 0x2E, 0x01, 0x74, 0x05, 0x48, 0x8B, 0x56, 0xCC };
 volatile unsigned char g_rovDecrypt[] = { 0xE8, 0, 0, 0, 0, 0x8B, 0x46, 0x10, 0x85, 0xC0, 0x74, 0x05, 0xB9, 0xCC };
 volatile unsigned char g_rovDecrypt2a[] = { 0xE8, 0, 0, 0, 0, 0x48, 0x8B, 0x46, 0x10, 0x66, 0xC7, 0x00, 0x00, 0x00, 0xEB, 0x05, 0xCC };
@@ -207,6 +211,8 @@ void RovSetup(int argc, wchar_t** argv)
 	SetCallTarget(g_rovCacheSite, const_cast<unsigned char*>(g_rovCacheCallee));
 	if (Has(argc, argv, L"rovcachepatched"))
 		g_rovCacheCallee[0] = 0xC3;
+	if (Has(argc, argv, L"tworovk1"))
+		SetCallTarget(g_rovCacheSiteCopy, const_cast<unsigned char*>(g_rovCacheCallee));
 	SetCallTarget(g_rovFindEnc, reinterpret_cast<const void*>(&FakeFindEncryption));
 	SetCallTarget(g_rovDecrypt, Has(argc, argv, L"rovredirected") ? RovOutside() : reinterpret_cast<const void*>(&FakeDecryptHeader));
 	SetCallTarget(g_rovDecrypt2a, reinterpret_cast<const void*>(&FakeDecryptHeader2));
@@ -220,6 +226,7 @@ void RovSetup(int argc, wchar_t** argv)
 void RovForEachDataSite(void (*fn)(const volatile unsigned char*, size_t))
 {
 	fn(g_rovConsole, sizeof(g_rovConsole)); fn(g_rovCacheSite, sizeof(g_rovCacheSite)); fn(g_rovCacheCallee, sizeof(g_rovCacheCallee));
+	fn(g_rovCacheSiteCopy, sizeof(g_rovCacheSiteCopy));
 	fn(g_rovFindEnc, sizeof(g_rovFindEnc)); fn(g_rovDecrypt, sizeof(g_rovDecrypt)); fn(g_rovDecrypt2a, sizeof(g_rovDecrypt2a));
 	fn(g_rovDecrypt2b, sizeof(g_rovDecrypt2b)); fn(g_rovParse, sizeof(g_rovParse));
 }

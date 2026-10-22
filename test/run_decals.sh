@@ -19,7 +19,7 @@ fresh_ini; out=$(game full_game.exe); echo "      $out"
 check "all 31 references -> one new 1280 KB read/write array outside the game" "has '$MOVED'"
 check "all 23 constants: 13 x 2047, 9 x 2048, the loop end 0x7D8 + 80 x 2028" "has '$NEW_LIMITS'"
 check "status line" "log_has 'The decal definitions array moved and its limit raised from 260 to 2048 entries.'"
-check "the other plugins still applied" "has 'heap: 1024 MB' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack refs: 30 new 0 game 0 other' && has 'box refs: 8 new 0 game 0 other'"
+check "the other plugins still applied" "has 'heap: 1024 MB' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack refs: 32 new 0 game 0 other' && has 'box refs: 8 new 0 game 0 other'"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
 check "nothing is measured with DIAGNOSTIC_MODE=0, no problems" "log_lacks 'registered decal definitions' && log_lacks 'PROBLEM'"
 

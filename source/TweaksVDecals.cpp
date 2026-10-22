@@ -87,7 +87,7 @@ namespace TweaksV
 		};
 
 		constexpr RelocationSpec kSpec = { kTag, "decal definitions array", "decal definitions limit", "The decal definitions limit is not raised",
-			kEntrySize, kMaxDefs, &kDecalDefsSize, kAnchors, kArrayReferences, kLeaPrefixes, 2 };
+			kEntrySize, kMaxDefs, &kDecalDefsSize, kAnchors, kArrayReferences, kLeaPrefixes, 2, 0 };
 
 		// ---- the measurement (DIAGNOSTIC_MODE)
 
