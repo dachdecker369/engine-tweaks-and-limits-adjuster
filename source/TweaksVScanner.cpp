@@ -7,8 +7,9 @@
 //   License: zlib - https://github.com/scripthookvdotnet/scripthookvdotnet#license (the text is in
 //   THIRD_PARTY_NOTICES.md)
 //   Source: https://github.com/Chiheb-Bacha/ScriptHookVDotNetEnhanced/blob/main/source/core/MemScanner.cs
-// Altered for TweaksV: a malformed token is refused instead of throwing inside DllMain, and a miss
-// logs and returns nullptr instead of ending the game.
+// Altered for TweaksV: a malformed token is refused instead of throwing inside DllMain - "??" among
+// them, so that one ? is the only wildcard, as the pattern table has it - and a miss logs and returns
+// nullptr instead of ending the game.
 //
 // The search is TweaksV's own. The original's Boyer-Moore-Horspool search went through the whole
 // image almost byte by byte (a wildcard near the end of a pattern limits its skips), about 0.6 s at
@@ -152,7 +153,8 @@ namespace TweaksV
 
 			// The parser (the altered ScriptHookVDotNet code): "48 8B ? 05" into bytes and a mask, 'x' for a
 			// byte that must match and '?' for any. False on a token that is not two hex digits or ?, so
-			// that nothing throws inside DllMain.
+			// that nothing throws inside DllMain - the rule IsPatternText checks the table by when TweaksV is
+			// compiled (TweaksVPatterns.h).
 			bool ParsePattern(const std::string& pat, std::vector<uint8_t>& outPattern, std::string& outMask)
 			{
 				outPattern.clear();
@@ -163,7 +165,7 @@ namespace TweaksV
 
 				while (ss >> token)
 				{
-					if (token == "?" || token == "??")
+					if (token == "?")
 					{
 						outPattern.push_back(0);
 						outMask.push_back('?');

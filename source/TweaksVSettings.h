@@ -35,8 +35,10 @@ namespace TweaksV
 
 	// The layout of TweaksV.ini this build writes and reads: VERSION, the last key of [TWEAKSV]. A file
 	// without VERSION has the layout of TweaksV 1.x and is replaced (TweaksVIni.h); a file with a higher
-	// number comes from a newer TweaksV and is reported. It goes up only when a key changes its meaning
-	// or moves - new keys are simply added to an older file.
+	// number comes from a newer TweaksV and is reported. It goes up with every new key in the file (the
+	// static_assert on IniKeyCount below), and when a key changes its meaning or moves. An older file is
+	// not carried forward: it gets the keys it lacks, but VERSION is never written back, so after a new
+	// layout it reports its VERSION, now below the minimum, at every start (NOTES.md, T-LAYOUT).
 	inline constexpr int kIniLayoutVersion = 2;
 
 	enum class SettingKind { Switch, Number, Text };

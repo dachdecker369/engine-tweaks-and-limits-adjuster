@@ -22,7 +22,7 @@ The game's box streamer finds the map boxes to stream for the area around the pl
 
 `TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER]` (default 10000, 1000 to 100000) moves the list to a larger one. TweaksV's own part; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy, and none of their code is used.
 
-With `DIAGNOSTIC_MODE=1` the part counts the searches and logs, 10 seconds in and then every minute, how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all. Measure with a larger list: with `TRAVERSAL_LIST_SIZE=1000`, the game's own size, no search can return more than the list holds, and the log says so.
+With `DIAGNOSTIC_MODE=1` the part counts the searches and logs, 10 seconds in and then every minute while the numbers change, how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all. Measure with a larger list: with `TRAVERSAL_LIST_SIZE=1000`, the game's own size, no search can return more than the list holds, and the log says so.
 
 ### Decals
 
@@ -30,13 +30,13 @@ The game reads its decal definitions - the kinds of bullet holes, blood, scorch 
 
 `DECALDEFS_SIZE` under `[DECALS]` (default 2048, 260 to 16384) moves the array to a larger one and raises the limit everywhere the game uses it. TweaksV's own part, written from TweaksV's own findings about the game; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy. The published patches were known as the idea and as a guide to what to look for; no line of their code was read for the build or went into TweaksV.
 
-With `DIAGNOSTIC_MODE=1` the part logs how many decal definitions are registered - 10 seconds in and then every minute while the number changes - and whether the game's own array of 260 would have dropped some, so you can see whether your load needs the larger array at all. With `DRY_RUN=1` as well, it measures the game as it is.
+With `DIAGNOSTIC_MODE=1` the part logs how many decal definitions are registered - 10 seconds in and then every minute while the number changes - and whether the game's own array of 260 would have dropped some, so you can see whether your load needs the larger array at all. With `DRY_RUN=1` as well, it measures the game as it is, without the mods folder, which a dry run does not serve.
 
 ### RageOpenV
 
 Three switches under `[RAGEOPENV]`. With `MODS_FOLDER=1`, a file that exists under the `mods` folder in the game's current directory, normally the game folder, is served instead of the game's own, by the same path (`mods\update\update.rpf` for `update\update.rpf`); the folder is read once at start-up, so a file added while the game runs is seen at the next start. A file in the mods folder that cannot be opened - another program holds it, or it was deleted while the game runs - is never replaced by the game's own unnoticed: the game gets the failure, as for any file it cannot open, the log names each such file and a message box the first. With `OPEN_RPF=1`, RPF archives that are not encrypted - the kind OpenIV writes, marked OPEN - load. With `SKIP_RPF_CACHE_CHECK=1`, the game's check of its RPF cache is skipped, which modified archives need. Replaces RageOpenV; OpenIV's `OpenIV.asi` and `OpenRPF.asi` do the same job and must not be installed next to TweaksV. The experimental newmods folder of the original is not carried over.
 
-With `DIAGNOSTIC_MODE=1` the part logs every file the game asks for, every file served from the mods folder and every archive header read, 20,000 lines of each kind at most, with a summary 10 seconds in and then every minute.
+With `DIAGNOSTIC_MODE=1` the part logs every file the game asks for, every file served from the mods folder and every archive header read, 20,000 lines of each kind at most, with a summary 10 seconds in and then every minute while the numbers change.
 
 ### StraightToStoryMode
 
@@ -54,14 +54,14 @@ TweaksV's own part; the idea comes from alloc8or's [DirectStorageFix](https://gi
 
 ## TweaksV.ini
 
-TweaksV writes `TweaksV.ini` next to `TweaksV.asi` on the first start - or in `%LOCALAPPDATA%\TweaksV` if the game folder cannot be written to - with every setting at its default, and adds back any setting that goes missing. `1` is on, `0` is off (`true` and `false` work too). The file carries no comments; this is what each key does.
+TweaksV writes `TweaksV.ini` in the game folder, next to `GTA5_Enhanced.exe`, on the first start - or in `%LOCALAPPDATA%\TweaksV` if the game folder cannot be written to - with every setting at its default, and adds back any setting that goes missing. `1` is on, `0` is off (`true` and `false` work too). The file carries a short header and no comment per key; this is what each key does.
 
 | Section | Key | Default | What it does |
 |---|---|---|---|
 | `[TWEAKSV]` | `ENABLED` | 1 | the master switch: 0 means TweaksV changes nothing |
 | | `LOG` | 1 | writes `TweaksV.log`, in the game folder or in `%LOCALAPPDATA%\TweaksV` when the game folder cannot take it |
 | | `DIAGNOSTIC_MODE` | 0 | testing: every part that is on logs every pattern, site and write, and runs its measurement - see "Diagnostics" below |
-| | `DRY_RUN` | 0 | testing: everything is looked for and checked, nothing is written or hooked |
+| | `DRY_RUN` | 0 | testing: everything is looked for and checked; nothing in the game is written or hooked (only RageOpenV's one-shot hook on `GetSystemTimeAsFileTime`, which runs its checks and switches itself off) |
 | | `CONSOLE` | 0 | a console window that mirrors the log |
 | | `ERROR_POPUP` | 1 | a message box when something could not be applied, and one for a part that stops working later (at most three per session) |
 | | `CONFLICT_CHECK` | 1 | looks for the old plugins TweaksV replaces, in the game folder and its `scripts` and `plugins` subfolders, and switches the matching part off while they are there |
@@ -80,9 +80,9 @@ TweaksV writes `TweaksV.ini` next to `TweaksV.asi` on the first start - or in `%
 | | `SKIP_LANDING_PAGE` | 1 | goes straight into Story Mode |
 | `[DIRECTSTORAGE]` | `UNLOCK_FILES` | 1 | DirectStorage may open only the `.rpf` and `.cache` files in the game folder, so its other files stay free while the game runs |
 
-**Coming from TweaksV 1.x:** the 1.x file has another layout and is not migrated. On the first start, TweaksV renames it to `TweaksV.old.ini`, writes a fresh `TweaksV.ini` with the defaults and says so in the start-up message - set your values again, the old file still holds them. You can also delete the old file before the first start. The same happens to any `TweaksV.ini` without `VERSION` under `[TWEAKSV]`, so leave that line in. What changed: the sections lost their `_SETTINGS` ending and `[DECALDEFS_SETTINGS]` is `[DECALS]`; `LOG_TO_FILE`, `SHOW_ERROR_POPUPS`, `CHECK_FOR_CONFLICTS` and `INI_VERSION` are `LOG`, `ERROR_POPUP`, `CONFLICT_CHECK` and `VERSION`; the testing switches `LOG_SEARCHES`, `LOG_DECALDEFS`, `LOG_INFO`, `LOG_MODS`, `LOG_CALLS` and `LOG_FILE_OPENS` are all `DIAGNOSTIC_MODE` now; `NEWMODS` and `LOG_DEVICE` are gone with the newmods folder.
+**Coming from TweaksV 1.x:** the 1.x file has another layout and is not migrated. On the first start, TweaksV renames it to `TweaksV.old.ini`, writes a fresh `TweaksV.ini` with the defaults and says so in the start-up message - set your values again, the old file still holds them. You can also delete the old file before the first start. The same happens to any `TweaksV.ini` without `VERSION` under `[TWEAKSV]`, so leave that line in. What changed: `[HEAP_SETTINGS]` is `[HEAP_ADJUSTER]`, `[MODKIT_SETTINGS]` is `[MODKIT_LIMIT]`, `[PACKFILE_SETTINGS]` is `[PACKFILE_LIMIT]` and `[DECALDEFS_SETTINGS]` is `[DECALS]`; the other four sections lost their `_SETTINGS` ending (`[BOXSTREAMER]`, `[RAGEOPENV]`, `[STRAIGHTTOSTORYMODE]`, `[DIRECTSTORAGE]`), and `[TWEAKSV]` kept its name; `LOG_TO_FILE`, `SHOW_ERROR_POPUPS`, `CHECK_FOR_CONFLICTS` and `INI_VERSION` are `LOG`, `ERROR_POPUP`, `CONFLICT_CHECK` and `VERSION`; the testing switches `LOG_SEARCHES`, `LOG_DECALDEFS`, `LOG_INFO`, `LOG_MODS`, `LOG_CALLS` and `LOG_FILE_OPENS` are all `DIAGNOSTIC_MODE` now; `NEWMODS` and `LOG_DEVICE` are gone with the newmods folder.
 
-**Diagnostics:** `DIAGNOSTIC_MODE=1` makes every part that is on log every pattern it looks for (address, number of matches, bytes), every site it finds and every write, and run its measurement: the box streamer counts its searches, the decals part reads how many definitions are registered, RageOpenV logs every file request, every file served from `mods` and every archive header read, DirectStorage logs the game's calls into it and every file opened in the game folder. A part with `ENABLED=0` does nothing, so it logs nothing. Two ways to use it: with `DRY_RUN=1` nothing is hooked or written - the quiet check after a game update, which shows the patterns, the sites and the decal count of the unpatched game; alone, it is the full measurement of the running game with the mods folder served, and it hooks a little more than a normal boot (the box streamer's four search calls, DirectStorage's configuration calls - and its factory and `OpenFile` with `UNLOCK_FILES=0` - and the file opens). Every kind of line that comes per event stops after 20,000 - also DirectStorage's `OpenFile` lines - and the events are then only counted, with a summary every minute where the part has one.
+**Diagnostics:** `DIAGNOSTIC_MODE=1` makes every part that is on log every pattern it looks for (address, number of matches, bytes), every site it finds and every write, and run its measurement: the box streamer counts its searches, the decals part reads how many definitions are registered, RageOpenV logs every file request, every file served from `mods` and every archive header read, DirectStorage logs the game's calls into it and every file opened in the game folder. A part with `ENABLED=0` does nothing, so it logs nothing. Two ways to use it: with `DRY_RUN=1` nothing in the game is written or hooked (only RageOpenV's one-shot hook on `GetSystemTimeAsFileTime`, which runs its checks and switches itself off) - the quiet check after a game update, which shows the patterns, the sites and the decal count of the unpatched game; alone, it is the full measurement of the running game with the mods folder served, and it hooks a little more than a normal boot (the box streamer's four search calls, DirectStorage's configuration calls - and its factory and `OpenFile` with `UNLOCK_FILES=0` - and the file opens). Every kind of line that comes per event stops after 20,000 - also DirectStorage's `OpenFile` lines - and the events are then only counted, with a summary every minute where the part has one.
 
 ## Design
 
@@ -126,7 +126,7 @@ Add these switches to the `msbuild` line above:
 ## Testing
 
 1. Use GTA V Enhanced in Story Mode with BattlEye disabled. Never go online with mods.
-2. Remove the standalone versions of the five original plugins, alloc8or's `DirectStorageFix.asi` and `DecalPatch.asi`. Otherwise standalone modules take priority and disable the respective portions of `TweaksV.asi`.
+2. Remove the old plugins TweaksV replaces from the game folder and its `scripts` and `plugins` folders: `HeapAdjuster.asi` (or `ZHeapAdjuster.asi`, the name its author suggests), `ModkitLimitAdjusterEnhanced.asi`, `PackfileLimitAdjusterEnhanced.asi`, `RageOpenV.asi`, `OpenRPF.asi`, `OpenIV.asi`, `StraightToStoryMode.asi`, alloc8or's `DirectStorageFix.asi` and `DecalPatch.asi` - the ten files the conflict check knows. While one of them is there, TweaksV switches its matching part off and says so in the start-up message.
 3. `TweaksV.asi` goes in the game folder next to `GTA5_Enhanced.exe`.
 4. Add the ASI loader file `xinput1_4.dll` from the [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) download. It is the only file needed; Script Hook V itself is not.
 5. Coming from TweaksV 1.x: your old `TweaksV.ini` is renamed to `TweaksV.old.ini` on the first start and a fresh one is written - see "TweaksV.ini" above. You can also delete the old file first.
@@ -138,7 +138,7 @@ Add these switches to the `msbuild` line above:
 - **Zolika Patch:** the ModkitLimit Extender's author warned that its modkit patch may not be compatible with Zolika Patch's; the same goes for TweaksV's Modkit part.
 - **DecalPatch.asi**, a closed-source plugin that raises the box streamer list and the decal definitions limit for GTA V Enhanced, is detected as an old plugin: TweaksV switches its decal definitions part and its box streamer part off while it is installed, so nothing is patched twice. Delete it - TweaksV replaces both halves.
 - **Mods that hook the game's file functions:** TweaksV's RageOpenV part hooks on top of another mod's hook on GetFileTime or GetFileSize and chains through it. A hook on OpenBulk or GetAttributes changes the bytes TweaksV finds those two functions by: the mods folder is then not used, and the start-up message names the pattern that was not found.
-- **Script Hook V, ScriptHookVDotNet, OpenIV:** neither needed nor touched. Only the ASI loader file from the Script Hook V download is used, and OpenIV's `OpenIV.asi` must not be installed next to TweaksV (its job is TweaksV's RageOpenV part).
+- **Script Hook V, ScriptHookVDotNet, OpenIV:** neither needed nor touched. Only the ASI loader file from the Script Hook V download is used, and OpenIV's `OpenIV.asi` and `OpenRPF.asi` must not be installed next to TweaksV (their job is TweaksV's RageOpenV part).
 
 ## Reporting a problem
 

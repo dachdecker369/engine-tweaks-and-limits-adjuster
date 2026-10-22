@@ -80,7 +80,7 @@ This file back to its heading, its first paragraph and "Next steps" with what wa
 
 ## Next steps
 
-- Phases 0 to 5 and decision 5's commit are committed (483 checks); next are phase 6, the documents, and phase 7, the close, without a stop between them - my go for both is given.
+- Phases 0 to 6 and decision 5's commit are committed (483 checks); next is phase 7, the close - my go is given.
 - Skipped so far: the double-byte ANSI code pages (phase 3, finding 22). On a Japanese, Chinese or Korean Windows the mods list and the game's paths are folded byte by byte, so a name whose second byte is 0x5C (a backslash) or a capital letter never matches; the suites cannot set the ANSI code page, so no fix could be tested here.
 - Done differently from the plan, decided and kept:
   - Phase 1: the fakes' `TEMP` and `TMP` are `object\TestTemp`, next to `object\TestRun` and not inside it, because `object\TestRun` is the fake game's folder and the temp files must lie outside the game folder, as the real `%TEMP%` does (the DirectStorage scenarios open them as files outside it); `run_all.sh` deletes it with `object\TestRun` and `object\Test`. `/WX` on the fakes showed a warning they always had (an ignored `write` attribute of `.fakefn`), now gone.
@@ -114,4 +114,12 @@ This file back to its heading, its first paragraph and "Next steps" with what wa
   - Tests: the fake's tree searches get the capacity their call site holds and stop 16 entries short of it, as the game's do, so that B20's summary is one the game can write (`the largest returned 984 of 1000 entries; 0 returned more ...`); B8b and B18, which leave the game's capacity of 1000, now expect the fourth search to return 984. The heap's 3072 MB scenario runs inside S13; the second clamp of the heap is S17; the crafted values of `ini_default` give six problems now, the second clamp of `PACKFILEARRAY_SIZE=-5` among them.
   - Documents: SPECIFICATIONS has a section 6.6 for the measurement loop; 11.1 quotes the heap's `... - nothing to patch.` line and 11.4 and 11.5 the measurements' announcement lines, which they only described before; 6.4's list of the threads `StartModuleThread` starts names DirectStorage's too, which phase 4 had left out; 16 names `StartMeasurement` for a new part; 14.1 says how the fake's searches use the capacity.
 - Not covered by a scenario in phase 5: a measurement thread that cannot start, which the fake cannot bring about; the summaries after the first, which come after the suites' 60-second limit, as before.
+- Done beyond the plan in phase 6, mine to keep or undo (each recommended to keep):
+  - SPECIFICATIONS 5.4 got the hook list README's diagnostics paragraph has, which the finding named with it; section 2's sentence on the SPDX line says that `test\base.ini` carries one in its comment block since phase 1 and only `expected_default.ini` and `layout1.ini` carry none.
+  - NOTES.md: B-HEAP-03's column says `clamped and reported`, true since phase 5; T-LAYOUT's "When it goes" says what a carry-forward does (accept the older `VERSION`, add the keys, write the new number back).
+  - The parser's refusal of `??` is named among its alterations, in `TweaksVScanner.cpp`'s header and in THIRD_PARTY_NOTICES.md's note.
+  - PATTERNS.md's "Untested" row is one sentence now, as the "Found" row says what a normal boot leaves out; the path encoding of the file functions is item 5's last sentence, as the one fact not known yet.
+  - README: step 2 of "Testing" lists the ten files and says what TweaksV does while one is there; "Other mods" names `OpenRPF.asi` next to `OpenIV.asi`; the 1.x renames also name the four sections that only lost `_SETTINGS`, and that `[TWEAKSV]` kept its name.
+  - SECURITY.md keeps MinHook in scope "as far as the way TweaksV builds and uses it", its own problems going to its authors as before.
+- Not covered by a scenario in phase 6: the parser's refusal of `??`, which no run can reach - the table refuses such a pattern when TweaksV is compiled, and nothing else hands the parser a pattern.
 - Waiting on me: nothing until the last phase is committed.

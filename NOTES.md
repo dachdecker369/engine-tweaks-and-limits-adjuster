@@ -143,9 +143,15 @@ Known bugs and open issues in TweaksV.
 - **Status:** accepted. It is MinHook's own design, and `vendor\MinHook` stays unchanged; TweaksV's own stubs are never writable and executable at once.
 - **When it goes:** when MinHook keeps its trampolines read and execute only, or TweaksV moves to a hook library that does.
 
+### T-LAYOUT: an older TweaksV.ini is not carried to a new layout
+
+- **What:** `VERSION` under `[TWEAKSV]` is never written back, and its minimum is the current layout. A new key in the file means a new layout number, so after the first layout bump every existing `TweaksV.ini` - layout 2 - reports `VERSION=2 is outside 3..1000000` at every start: it gets the keys it lacks added back, but nothing carries it to the new layout.
+- **Status:** by design: a new key is a new layout number, decided with 2.0.0. Nothing is affected while the layout stays 2.
+- **When it goes:** with the first layout bump, when a carry-forward is written (accept the older `VERSION`, add the keys, write the new number back).
+
 ## Bugs Found in the Originals
 
-What the merge found in the five original projects, with the file and line in the originals as they were when merged, and what TweaksV does instead - the list to work from if they are ever reported upstream. Since 2.0.0 TweaksV carries none of the originals' code but RageOpenV's console opener, so this is history: what the rewrite had to do better. An open issue that carries one of these bugs uses its ID; B-ROV-18 did, until newmods went in 2.0.0. Severity: crash = could crash or close the game, corrupt = could silently corrupt memory or behaviour, robust = fragile or unsafe practice, hygiene = cleanliness; "latent" = only reached in some situations, such as a pattern miss after a game update. Two entries concerned the Legacy code, which TweaksV does not carry.
+What the merge found in the five original projects, with the file and line in the originals as they were when merged, and what TweaksV does instead - the list to work from if they are ever reported upstream. Since 2.0.0 TweaksV carries none of the originals' code but RageOpenV's console opener and the pattern parser their plugins carried, so this is history: what the rewrite had to do better. An open issue that carries one of these bugs uses its ID; B-ROV-18 did, until newmods went in 2.0.0. Severity: crash = could crash or close the game, corrupt = could silently corrupt memory or behaviour, robust = fragile or unsafe practice, hygiene = cleanliness; "latent" = only reached in some situations, such as a pattern miss after a game update. Two entries concerned the Legacy code, which TweaksV does not carry.
 
 ### HeapAdjusterEnhanced (`Heap Adjuster\Game.cpp`)
 
@@ -153,9 +159,9 @@ What the merge found in the five original projects, with the file and line in th
 |---|---|---|---|
 | B-HEAP-01 | crash, latent | `initializeGame`, lines 38 and 45: the pattern's success flag is never checked; after a miss `loc` is 0x1 and line 45 writes through it | a miss is reported and the part skipped |
 | B-HEAP-02 | corrupt | line 51: `heapSize * 1024 * 1024` overflows `int` from `HEAP_SIZE=2048` up | 64-bit math; clamped to the game's own size..2047 |
-| B-HEAP-03 | robust | line 11: the INI value is written as it is, 0 and negative included | clamped and logged |
+| B-HEAP-03 | robust | line 11: the INI value is written as it is, 0 and negative included | clamped and reported |
 | B-HEAP-04 | robust | nothing checks that the target is the imm32 of `mov edx, imm32` | the byte before it must be `BA` |
-| B-HEAP-05 | robust | line 11: the INI is read by a global initialiser during CRT start-up, through a relative path | read in `initializeGame` from the settings table |
+| B-HEAP-05 | robust | line 11: the INI is read by a global initialiser during CRT start-up, through a relative path | read once in DllMain (`LoadSettings`), from the settings table |
 | B-HEAP-06 | hygiene | a C++/CLI project for native code; the .sln points at a missing path; `app.rc` and `app.ico` are not built; an orphan .filters file; a Win32 post-build copy | not carried over: one native project |
 
 ### ModkitLimitAdjusterEnhanced (`Game.cpp`, `MemScanner.cpp`)

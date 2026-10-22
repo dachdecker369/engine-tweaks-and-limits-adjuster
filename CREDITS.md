@@ -4,12 +4,12 @@ TweaksV's parts are rewritten from the projects below; the research and the orig
 
 ## Chiheb-Bacha - https://github.com/Chiheb-Bacha
 
-The five plugins TweaksV 1.x merged and 2.0.0 rewrote as its own parts, each taken from its main branch as it was when TweaksV merged it (the copies held no git data, so no commit is known). When a pattern stops matching after a game update, these projects are where it came from and worth a look ([PATTERNS.md](PATTERNS.md), "When Game Updates").
+The five plugins TweaksV 1.x merged and 2.0.0 rewrote as its own parts, and the scanner they carried. Each plugin was taken from its main branch as it was when TweaksV merged it (the copies held no git data, so no commit is known); when a pattern stops matching after a game update, these projects are where it came from and worth a look ([PATTERNS.md](PATTERNS.md), "When Game Updates").
 
 - [HeapAdjusterEnhanced](https://github.com/Chiheb-Bacha/HeapAdjusterEnhanced) - the HeapAdjuster part. Its LICENSE file says "licensed under LGPLv2" but holds the text of the MIT license; TweaksV 1.x carried its code under that text, 2.0.0 carries none of it
 - [ModkitLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/ModkitLimitAdjusterEnhanced) - the ModkitLimit part
 - [PackfileLimitAdjusterEnhanced](https://github.com/Chiheb-Bacha/PackfileLimitAdjusterEnhanced) - the PackfileLimit part
-- [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV) - the RageOpenV part; its newmods folder was never carried over
+- [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV) - the RageOpenV part; its experimental newmods folder, which 1.x carried, went in 2.0.0
 - [StraightToStoryMode](https://github.com/Chiheb-Bacha/StraightToStoryMode) - the StraightToStoryMode part
 - [ScriptHookVDotNetEnhanced](https://github.com/Chiheb-Bacha/ScriptHookVDotNetEnhanced) - the C++ port of ScriptHookVDotNet's `MemScanner.cs` that those plugins carried, altered into the scanner's pattern parser
 
