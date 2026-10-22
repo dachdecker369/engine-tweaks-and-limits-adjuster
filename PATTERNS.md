@@ -7,7 +7,7 @@ Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game bui
 | | |
 |---|---|
 | **Game Build** | 1.0.1158.16 |
-| **Found** | 1.0.1158.16 uses 89 of the table's 92 patterns, and the check boot (`DIAGNOSTIC_MODE=1`, `DRY_RUN=1`, `CONSOLE=1`, every part on) finds all 89 - `P-E-R32` and `P-E-R33` so far by a scan of my dump of the running game; a normal boot looks for fewer (`R-E-C1` only with `CONSOLE=1`, `R-E-F1..F8` only with a mods folder in the game's current directory, normally the game folder, or with `DIAGNOSTIC_MODE=1`) |
+| **Found** | 1.0.1158.16 uses 89 of the table's 92 patterns, and the check boot (`DIAGNOSTIC_MODE=1` and `CONSOLE=1`, every part on, with or without `DRY_RUN=1`) finds all 89; a normal boot looks for fewer (`R-E-C1` only with `CONSOLE=1`, `R-E-F1..F8` only with a mods folder in the game's current directory, normally the game folder, or with `DIAGNOSTIC_MODE=1`) |
 | **Untested** | None: the check boot looks for every pattern this build uses. A part with `ENABLED=0` looks for none of its patterns. |
 | **Matches** | All match exactly once, except `D-E-L12`, which matches exactly 7 times (the check seven decal-placing functions share). To check: boot once with `DIAGNOSTIC_MODE=1` and `CONSOLE=1`, every part on. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once (`D-E-L12`: exactly 7 times). |
 
