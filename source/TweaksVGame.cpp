@@ -9,8 +9,6 @@
 #include <cwchar>
 #include <vector>
 
-#pragma comment(lib, "Version.lib")
-
 namespace TweaksV
 {
 	namespace

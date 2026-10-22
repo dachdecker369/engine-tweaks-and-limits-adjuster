@@ -436,4 +436,11 @@ namespace TweaksV
 			result += std::string(", ") + text;
 		return result;
 	}
+
+	std::string Capitalised(std::string text)
+	{
+		if (!text.empty() && text[0] >= 'a' && text[0] <= 'z')
+			text[0] = static_cast<char>(text[0] - 'a' + 'A');
+		return text;
+	}
 }

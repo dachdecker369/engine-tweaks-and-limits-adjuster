@@ -35,10 +35,10 @@
 
 #include "TweaksVConflicts.h"
 #include "TweaksVLog.h"
+#include "TweaksVMeasure.h"
 #include "TweaksVPatch.h"
 #include "TweaksVRelocation.h"
 #include "TweaksVSettings.h"
-#include "TweaksVSummary.h"
 
 namespace TweaksV
 {
@@ -52,8 +52,6 @@ namespace TweaksV
 		constexpr size_t kArrayReferences = 31;			// the lea instructions that load the array - every one of them, on 1.0.1158.16
 		constexpr size_t kCountToArray = 16;			// the array lies this many bytes after its count
 		constexpr char kLeaPrefixes[] = "\x48\x4C";		// the REX bytes the game's loads of the array start with
-		constexpr DWORD kFirstSummaryMs = 10000;		// DIAGNOSTIC_MODE: the first summary, then one every minute
-		constexpr DWORD kSummaryEveryMs = 60000;
 
 		// The anchors the part reads itself, by their place in the table.
 		enum : size_t { kParserCheck, kParserLea, kLoopStart, kLoopEnd };
@@ -95,7 +93,7 @@ namespace TweaksV
 		uint32_t g_capacity = 0;					// the array in use: the new one, or the game's own with DRY_RUN
 		uint32_t g_vanillaSize = 0;					// the game's own array
 
-		void LogSummary(uint32_t registered)
+		void LogSummary(uint64_t registered)
 		{
 			std::string line = "DIAGNOSTIC: " + std::to_string(registered) + " decal definitions registered (the game's own array holds " +
 				std::to_string(g_vanillaSize) + (g_capacity == g_vanillaSize ? std::string(" and is in use") : ", this one " + std::to_string(g_capacity)) + ")";
@@ -106,37 +104,14 @@ namespace TweaksV
 			WriteLog(kTag, line + ".");
 		}
 
-		// The first summary 10 seconds in, then one a minute while the number changes. The count is the
-		// game's own dword, read as it is: nothing is hooked.
-		DWORD WINAPI SummaryThread(LPVOID)
+		// The count is the game's own dword, read as it is: nothing is hooked.
+		uint64_t Registered()
 		{
-			uint32_t last = UINT32_MAX;
-			for (DWORD wait = kFirstSummaryMs;; wait = kSummaryEveryMs)
-			{
-				Sleep(wait);
-				const uint32_t registered = *g_count;
-				if (registered == last)
-					continue;
-				last = registered;
-				try
-				{
-					LogSummary(registered);
-				}
-				catch (...)
-				{
-				}
-			}
+			return *g_count;
 		}
 
-		void StartSummaryThread()
-		{
-			const HANDLE thread = CreateThread(nullptr, 0, SummaryThread, nullptr, 0, nullptr);
-			if (thread)
-				CloseHandle(thread);
-			else
-				ReportFailure(kTag, "DIAGNOSTIC: the summary thread could not be started (" + DescribeError(GetLastError()) +
-					") - the number of registered definitions is never logged.");
-		}
+		// The first summary 10 seconds in, then one a minute while the number changes.
+		constexpr Measurement kMeasurement = { "decal definitions summary", kFirstSummaryMs, &Registered, &LogSummary };
 
 		uint32_t Imm32At(const uint8_t* address)
 		{
@@ -227,6 +202,6 @@ namespace TweaksV
 			return;
 		WriteLog(kTag, std::string("DIAGNOSTIC: the number of registered decal definitions is logged after 10 seconds, then every minute while it changes") +
 			(IsDryRun() ? " (DRY_RUN: the game's own array is in use)." : "."));
-		StartSummaryThread();
+		StartMeasurement<kMeasurement>();	// one that cannot start is logged
 	}
 }

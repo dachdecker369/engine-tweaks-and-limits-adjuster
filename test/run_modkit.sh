@@ -25,10 +25,10 @@ fresh_ini; setkey MODKITARRAY_SIZE 4096 MODKIT_LIMIT; out=$(game full_game.exe);
 check "limits 4095/4099/8192" "[[ \"\$out\" == *'limits: 4095 4099 4099 4099 4099 8192 4095 4095 |'* ]]"
 check "array still 128 KB" "[[ \"\$out\" == *\"$NEW_ARRAY\"* ]]"
 
-echo "== K3 MODKITARRAY_SIZE=500 is raised to the game's own 1024"
+echo "== K3 MODKITARRAY_SIZE=500 is raised to the game's own 1024, reported"
 fresh_ini; setkey MODKITARRAY_SIZE 500 MODKIT_LIMIT; out=$(game full_game.exe); echo "      $out"
 check "limits stay at the game's values" "[[ \"\$out\" == *\"$GAME_LIMITS\"* ]]"
-check "clamp logged" "log_has 'MODKITARRAY_SIZE=500 is outside 1024..65536 - using 1024'"
+check "clamp reported for the start-up summary, which names the size used" "log_has 'PROBLEM: TweaksV.ini: MODKITARRAY_SIZE=500 is outside 1024..65536 - using 1024.'"
 
 echo "== K4 MODKITARRAY_SIZE=70000 is clamped to 65536"
 fresh_ini; setkey MODKITARRAY_SIZE 70000 MODKIT_LIMIT; out=$(game full_game.exe)

@@ -49,4 +49,7 @@ namespace TweaksV
 	// without the "\\?\" in front - so that two spellings of one folder (a short name, a junction) can be
 	// told to be the same. Empty if it cannot be opened or its path not read.
 	std::wstring FinalPathOf(const std::wstring& path);
+
+	// True if path names a file (not a folder) that exists.
+	bool FileExists(const std::wstring& path);
 }

@@ -163,7 +163,8 @@ namespace TweaksV
 	// points at one array inside the game, every limit is the expected instruction and decodes to the
 	// same plausible size, the scanned loads are exactly as many as expected, and with expectedReferences
 	// the anchors' references are every one the game has. Clamps the setting to the game's own
-	// size..maxEntries. False, reported, if the part must leave the game as it is.
+	// size..maxEntries, reported when it lay outside. False, reported, if the part must leave the game as
+	// it is.
 	bool FindRelocation(const RelocationSpec& spec, RelocationPlan& plan);
 
 	// DRY_RUN: logs what would change (with also, the part's own addition to the line) and returns true.

@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "TweaksVFeatures.h"
+#include "TweaksVFiles.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
 #include "TweaksVSettings.h"
@@ -17,22 +18,10 @@
 
 namespace TweaksV
 {
-	namespace
-	{
-		// ASI loaders load .asi files from the game folder and these subfolders.
-		constexpr const wchar_t* kFolders[] = { L"", L"\\scripts", L"\\plugins" };
-
-		bool FileExists(const std::wstring& path)
-		{
-			const DWORD attributes = GetFileAttributesW(path.c_str());
-			return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
-		}
-	}
-
 	void CheckForConflicts()
 	{
 		int found = 0;
-		for (const wchar_t* folder : kFolders)
+		for (const wchar_t* folder : kLoaderFolders)
 		{
 			for (const Feature& feature : Features())
 			{

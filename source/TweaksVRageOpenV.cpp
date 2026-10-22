@@ -54,6 +54,7 @@
 #include "TweaksVFiles.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
+#include "TweaksVMeasure.h"
 #include "TweaksVPatch.h"
 #include "TweaksVPatterns.h"
 #include "TweaksVScanner.h"
@@ -73,11 +74,8 @@ namespace TweaksV
 		template <typename F> const void* Code(F* function) { return reinterpret_cast<const void*>(function); }
 		template <typename F> void** Original(F*& variable) { return reinterpret_cast<void**>(&variable); }
 
-		// ---- the diagnostic lines: each kind capped, then only counted; a summary every minute
+		// ---- the diagnostic lines: each kind capped (kMaxLinesPerKind), then only counted; a summary every minute
 
-		constexpr uint64_t kMaxLinesPerKind = 20000;
-		constexpr DWORD kFirstSummaryMs = 10000;
-		constexpr DWORD kSummaryEveryMs = 60000;
 		constexpr size_t kMaxPathText = 259;		// characters of a game path (MAX_PATH less the terminator)
 
 		struct EventKind
@@ -158,7 +156,7 @@ namespace TweaksV
 		}
 
 		// The mods files that could not be opened and the OPEN archives left as they are only when there are any.
-		void LogSummary()
+		void LogSummary(uint64_t)
 		{
 			const uint64_t notOpened = g_notOpened.count.load(), unprepared = g_unprepared.count.load();
 			WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(g_requests.count.load()) + " file requests so far, " +
@@ -168,27 +166,15 @@ namespace TweaksV
 				(unprepared ? " (" + std::to_string(unprepared) + " left as they are)" : std::string()) + ".");
 		}
 
-		// The first summary 10 seconds in, then one a minute while the numbers change.
-		DWORD WINAPI SummaryThread(LPVOID)
+		// Changes with any of the numbers of the summary.
+		uint64_t Events()
 		{
-			uint64_t last = UINT64_MAX;
-			for (DWORD wait = kFirstSummaryMs;; wait = kSummaryEveryMs)
-			{
-				Sleep(wait);
-				const uint64_t now = g_requests.count.load() + g_served.count.load() + g_notOpened.count.load() + g_archives.count.load() +
-					g_openArchives.load() + g_unprepared.count.load();
-				if (now == last)
-					continue;
-				last = now;
-				try
-				{
-					LogSummary();
-				}
-				catch (...)
-				{
-				}
-			}
+			return g_requests.count.load() + g_served.count.load() + g_notOpened.count.load() + g_archives.count.load() +
+				g_openArchives.load() + g_unprepared.count.load();
 		}
+
+		// The first summary 10 seconds in, then one a minute while the numbers change.
+		constexpr Measurement kMeasurement = { "RageOpenV summary", kFirstSummaryMs, &Events, &LogSummary };
 
 		// ---- the mods folder: its list, read once, and the eight file functions
 
@@ -886,12 +872,7 @@ namespace TweaksV
 			WriteLog(kTag, "DIAGNOSTIC: every file request, every file served from the mods folder and every archive header read are logged, " +
 				std::to_string(kMaxLinesPerKind) + " lines per kind at most; a summary follows after 10 seconds, then every minute while the "
 				"numbers change.");
-			const HANDLE thread = CreateThread(nullptr, 0, SummaryThread, nullptr, 0, nullptr);
-			if (thread)
-				CloseHandle(thread);
-			else
-				ReportFailure(kTag, "DIAGNOSTIC: the summary thread could not be started (" + DescribeError(GetLastError()) +
-					") - the requests are counted but never summed up.");
+			StartMeasurement<kMeasurement>();	// one that cannot start is logged
 		}
 
 		// If the game never asks for the time through the hooked function, the start-up never runs, and with

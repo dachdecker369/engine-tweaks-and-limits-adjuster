@@ -28,10 +28,10 @@ echo "== P2 PACKFILEARRAY_SIZE=20000"
 fresh_ini; setkey PACKFILEARRAY_SIZE 20000 PACKFILE_LIMIT; out=$(game full_game.exe); echo "      $out"
 check "limits and configuration count 20000, array still full size" "has 'D3=20000 D2=4500 D1=4500 I=19996 |' && has 'config 3000 -> 20000,' && has '$MOVED'"
 
-echo "== P3 PACKFILEARRAY_SIZE=1000 is raised to the game's own 4500"
+echo "== P3 PACKFILEARRAY_SIZE=1000 is raised to the game's own 4500, reported"
 fresh_ini; setkey PACKFILEARRAY_SIZE 1000 PACKFILE_LIMIT; out=$(game full_game.exe)
 check "limits stay 4500, configuration count 4500" "has 'D3=4500 D2=4500 D1=4500 I=4496 |' && has 'config 3000 -> 4500,'"
-check "clamp logged" "log_has 'PACKFILEARRAY_SIZE=1000 is outside 4500..65535 - using 4500'"
+check "clamp reported for the start-up summary, which names the size used" "log_has 'PROBLEM: TweaksV.ini: PACKFILEARRAY_SIZE=1000 is outside 4500..65535 - using 4500.'"
 
 echo "== P4 PACKFILEARRAY_SIZE=70000 is clamped to 65535"
 fresh_ini; setkey PACKFILEARRAY_SIZE 70000 PACKFILE_LIMIT; out=$(game full_game.exe)
@@ -130,6 +130,11 @@ echo "== P18 a 34th reference to the array that no pattern names (a changed game
 fresh_ini; out=$(game full_game.exe packextra); echo "      $out"
 check "references, sizes and call untouched" "has '$UNMOVED' && has '$GAME_SIZES' && has '$NO_HOOK'"
 check "reason logged and reported" "log_has 'the game code holds 34 or more references to the packfile array, not the expected 33 (another mod may have moved some of them, or the game has changed).' && log_has 'PROBLEM: The packfile limit is not changed'"
+
+echo "== P19 the game's configuration holds more archives (20000) than PACKFILEARRAY_SIZE gives: replaced exactly, lowered to 12000"
+fresh_ini; out=$(game full_game.exe packbigconfig); echo "      $out"
+check "the hooked call writes exactly the new size over the configured 20000 and calls the game's function with it" "has 'hook: config 20000 -> 12000, original called 1x with 12000 |' && has '$MOVED'"
+check "the hook's line names both counts; no problem" "log_has 'The archive count of the game.s configuration, 20000, is replaced by 12000.' && log_lacks 'PROBLEM'"
 
 echo
 echo "PACKFILE SCENARIOS: $pass passed, $fail failed"

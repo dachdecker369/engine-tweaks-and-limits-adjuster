@@ -46,6 +46,9 @@
     <ClCompile Include="TweaksVLog.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVMeasure.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVModkitLimit.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -121,6 +124,9 @@
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVLog.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVMeasure.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVModkitLimit.h">

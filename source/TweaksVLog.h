@@ -37,4 +37,5 @@ namespace TweaksV
 	std::string ToUtf8(std::wstring_view text);
 	std::wstring FromUtf8(std::string_view text);
 	std::string DescribeError(DWORD error);
+	std::string Capitalised(std::string text);	// "the modkit array" -> "The modkit array", for the start of a line
 }

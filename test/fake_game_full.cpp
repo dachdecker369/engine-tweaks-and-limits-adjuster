@@ -12,6 +12,7 @@
 //   hookedlanding  the landing page function starts with a jmp (another mod's hook)
 //   twos3          a second copy of the landing page's site (S-E3 matches twice)
 //   heapraised     the heap site already holds 2000 MB (another heap adjuster ran first)
+//   heaphuge       the heap site already holds 3072 MB, more than HEAP_SIZE allows (another heap adjuster ran first)
 //   heapodd        the heap site holds a value that is not a whole number of MB
 //   modkitmoved / modkitsplit / modkitmismatch   see main()
 //   modkitextra    a seventh lea of the modkit array, which no pattern names (a changed game)
@@ -19,6 +20,7 @@
 //   packhooked     the streaming configuration call already leads outside the game
 //   packbadsize    the direct size limit holds an implausible 70000
 //   packindirect   the indirect size variable holds the array's size itself, 4500, not 4 less (a changed margin)
+//   packbigconfig  the streaming configuration the report hands the hooked call holds 20000 archives, not 3000
 //   twor31a        a second, identical copy of the 1158.13+ packfile reference (its pattern matches twice)
 //   junkr31a       the game's obfuscated code that the old 1158.13+ reference pattern also matched
 //   packextra      a 34th reference to the packfile array, a mov no pattern names (a changed game)
@@ -322,18 +324,20 @@ static DecalStore* volatile g_oldDecalStore = &g_oldDecalStoreStorage;
 
 // The game's two tree searches behind the box streamer's four calls: the first and the third call lead
 // to the first search, the second and the fourth to the second. Each writes the number of entries the
-// harness asks for and returns it, and checks that it was given the harness's own arguments. The two
-// differ, so that the linker cannot fold them into one.
+// harness asks for - at most 16 short of the capacity it is handed, where the game's searches stop - and
+// returns it, and checks that it was given the harness's own arguments, the capacity its call site
+// holds among them. The two differ, so that the linker cannot fold them into one.
 using BoxTreeSearch = int (*)(void* tree, const float* min, const float* max, uint64_t* list, int capacity);
 static uint64_t g_boxSearchList[10000];
-static int g_boxSearchWanted = 0, g_boxSearchCallsA = 0, g_boxSearchCallsB = 0, g_boxSearchArgsBad = 0;
+static int g_boxSearchWanted = 0, g_boxSearchCapacity = 0, g_boxSearchCallsA = 0, g_boxSearchCallsB = 0, g_boxSearchArgsBad = 0;
 static int FakeTreeSearch(void* tree, const float* min, const float* max, uint64_t* list, int capacity)
 {
-	if (tree != nullptr || !min || !max || list != g_boxSearchList || capacity != 10000)
+	if (tree != nullptr || !min || !max || list != g_boxSearchList || capacity != g_boxSearchCapacity)
 		g_boxSearchArgsBad++;
-	for (int i = 0; i < g_boxSearchWanted && i < capacity; i++)
+	const int found = g_boxSearchWanted < capacity - 16 ? g_boxSearchWanted : capacity - 16;
+	for (int i = 0; i < found; i++)
 		list[i] = static_cast<uint64_t>(i);
-	return g_boxSearchWanted;
+	return found;
 }
 static __declspec(noinline) int FakeTreeSearchA(void* tree, const float* min, const float* max, uint64_t* list, int capacity)
 {
@@ -552,20 +556,21 @@ static void PrintPackfile(int argc, wchar_t** argv)
 	}
 	else
 	{
-		// Call it the way the game would, with a streaming configuration whose archive count is 3000.
+		// Call it the way the game would, with a streaming configuration whose archive count is 3000 - or,
+		// with the option "packbigconfig", 20000, more than the array is given.
 		alignas(8) char si[64] = {};
-		const uint32_t configCount = 3000;
+		const uint32_t configCount = HasOption(argc, argv, L"packbigconfig") ? 20000 : 3000;
 		memcpy(si + 24, &configCount, 4);
 		reinterpret_cast<void (*)(char*)>(const_cast<unsigned char*>(callTarget))(si);
 		uint32_t after = 0;
 		memcpy(&after, si + 24, 4);
-		wprintf(L"hook: config 3000 -> %u, original called %dx with %u | ", after, g_origCalls, g_origSawCount);
+		wprintf(L"hook: config %u -> %u, original called %dx with %u | ", configCount, after, g_origCalls, g_origSawCount);
 	}
 }
 
 // Calls each of the four tree-search calls' targets the way the game would - TweaksV's stub or the
-// game's own tree search; "another mod's" address (option "boxcallhooked") not at all - asking for
-// 100, 400, 700 and 1000 entries of a 10000-entry list.
+// game's own tree search, with the capacity its site holds; "another mod's" address (option
+// "boxcallhooked") not at all - asking for 100, 400, 700 and 1000 entries of a 10000-entry list.
 // "box calls: 4 redirected 0 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000 | "
 static wchar_t g_boxCallsResult[160];
 static void CallBoxSearches()
@@ -593,7 +598,9 @@ static void CallBoxSearches()
 			redirected++;
 		}
 		g_boxSearchWanted = 100 + 300 * i;
-		returns[i] = reinterpret_cast<BoxTreeSearch>(const_cast<unsigned char*>(target))(nullptr, lower, upper, g_boxSearchList, 10000);
+		g_boxSearchCapacity = static_cast<int>(Imm32(g_boxCaps[i]));
+		returns[i] = reinterpret_cast<BoxTreeSearch>(const_cast<unsigned char*>(target))(nullptr, lower, upper, g_boxSearchList,
+			g_boxSearchCapacity);
 	}
 	swprintf(g_boxCallsResult, 160, L"box calls: %d redirected %d game %d other, originals %dx+%dx, args %ls, returns %d %d %d %d | ",
 		redirected, game, other, g_boxSearchCallsA, g_boxSearchCallsB, g_boxSearchArgsBad == 0 ? L"ok" : L"BAD",
@@ -969,6 +976,11 @@ int wmain(int argc, wchar_t** argv)
 	{
 		const Site heap = SITE(g_heapSite, 1);
 		SetImm32(heap, 2000u << 20);
+	}
+	if (HasOption(argc, argv, L"heaphuge"))		// another heap adjuster set more than HEAP_SIZE allows
+	{
+		const Site heap = SITE(g_heapSite, 1);
+		SetImm32(heap, 3072u << 20);
 	}
 	if (HasOption(argc, argv, L"heapodd"))		// a value that is not a whole number of MB
 	{

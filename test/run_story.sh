@@ -47,6 +47,7 @@ check "three story patterns found once each" "log_has 'Pattern S-E1 found: 0F 85
 check "three writes logged with old -> new bytes" "log_has 'DIAGNOSTIC: splash screen at RVA 0x.*: 0F 84 85 01 00 00 -> E9 86 01 00 00 90' && log_has 'DIAGNOSTIC: legal screen at RVA' && log_has 'DIAGNOSTIC: landing page at RVA 0x.*: 48 89 5C -> 31 C0 C3'"
 check "patterns found once get no per-match lines (only D-E-L12, which matches 7 times, gets them)" "[ \$(count ' match 1 of ') -eq 1 ] && log_has 'D-E-L12 match 1 of 7 at RVA'"
 check "the heap's site logged with the size it holds" "log_has 'HeapAdjuster\] DIAGNOSTIC: heap size at RVA 0x[0-9A-F]* holds 648 MB'"
+check "the three screens' sites logged with the bytes they hold, three lines" "[ \$(count 'StraightToStoryMode\] DIAGNOSTIC: .*\(jz\|function\) at RVA') -eq 3 ] && log_has 'DIAGNOSTIC: splash screen jz at RVA 0x[0-9A-F]*: 0F 84 85 01 00 00' &&log_has 'DIAGNOSTIC: legal screen jz at RVA 0x[0-9A-F]*: 0F 84 07 05 00 00' && log_has 'DIAGNOSTIC: landing page function at RVA 0x[0-9A-F]*: 48 89 5C'"
 
 echo "== S7 already patched (an old StraightToStoryMode ran first under another name): skipped quietly"
 fresh_ini; out=$(game full_game.exe prepatched); echo "      $out"
@@ -85,13 +86,15 @@ fresh_ini; out=$(game plain_game.exe); echo "      $out"
 check "harness survived" "grep -q 'loaded' harness.out"
 check "three 'not found' problems" "log_has 'The splash screen is not skipped this session: S-E1 was not found.' && log_has 'The legal screen is not skipped this session: S-E2 was not found.' && log_has 'The landing page is not skipped this session: S-E3 was not found.'"
 
-echo "== S13 another heap adjuster ran first (the site holds 2000 MB): left as it is, logged, not a problem"
+echo "== S13 another heap adjuster ran first (the site holds 2000 MB, or 3072 MB): left as it is, logged, not a problem"
 fresh_ini; out=$(game full_game.exe heapraised); echo "      $out"
 check "the heap stays at the 2000 MB found, HEAP_SIZE=1024 not applied, logged, no problem" "[[ \"\$out\" == *'heap: 2000 MB'* ]] && log_has 'The heap size is not changed this session: another heap adjuster already set it to 2000 MB - left as it is.' && log_lacks 'Heap size patched' && log_lacks 'PROBLEM'"
 fresh_ini; setkey HEAP_SIZE 2047; out=$(game full_game.exe heapraised)
 check "nor is HEAP_SIZE=2047: what another mod changed is not changed again" "[[ \"\$out\" == *'heap: 2000 MB'* ]] && log_lacks 'Heap size patched' && log_lacks 'PROBLEM'"
 fresh_ini; setkey HEAP_SIZE 648; out=$(game full_game.exe)
 check "HEAP_SIZE at the game's own 648 MB: nothing to patch, logged, no problem" "[[ \"\$out\" == *'heap: 648 MB'* ]] && log_has 'Heap size is 648 MB already (HEAP_SIZE=648) - nothing to patch.' && log_lacks 'Heap size patched' && log_lacks 'PROBLEM'"
+fresh_ini; out=$(game full_game.exe heaphuge); echo "      $out"
+check "3072 MB, more than HEAP_SIZE allows (the mov zero-extends its imm32), is another heap adjuster's too: left as it is, logged, no problem" "[[ \"\$out\" == *'heap: 3072 MB'* ]] && log_has 'The heap size is not changed this session: another heap adjuster already set it to 3072 MB - left as it is.' && log_lacks 'unexpected value' && log_lacks 'PROBLEM'"
 
 echo "== S14 the heap site holds a value that is not a whole number of MB: refused with the value, the screens still skipped"
 fresh_ini; out=$(game full_game.exe heapodd); echo "      $out"
@@ -106,6 +109,10 @@ echo "== S16 S-E3 matches twice (a second copy of the landing page's site): not 
 fresh_ini; out=$(game full_game.exe twos3); echo "      $out"
 check "the landing page left alone, the splash and legal screens skipped" "[[ \"\$out\" == *\"$ORIG_LANDING\"* && \"\$out\" == *\"$NEW_SPLASH\"* && \"\$out\" == *\"$NEW_LEGAL\"* ]]"
 check "the scanner says why; the problem names the pattern" "log_has 'Scanner\] Pattern S-E3 matches 2 or more times - not used (the site must be unique).' && log_has 'PROBLEM: The landing page is not skipped this session: S-E3 was not found.'"
+
+echo "== S17 HEAP_SIZE=100, below the game's own 648 MB: raised to it and reported, so the start-up summary names the size used"
+fresh_ini; setkey HEAP_SIZE 100; out=$(game full_game.exe); echo "      $out"
+check "the heap stays at the game's 648 MB; the clamp reported for the start-up summary, nothing to patch" "[[ \"\$out\" == *'heap: 648 MB'* ]] && log_has 'PROBLEM: TweaksV.ini: HEAP_SIZE=100 is outside 648..2047 - using 648.' && log_has 'Heap size is 648 MB already (HEAP_SIZE=100) - nothing to patch.' && log_lacks 'Heap size patched'"
 
 echo
 echo "STORY SCENARIOS: $pass passed, $fail failed"

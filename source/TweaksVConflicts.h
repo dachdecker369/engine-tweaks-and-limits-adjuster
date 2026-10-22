@@ -4,10 +4,13 @@
 
 namespace TweaksV
 {
+	// The folders ASI loaders load .asi files from: the game folder and these subfolders of it.
+	inline constexpr const wchar_t* kLoaderFolders[] = { L"", L"\\scripts", L"\\plugins" };
+
 	// Looks for the old plugins of every feature (TweaksVFeatures.h) in the game folder and its
-	// "scripts" and "plugins" subfolders (ASI loaders load from all three). A match switches that
-	// feature off for this session, is logged and goes into the start-up summary, which tells the
-	// user to delete the old file.
+	// "scripts" and "plugins" subfolders (kLoaderFolders). A match switches that feature off for this
+	// session, is logged and goes into the start-up summary, which tells the user to delete the old
+	// file.
 	void CheckForConflicts();
 
 	// True if p lies inside GTA5_Enhanced.exe's image. The relocation checks use it: an

@@ -43,9 +43,12 @@
 #include <utility>
 #include <vector>
 
+#include "TweaksVConflicts.h"
+#include "TweaksVFiles.h"
 #include "TweaksVIni.h"
 #include "TweaksVLock.h"
 #include "TweaksVLog.h"
+#include "TweaksVMeasure.h"
 #include "TweaksVPatch.h"
 #include "TweaksVSettings.h"
 #include "TweaksVSummary.h"
@@ -59,11 +62,9 @@ namespace TweaksV
 		constexpr const char* kTag = "DirectStorage";
 
 		constexpr uint64_t kLinesPerWay = 2;		// open lines per file, caller and sharing; more opens are counted
-		constexpr uint64_t kMaxLines = 20000;		// lines of one kind; then the events are only counted
 		constexpr size_t kMaxTableEntries = 100000;	// entries per table of the open summary; more are only counted
 		constexpr size_t kMaxTypesShown = 15;		// types a summary lists; the rest are "others"
 		constexpr size_t kMaxPathChars = 2047;		// characters of an OpenFile path TweaksV checks
-		constexpr DWORD kSummaryEveryMs = 60000;
 
 		// The switches, read once: the hooks never read TweaksV.ini.
 		bool g_unlockFiles = false;				// UNLOCK_FILES
@@ -99,10 +100,10 @@ namespace TweaksV
 		bool Counted(std::atomic<uint64_t>& lines, const char* prefix, const char* kind)
 		{
 			const uint64_t n = lines.fetch_add(1, std::memory_order_relaxed) + 1;
-			if (n <= kMaxLines)
+			if (n <= kMaxLinesPerKind)
 				return true;
-			if (n == kMaxLines + 1)
-				WriteLog(kTag, prefix + std::to_string(kMaxLines) + " lines of " + kind + " written - from now on they are only counted.");
+			if (n == kMaxLinesPerKind + 1)
+				WriteLog(kTag, prefix + std::to_string(kMaxLinesPerKind) + " lines of " + kind + " written - from now on they are only counted.");
 			return false;
 		}
 
@@ -540,11 +541,11 @@ namespace TweaksV
 				return;
 			}
 			const uint64_t line = ++g_lines;
-			if (line > kMaxLines)
+			if (line > kMaxLinesPerKind)
 			{
 				++g_notShown;
-				if (line == kMaxLines + 1)
-					WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(kMaxLines) + " open lines written - from now on "
+				if (line == kMaxLinesPerKind + 1)
+					WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(kMaxLinesPerKind) + " open lines written - from now on "
 						"the opens are only counted (see the summaries).");
 				return;
 			}
@@ -557,7 +558,7 @@ namespace TweaksV
 				details + callers);
 		}
 
-		void LogSummary()
+		void LogSummary(uint64_t opens)
 		{
 			size_t paths = 0;
 			std::vector<std::pair<std::string, uint64_t>> callers;
@@ -573,7 +574,7 @@ namespace TweaksV
 			std::sort(callers.begin(), callers.end(), byCount);
 			std::sort(types.begin(), types.end(), byCount);
 
-			std::string text = "summary: " + std::to_string(g_opens.load()) + " opens of " + std::to_string(paths) +
+			std::string text = "summary: " + std::to_string(opens) + " opens of " + std::to_string(paths) +
 				" files and folders in the game folder (" + std::to_string(g_notShown.load()) + " not shown above";
 			if (const uint64_t untracked = g_untracked.load())
 				text += ", " + std::to_string(untracked) + " not tracked: " + std::to_string(kMaxTableEntries) + " entries per table at most";
@@ -594,27 +595,13 @@ namespace TweaksV
 			WriteLog(kTag, text);
 		}
 
-		// The open summary, every minute while the count changes. The thread keeps its reference to
-		// TweaksV.asi: it never ends.
-		DWORD WINAPI SummaryThread(LPVOID)
+		uint64_t Opens()
 		{
-			uint64_t last = 0;
-			for (;;)
-			{
-				Sleep(kSummaryEveryMs);
-				const uint64_t opens = g_opens.load();
-				if (opens == last)
-					continue;
-				last = opens;
-				try
-				{
-					LogSummary();
-				}
-				catch (...)
-				{
-				}
-			}
+			return g_opens.load();
 		}
+
+		// The open summary, a minute in and then every minute while the count changes.
+		constexpr Measurement kMeasurement = { "DirectStorage open summary", kSummaryEveryMs, &Opens, &LogSummary };
 
 		NTSTATUS NTAPI HookNtCreateFile(PHANDLE fileHandle, ACCESS_MASK access, POBJECT_ATTRIBUTES attributes,
 			PIO_STATUS_BLOCK ioStatus, PLARGE_INTEGER allocationSize, ULONG fileAttributes, ULONG share,
@@ -886,7 +873,7 @@ namespace TweaksV
 		}
 
 		// DIAGNOSTIC_MODE: every call; otherwise only the refusals after the summary. Each kind stops after
-		// kMaxLines lines; the name is made only for a line that is written.
+		// kMaxLinesPerKind lines; the name is made only for a line that is written.
 		void LogOpenFile(uint64_t number, const OpenFilePath& path, bool refused, HRESULT result)
 		{
 			if (g_diagnostic)
@@ -1169,11 +1156,10 @@ namespace TweaksV
 		// DirectStorageFix.asi in a folder an ASI loader loads from, or empty
 		std::wstring FindDirectStorageFix()
 		{
-			for (const wchar_t* folder : { L"", L"\\scripts", L"\\plugins" })
+			for (const wchar_t* folder : kLoaderFolders)
 			{
 				const std::wstring path = g_gameFolder + folder + L"\\DirectStorageFix.asi";
-				const DWORD attributes = GetFileAttributesW(path.c_str());
-				if (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY))
+				if (FileExists(path))
 					return path;
 			}
 			return {};
@@ -1274,7 +1260,7 @@ namespace TweaksV
 		{
 			WriteLog(kTag, "DIAGNOSTIC: every open of a file or folder in " + ToUtf8(g_gameFolder) + " is logged, " +
 				std::to_string(kLinesPerWay) + " lines per file, caller and sharing; a summary follows every minute.");
-			StartModuleThread(SummaryThread, "DirectStorage open summary");	// one that cannot start is logged
+			StartMeasurement<kMeasurement>();	// one that cannot start is logged
 		}
 	}
 }

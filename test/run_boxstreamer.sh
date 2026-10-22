@@ -13,6 +13,9 @@ GAME_CAPS='box caps: 1000 1000 1000 1000 |'
 NEW_CAPS='box caps: 10000 10000 10000 10000 |'
 CALLS_GAME='box calls: 0 redirected 4 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000 |'
 CALLS_COUNTED='box calls: 4 redirected 0 game 0 other, originals 2x+2x, args ok, returns 100 400 700 1000 |'
+# with the game's own capacity of 1000 a search stops 16 short of it: the fourth returns 984, not 1000
+CALLS_GAME_OWN='box calls: 0 redirected 4 game 0 other, originals 2x+2x, args ok, returns 100 400 700 984 |'
+CALLS_COUNTED_OWN='box calls: 4 redirected 0 game 0 other, originals 2x+2x, args ok, returns 100 400 700 984 |'
 NOT_ENLARGED='PROBLEM: The box streamer.s traversal list is not enlarged this session'
 
 echo "== B1 defaults: list moved, capacity 10000, the other plugins still fine"
@@ -67,7 +70,7 @@ check "header: BoxStreamer off; no BoxStreamer lines" "log_has 'Features: .*, Bo
 
 echo "== B8b [BOXSTREAMER] ENABLED=0 with DIAGNOSTIC_MODE=1: a part that is off dumps nothing, its patterns are not looked for"
 fresh_ini; setkey ENABLED 0 BOXSTREAMER; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe)
-check "nothing changed, no BoxStreamer line, no B-E pattern looked for" "has '$UNMOVED' && has '$GAME_CAPS' && has '$CALLS_GAME' && log_lacks '\[BoxStreamer\]' && log_lacks 'Pattern B-E-'"
+check "nothing changed, no BoxStreamer line, no B-E pattern looked for" "has '$UNMOVED' && has '$GAME_CAPS' && has '$CALLS_GAME_OWN' && log_lacks '\[BoxStreamer\]' && log_lacks 'Pattern B-E-'"
 
 echo "== B9 another mod already moved the list (every reference points outside the game): nothing written"
 fresh_ini; out=$(game full_game.exe boxmoved); echo "      $out"
@@ -118,12 +121,18 @@ check "reason logged and reported" "log_has 'tree-search calls of the box stream
 
 echo "== B18 DIAGNOSTIC_MODE=1 and DRY_RUN=1: the calls are checked, nothing written, nothing counted"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; setkey DRY_RUN 1; out=$(game full_game.exe)
-check "nothing changed" "has '$UNMOVED' && has '$GAME_CAPS' && has '$CALLS_GAME'"
+check "nothing changed" "has '$UNMOVED' && has '$GAME_CAPS' && has '$CALLS_GAME_OWN'"
 check "the 'would' line names the calls" "log_has 'DRY_RUN: would move the box streamer.s traversal list (8 references) and raise its limit from 1000 to 10000 (4 sites) and redirect the 4 tree-search calls (DIAGNOSTIC_MODE).'"
 
 echo "== B19 DIAGNOSTIC_MODE=0 with a hooked call: the calls are not looked at, the list is moved all the same"
 fresh_ini; out=$(game full_game.exe boxcallhooked)
 check "list moved, the other mod's call kept, no problem" "has '$MOVED' && has 'box calls: 0 redirected 3 game 1 other' && log_lacks 'PROBLEM'"
+
+echo "== B20 DIAGNOSTIC_MODE=1 with TRAVERSAL_LIST_SIZE=1000, the game's own size: the summary says no search can exceed it"
+fresh_ini; setkey TRAVERSAL_LIST_SIZE 1000 BOXSTREAMER; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe wait); echo "      $out"
+check "list moved, the capacities stay 1000, the four calls counted, each search stopping 16 short of the capacity" "has '$MOVED' && has '$GAME_CAPS' && has '$CALLS_COUNTED_OWN'"
+check "the summary: the largest 984 of 1000, none more than the game's own list could hold - and why" "log_has 'DIAGNOSTIC: 4 searches so far; the largest returned 984 of 1000 entries; 0 returned more than the game.s own list (1000 entries) could hold (the list has the game.s own size, so no search can exceed it).'"
+check "no problems" "log_lacks 'PROBLEM'"
 
 echo
 echo "BOXSTREAMER SCENARIOS: $pass passed, $fail failed"

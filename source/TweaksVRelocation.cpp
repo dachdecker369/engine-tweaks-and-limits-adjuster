@@ -20,14 +20,6 @@ namespace TweaksV
 	{
 		constexpr size_t kLeaSize = 7;	// REX.W, 8D (or 89 for a mov), ModRM, disp32
 
-		// "the modkit array" -> "The modkit array", for the start of a line
-		std::string Capitalised(std::string text)
-		{
-			if (!text.empty() && text[0] >= 'a' && text[0] <= 'z')
-				text[0] = static_cast<char>(text[0] - 'a' + 'A');
-			return text;
-		}
-
 		// "N", "N-1", "N+3", "2N": how a limit encodes the array's size N
 		std::string EncodingText(int mul, int add)
 		{
@@ -259,7 +251,8 @@ namespace TweaksV
 			}
 		}
 
-		// 3. the size to use: the game's own size..maxEntries - smaller would shrink the array
+		// 3. the size to use: the game's own size..maxEntries - smaller would shrink the array; a value
+		// outside is reported, so that the start-up summary names the size really used
 		const uint32_t requested = static_cast<uint32_t>(GetNumber(*spec.setting));
 		uint32_t size = requested;
 		if (size < plan.gameSize)
@@ -267,7 +260,7 @@ namespace TweaksV
 		if (size > spec.maxEntries)
 			size = spec.maxEntries;
 		if (size != requested)
-			WriteLog(spec.tag, std::string("TweaksV.ini: ") + spec.setting->key + "=" + std::to_string(requested) + " is outside " +
+			ReportFailure(spec.tag, std::string("TweaksV.ini: ") + spec.setting->key + "=" + std::to_string(requested) + " is outside " +
 				std::to_string(plan.gameSize) + ".." + std::to_string(spec.maxEntries) + " - using " + std::to_string(size) + ".");
 		plan.size = size;
 		return true;

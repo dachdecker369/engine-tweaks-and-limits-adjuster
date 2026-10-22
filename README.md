@@ -6,29 +6,29 @@ TweaksV is one ASI plugin for GTA V Enhanced, `TweaksV.asi`, with eight parts: a
 
 ### HeapAdjuster
 
-`HEAP_SIZE` under `[HEAP_ADJUSTER]` (default 2000 MB, 1 to 2047) sets the size of the game's memory heap, one number in its start-up code; the game's own is 646 MB. A value below the game's own is raised to it. A heap of 1024 MB or more is not the game's own: another heap adjuster set it, and TweaksV leaves it as it is and says so in the log. Replaces HeapAdjusterEnhanced.
+`HEAP_SIZE` under `[HEAP_ADJUSTER]` (default 2000 MB, 1 to 2047) sets the size of the game's memory heap, one number in its start-up code; the game's own is 646 MB. A value below the game's own is raised to it and reported. A heap of 1024 MB or more is not the game's own: another heap adjuster set it, and TweaksV leaves it as it is and says so in the log. Replaces HeapAdjusterEnhanced.
 
 ### ModkitLimit
 
-`MODKITARRAY_SIZE` under `[MODKIT_LIMIT]` (default 65536, up to 65536) moves the game's array of vehicle modkit IDs, 1024 entries, to a larger one and raises the eight limits the game's code carries for it, so more add-on vehicles with modkits of their own fit. Replaces ModkitLimitAdjusterEnhanced.
+`MODKITARRAY_SIZE` under `[MODKIT_LIMIT]` (default 65536, 1 to 65536; a value below the game's own 1024 is raised to it and reported) moves the game's array of vehicle modkit IDs, 1024 entries, to a larger one and raises the eight limits the game's code carries for it, so more add-on vehicles with modkits of their own fit. Replaces ModkitLimitAdjusterEnhanced.
 
 ### PackfileLimit
 
-`PACKFILEARRAY_SIZE` under `[PACKFILE_LIMIT]` (default 13000, up to 65535) moves the game's array of RPF archives, 7260 entries, to a larger one, raises both limits the game's code carries for it, and replaces the archive count of `gameconfig.xml` with the same number when the game reads its configuration, so more add-on archives load. Replaces PackfileLimitAdjusterEnhanced.
+`PACKFILEARRAY_SIZE` under `[PACKFILE_LIMIT]` (default 13000, 1 to 65535; a value below the game's own 7260 is raised to it and reported) moves the game's array of RPF archives, 7260 entries, to a larger one, raises both limits the game's code carries for it, and replaces the archive count of `gameconfig.xml` with the same number when the game reads its configuration, so more add-on archives load. The count is replaced exactly, also when it was higher: the game's own configuration holds 8512 on 1.0.1158.16, so a `PACKFILEARRAY_SIZE` below 8512 lowers it. Replaces PackfileLimitAdjusterEnhanced.
 
 ### BoxStreamer
 
 The game's box streamer finds the map boxes to stream for the area around the player and keeps what one search returns in a list of 1000 entries. With heavy map mods a search returns more: the boxes the list has no room for are never streamed, and their LODs are missing.
 
-`TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER]` (default 10000, up to 100000) moves the list to a larger one. TweaksV's own part; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy, and none of their code is used.
+`TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER]` (default 10000, 1000 to 100000) moves the list to a larger one. TweaksV's own part; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy, and none of their code is used.
 
-With `DIAGNOSTIC_MODE=1` the part counts the searches and logs, 10 seconds in and then every minute, how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all.
+With `DIAGNOSTIC_MODE=1` the part counts the searches and logs, 10 seconds in and then every minute, how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all. Measure with a larger list: with `TRAVERSAL_LIST_SIZE=1000`, the game's own size, no search can return more than the list holds, and the log says so.
 
 ### Decals
 
 The game reads its decal definitions - the kinds of bullet holes, blood, scorch and tyre marks, liquids, graffiti and so on - from the `decals.dat` files into an array of 260 entries. Once 260 are registered, every further definition is dropped silently; the files are read in order, so it is the definitions of the last files - add-on and mod content - that go missing, and the decals that use them never appear. This is a limit on the kinds of decal, not on the decals on screen. Vanilla 1.0.1158.16 already registers 259 of the 260, so a mod that adds two definitions is one too many for the game's own array.
 
-`DECALDEFS_SIZE` under `[DECALS]` (default 2048, up to 16384) moves the array to a larger one and raises the limit everywhere the game uses it. TweaksV's own part, written from TweaksV's own findings about the game; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy. The published patches were known as the idea and as a guide to what to look for; no line of their code was read for the build or went into TweaksV.
+`DECALDEFS_SIZE` under `[DECALS]` (default 2048, 260 to 16384) moves the array to a larger one and raises the limit everywhere the game uses it. TweaksV's own part, written from TweaksV's own findings about the game; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy. The published patches were known as the idea and as a guide to what to look for; no line of their code was read for the build or went into TweaksV.
 
 With `DIAGNOSTIC_MODE=1` the part logs how many decal definitions are registered - 10 seconds in and then every minute while the number changes - and whether the game's own array of 260 would have dropped some, so you can see whether your load needs the larger array at all. With `DRY_RUN=1` as well, it measures the game as it is.
 
@@ -67,9 +67,9 @@ TweaksV writes `TweaksV.ini` next to `TweaksV.asi` on the first start - or in `%
 | | `CONFLICT_CHECK` | 1 | looks for the old plugins TweaksV replaces, in the game folder and its `scripts` and `plugins` subfolders, and switches the matching part off while they are there |
 | | `VERSION` | 2 | the layout of this file; TweaksV keeps it - leave the line in |
 | `[HEAP_ADJUSTER]` | `ENABLED` | 1 | the part on or off - every part's section has this key |
-| | `HEAP_SIZE` | 2000 | the game's heap in MB, 1 to 2047; a value below the game's own is raised to it |
-| `[MODKIT_LIMIT]` | `MODKITARRAY_SIZE` | 65536 | the number of vehicle modkit IDs, up to 65536 (the game's own: 1024) |
-| `[PACKFILE_LIMIT]` | `PACKFILEARRAY_SIZE` | 13000 | the number of RPF archives, up to 65535 (the game's own: 7260); it also replaces the archive count of `gameconfig.xml` |
+| | `HEAP_SIZE` | 2000 | the game's heap in MB, 1 to 2047; a value below the game's own is raised to it and reported |
+| `[MODKIT_LIMIT]` | `MODKITARRAY_SIZE` | 65536 | the number of vehicle modkit IDs, 1 to 65536; a value below the game's own 1024 is raised to it and reported |
+| `[PACKFILE_LIMIT]` | `PACKFILEARRAY_SIZE` | 13000 | the number of RPF archives, 1 to 65535; a value below the game's own 7260 is raised to it and reported; it also replaces the archive count of `gameconfig.xml`, exactly |
 | `[BOXSTREAMER]` | `TRAVERSAL_LIST_SIZE` | 10000 | map boxes one search of the box streamer can return, 1000 to 100000 (the game's own: 1000) |
 | `[DECALS]` | `DECALDEFS_SIZE` | 2048 | decal definitions the game can hold, 260 to 16384 (the game's own: 260) |
 | `[RAGEOPENV]` | `MODS_FOLDER` | 1 | replacement files from the `mods` folder in the game's current directory, normally the game folder |
@@ -134,7 +134,7 @@ Add these switches to the `msbuild` line above:
 ## Other mods
 
 - **NaturalVision Enhanced** sets the heap size as well. TweaksV leaves a heap another mod has already set alone and says so in the log, so with NVE installed its heap size wins, whatever the load order.
-- **gameconfig.xml:** a gameconfig that raises the archive count has no effect while the Packfile part is on - TweaksV replaces that count with `PACKFILEARRAY_SIZE` when the game reads its configuration. Everything else in a gameconfig works as usual.
+- **gameconfig.xml:** a gameconfig that raises the archive count has no effect while the Packfile part is on - TweaksV replaces that count with `PACKFILEARRAY_SIZE` when the game reads its configuration, exactly, also when the gameconfig's count is higher. Everything else in a gameconfig works as usual.
 - **Zolika Patch:** the ModkitLimit Extender's author warned that its modkit patch may not be compatible with Zolika Patch's; the same goes for TweaksV's Modkit part.
 - **DecalPatch.asi**, a closed-source plugin that raises the box streamer list and the decal definitions limit for GTA V Enhanced, is detected as an old plugin: TweaksV switches its decal definitions part and its box streamer part off while it is installed, so nothing is patched twice. Delete it - TweaksV replaces both halves.
 - **Mods that hook the game's file functions:** TweaksV's RageOpenV part hooks on top of another mod's hook on GetFileTime or GetFileSize and chains through it. A hook on OpenBulk or GetAttributes changes the bytes TweaksV finds those two functions by: the mods folder is then not used, and the start-up message names the pattern that was not found.

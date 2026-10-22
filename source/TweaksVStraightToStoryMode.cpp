@@ -10,8 +10,8 @@
 // The bytes must be the game's own before a write: the splash and legal sites must hold a "jz". A
 // screen already patched - an old StraightToStoryMode.asi under another name, say - is skipped; a
 // landing-page function another mod hooked is left alone and reported; a missing pattern skips only
-// its screen. Every write goes through TweaksVPatch, which logs it with DIAGNOSTIC_MODE and only
-// describes it with DRY_RUN.
+// its screen. With DIAGNOSTIC_MODE each site found is logged with the bytes it holds. Every write goes
+// through TweaksVPatch, which logs it with DIAGNOSTIC_MODE and only describes it with DRY_RUN.
 // Written for TweaksV. The splash and legal patches follow ChaosModV's, the landing-page patch is
 // alloc8or's ("Unknown Modder"); StraightToStoryMode by Chiheb-Bacha carried both to GTA V Enhanced
 // (CREDITS.md).
@@ -49,15 +49,6 @@ namespace TweaksV
 			ReportFailure(kTag, std::string("The ") + screen + " is not skipped this session: " + why);
 		}
 
-		// "splash screen" -> "Splash screen", for the start of a line
-		std::string Capitalised(const char* screen)
-		{
-			std::string text = screen;
-			if (!text.empty() && text[0] >= 'a' && text[0] <= 'z')
-				text[0] = static_cast<char>(text[0] - 'a' + 'A');
-			return text;
-		}
-
 		// The one write of a screen's patch, in one wording: "<Screen> patched: <old bytes> -> <new bytes>."
 		void Patch(uint8_t* address, const std::vector<uint8_t>& bytes, const char* screen)
 		{
@@ -83,6 +74,13 @@ namespace TweaksV
 			return site;
 		}
 
+		// DIAGNOSTIC_MODE: a site found, with the bytes it holds ("DIAGNOSTIC: splash screen jz at RVA ...: 0F 84 ...")
+		void LogSite(const char* site, const uint8_t* address, size_t size)
+		{
+			if (IsDiagnosticMode())
+				WriteLog(kTag, std::string("DIAGNOSTIC: ") + site + " at " + DescribeAddress(address) + ": " + HexBytes(address, size));
+		}
+
 		void SkipSplashScreen()
 		{
 			constexpr const char* kScreen = "splash screen";
@@ -100,6 +98,7 @@ namespace TweaksV
 			uint8_t* const site = JumpSite(kScreen, match, 0x0D);
 			if (!site)
 				return;
+			LogSite("splash screen jz", site, kJzSize);
 			if (site[0] == 0xE9 && site[kJmpSize] == kNop)
 			{
 				WriteLog(kTag, "Splash screen already patched - skipped.");
@@ -145,6 +144,7 @@ namespace TweaksV
 			uint8_t* const site = JumpSite(kScreen, match, 0x0F);
 			if (!site)
 				return;
+			LogSite("legal screen jz", site, kJzSize);
 			const std::vector<uint8_t> nops(kJzSize, kNop);
 			if (memcmp(site, nops.data(), kJzSize) == 0)
 			{
@@ -184,6 +184,7 @@ namespace TweaksV
 				Fail(kScreen, "the call found does not lead into the game code (another mod may have redirected it).");
 				return;
 			}
+			LogSite("landing page function", function, sizeof(kReturnZero));
 			if (memcmp(function, kReturnZero, sizeof(kReturnZero)) == 0)
 			{
 				WriteLog(kTag, "Landing page already patched - skipped.");

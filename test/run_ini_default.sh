@@ -53,11 +53,11 @@ setkey SKIP_SPLASH_SCREEN '  TRUE  '; setkey UNLOCK_FILES 'Off'	# spaces and cap
 out=$(game full_game.exe); echo "      ${out:0:160}"
 check "HEAP_SIZE=5000: outside 1..2047, 2047 used" "grep -q 'PROBLEM: TweaksV.ini: \[HEAP_ADJUSTER\] HEAP_SIZE=5000 is outside 1..2047 - using 2047.' TweaksV.log && grep -q 'heap: 2047 MB' harness.out"
 check "MODKITARRAY_SIZE of 300 characters: only the first 255 are read, 250 zeros and 99999 - a number outside its limits, 65536 used (all 300 would be no number)" "grep -q 'PROBLEM: TweaksV.ini: \[MODKIT_LIMIT\] MODKITARRAY_SIZE=99999 is outside 1..65536 - using 65536.' TweaksV.log && log_lacks 'MODKITARRAY_SIZE=.* is not a number'"
-check "PACKFILEARRAY_SIZE=-5: outside, raised to the game's own size" "grep -q 'PACKFILEARRAY_SIZE=-5 is outside 1..65535 - using 1.' TweaksV.log && grep -q 'I=4496 |' harness.out"
+check "PACKFILEARRAY_SIZE=-5: outside, 1 used, which is then raised to the game's own size - both reported" "grep -q 'PROBLEM: TweaksV.ini: \[PACKFILE_LIMIT\] PACKFILEARRAY_SIZE=-5 is outside 1..65535 - using 1.' TweaksV.log && grep -q 'PROBLEM: TweaksV.ini: PACKFILEARRAY_SIZE=1 is outside 4500..65535 - using 4500.' TweaksV.log && grep -q 'I=4496 |' harness.out"
 check "CONSOLE=maybe: not on/off, off" "grep -q 'PROBLEM: TweaksV.ini: \[TWEAKSV\] CONSOLE=maybe is not a valid on/off value - using 0.' TweaksV.log"
 check "VERSION=3: a newer layout is reported" "grep -q 'PROBLEM: TweaksV.ini comes from a newer TweaksV (layout 3; this TweaksV knows layout 2)' TweaksV.log"
 check "'  TRUE  ' and 'Off' are read, not reported" "grep -q 'SKIP_SPLASH_SCREEN=1' TweaksV.log && grep -q 'UNLOCK_FILES=0' TweaksV.log && log_lacks 'PROBLEM: .*SKIP_SPLASH_SCREEN\|PROBLEM: .*UNLOCK_FILES'"
-check "all five in one start-up summary, nothing written back" "grep -q 'Start-up summary not shown (ERROR_POPUP=0): 5 problem' TweaksV.log && grep -q '^HEAP_SIZE=5000' TweaksV.ini"
+check "all six in one start-up summary, nothing written back" "grep -q 'Start-up summary not shown (ERROR_POPUP=0): 6 problem' TweaksV.log && grep -q '^HEAP_SIZE=5000' TweaksV.ini"
 
 echo "== a 1.x TweaksV.ini (the 1.6.0 default with HEAP_SIZE=1500): renamed, replaced, reported once, nothing of it read"
 rm -f TweaksV.old.ini; sed 's/$/\r/' "$T/layout1.ini" > TweaksV.ini; setkey HEAP_SIZE 1500; cp TweaksV.ini old.before

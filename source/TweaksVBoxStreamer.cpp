@@ -8,10 +8,10 @@
 // list fills up, and the boxes it has no room for are never streamed: their LODs are missing.
 //   TRAVERSAL_LIST_SIZE  the new list's capacity, from the game's own 1000 up to 100000
 //   DIAGNOSTIC_MODE      the measurement: the four calls to the tree searches go through TweaksV's call
-//                        stubs to a wrapper that only counts; 10 seconds in and then every minute, the
-//                        log says how many searches ran, the most entries one returned and how many
-//                        returned more than the game's own list could hold - the number that says
-//                        whether a map load needs the larger list at all
+//                        stubs to a wrapper that only counts; 10 seconds in and then every minute while
+//                        the numbers change, the log says how many searches ran, the most entries one
+//                        returned and how many returned more than the game's own list could hold - the
+//                        number that says whether a map load needs the larger list at all
 // Eight "lea r64, [rip+disp32]" load the list, two per query function. Two of the functions are
 // near-identical copies, so the second lea of each cannot be told apart by the bytes around it. Instead
 // the relocation core takes the list's address from the lea after three of the capacity sites
@@ -33,10 +33,10 @@
 
 #include "TweaksVConflicts.h"
 #include "TweaksVLog.h"
+#include "TweaksVMeasure.h"
 #include "TweaksVPatch.h"
 #include "TweaksVRelocation.h"
 #include "TweaksVSettings.h"
-#include "TweaksVSummary.h"
 
 namespace TweaksV
 {
@@ -49,10 +49,8 @@ namespace TweaksV
 		static_assert(kMaxListSize == static_cast<uint32_t>(kTraversalListSize.maxValue), "TweaksV: TRAVERSAL_LIST_SIZE's maximum must be the list's size");
 		constexpr size_t kListReferences = 8;		// the lea instructions that load the list - every one of them, on 1.0.1158.16
 		constexpr size_t kTreeSearches = 2;			// the tree searches the query functions call
-		constexpr int kSearchHeadroom = 16;			// a search stops this many entries short of the capacity
+		constexpr int kSearchHeadroom = 16;			// a search stops this many entries short of the capacity (PATTERNS.md)
 		constexpr size_t kCallSize = 5;				// "call rel32"
-		constexpr DWORD kFirstSummaryMs = 10000;	// DIAGNOSTIC_MODE: the first summary, then one every minute
-		constexpr DWORD kSummaryEveryMs = 60000;
 
 		constexpr char kMovCapacity[] = "\xC7\x44\x24\x20";	// mov dword ptr [rsp+20h], imm32
 		constexpr char kLeaR13[] = "\x4C\x8D\x2D";			// lea r13, [rip+disp32]
@@ -114,34 +112,23 @@ namespace TweaksV
 
 		constexpr TreeSearch kCountedSearch[kTreeSearches] = { &CountedSearch0, &CountedSearch1 };
 
-		void LogSummary()
+		// A list that keeps the game's own size stops every search where the game's own would: none can
+		// return more than it could hold, and the summary says so.
+		void LogSummary(uint64_t searches)
 		{
-			WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(g_searches.load()) + " searches so far; the largest returned " +
+			WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(searches) + " searches so far; the largest returned " +
 				std::to_string(g_largest.load()) + " of " + std::to_string(g_capacity) + " entries; " +
 				std::to_string(g_overVanilla.load()) + " returned more than the game's own list (" + std::to_string(g_vanillaSize) +
-				" entries) could hold.");
+				" entries) could hold" + (g_capacity == g_vanillaSize ? " (the list has the game's own size, so no search can exceed it)" : "") + ".");
 		}
 
-		// The first summary 10 seconds in, then one a minute while the numbers change.
-		DWORD WINAPI SummaryThread(LPVOID)
+		uint64_t Searches()
 		{
-			uint64_t last = UINT64_MAX;
-			for (DWORD wait = kFirstSummaryMs;; wait = kSummaryEveryMs)
-			{
-				Sleep(wait);
-				const uint64_t searches = g_searches.load();
-				if (searches == last)
-					continue;
-				last = searches;
-				try
-				{
-					LogSummary();
-				}
-				catch (...)
-				{
-				}
-			}
+			return g_searches.load();
 		}
+
+		// The first summary 10 seconds in, then one a minute while the number of searches changes.
+		constexpr Measurement kMeasurement = { "box streamer summary", kFirstSummaryMs, &Searches, &LogSummary };
 	}
 
 	void InitBoxStreamer()
@@ -196,11 +183,6 @@ namespace TweaksV
 
 		WriteLog(kTag, "DIAGNOSTIC: the " + std::to_string(std::size(kCalls)) + " tree-search calls are counted; a summary follows "
 			"after 10 seconds, then every minute while the numbers change.");
-		const HANDLE thread = CreateThread(nullptr, 0, SummaryThread, nullptr, 0, nullptr);
-		if (thread)
-			CloseHandle(thread);
-		else
-			ReportFailure(kTag, "DIAGNOSTIC: the summary thread could not be started (" + DescribeError(GetLastError()) +
-				") - the searches are counted but never logged.");
+		StartMeasurement<kMeasurement>();	// one that cannot start is logged
 	}
 }
