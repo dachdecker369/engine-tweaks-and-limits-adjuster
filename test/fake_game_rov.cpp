@@ -19,6 +19,7 @@
 //                      so the OpenBulk hooks must give the game that failure; waits 1.5 s before its report ends, for the
 //                      problem after the start-up summary
 //   rovbadarchive      parses an OPEN archive whose entry count is implausible, twice; waits 1.5 s the same way
+//   rovbadtable        parses an OPEN archive whose entry table points at memory that cannot be read, twice; the same wait
 //   rovprofile         asks OpenBulk 1 for a file under %USERPROFILE%, in the ANSI code page
 //   rovnotime          never asks for the time (a game TweaksV's time hook does not reach): waits 35 s instead
 //   rovcwd DIR         runs in DIR, not in its own folder (a shortcut that sets another working folder): it changes
@@ -215,7 +216,7 @@ static bool Has(int argc, wchar_t** argv, const wchar_t* option)
 }
 
 static unsigned char g_apiBefore[5];
-static bool g_flood = false, g_badArchive = false, g_profile = false, g_noTime = false;
+static bool g_flood = false, g_badArchive = false, g_badTable = false, g_profile = false, g_noTime = false;
 static const wchar_t* g_cwdResult = nullptr;	// with rovcwd: whether the current directory could be changed
 
 void RovSetup(int argc, wchar_t** argv)
@@ -227,6 +228,7 @@ void RovSetup(int argc, wchar_t** argv)
 	g_flood = Has(argc, argv, L"rovflood");
 	g_openFail = Has(argc, argv, L"rovopenfail");
 	g_badArchive = Has(argc, argv, L"rovbadarchive");
+	g_badTable = Has(argc, argv, L"rovbadtable");
 	g_profile = Has(argc, argv, L"rovprofile");
 	g_noTime = Has(argc, argv, L"rovnotime");
 
@@ -444,9 +446,22 @@ void RovReport()
 			memcpy(&enc1, entries[1] + 12, 4); memcpy(&offset, packfile + 0xB4 + 8, 4);
 			ok = ok && enc1 == 1 && offset == 0;
 		}
+		if (g_badTable)	// an OPEN archive whose entry table points at memory that cannot be read (a field that moved after a
+		{				// game update would), parsed twice: left alone. Reserved and never committed, so nothing else is there
+			char* const reserved = static_cast<char*>(VirtualAlloc(nullptr, 65536, MEM_RESERVE, PAGE_NOACCESS));
+			memcpy(packfile + 0x20 + 8, &reserved, 8);
+			for (int i = 0; i < 2; i++)
+			{
+				findEncryption(0x4E45504F);
+				ok = ok && parse(packfile, "test4.rpf", true, nullptr);
+			}
+			memcpy(&offset, packfile + 0xB4 + 8, 4);
+			ok = ok && reserved != nullptr && offset == 0;
+			memcpy(packfile + 0x20 + 8, &table2, 8);
+		}
 		wprintf(L", behaviour %ls", ok ? L"ok" : L"WRONG");
 	}
 	wprintf(L" | ");
-	if (g_badArchive || g_openFail)
+	if (g_badArchive || g_badTable || g_openFail)
 		Sleep(1500);	// a problem after the start-up summary is shown (or logged) a second after it is reported
 }

@@ -608,10 +608,22 @@ namespace TweaksV
 				g_originalDecryptHeader2(encryption, salt, header, size);
 		}
 
+		// An OPEN archive left as it is: a line (capped) with what is wrong with its entry table, and the
+		// first time in a session a problem, why saying the same after "its entry table".
+		void Unprepared(const char* name, const std::string& what, const std::string& why)
+		{
+			if (Counted(g_unprepared))
+				WriteLog(kTag, "The OPEN archive " + PathText(name) + " " + what + " - left as it is.");
+			if (!g_unpreparedReported.load(std::memory_order_relaxed) && !g_unpreparedReported.exchange(true))
+				ReportFailure(kTag, "Unencrypted (OPEN) RPF archive " + PathText(name) + " could not be prepared: its entry table " + why +
+					" - its files may not load.");
+		}
+
 		// Once the game has read an archive's header: an OPEN archive's named binary entries and its
 		// current offset are marked as the game expects them; any other archive is left as it is, and so
-		// is an OPEN one whose entry table is implausible - logged (capped) and, the first time in a
-		// session, reported. Can throw (a log line).
+		// is an OPEN one whose entry table is implausible, or cannot be read - the table is the game's heap
+		// memory, and a field that has moved after a game update would point anywhere - logged (capped)
+		// and, the first time in a session, reported. Can throw (a log line).
 		void PrepareArchive(void* packfile, const char* name, bool open)
 		{
 			uint8_t* const fields = static_cast<uint8_t*>(packfile) + kPackfileShift;
@@ -622,14 +634,16 @@ namespace TweaksV
 			if (!open)
 				return;
 			g_openArchives.fetch_add(1, std::memory_order_relaxed);
+			const std::string entries = std::to_string(count) + " entries";
 			if (!table || count < 0 || count > kMaxArchiveEntries)
 			{
-				if (Counted(g_unprepared))
-					WriteLog(kTag, "The OPEN archive " + PathText(name) + " has an implausible entry table (" + std::to_string(count) +
-						" entries) - left as it is.");
-				if (!g_unpreparedReported.load(std::memory_order_relaxed) && !g_unpreparedReported.exchange(true))
-					ReportFailure(kTag, "Unencrypted (OPEN) RPF archive " + PathText(name) + " could not be prepared: its entry table is "
-						"implausible (" + std::to_string(count) + " entries) - its files may not load.");
+				Unprepared(name, "has an implausible entry table (" + entries + ")", "is implausible (" + entries + ")");
+				return;
+			}
+			if (count > 0 && !IsReadable(table, static_cast<size_t>(count) * kEntrySize))
+			{
+				const std::string where = entries + " at " + DescribeAddress(table);
+				Unprepared(name, "has an entry table that cannot be read (" + where + ")", "cannot be read (" + where + ")");
 				return;
 			}
 			for (int32_t i = 0; i < count; i++)

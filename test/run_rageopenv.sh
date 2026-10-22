@@ -34,6 +34,11 @@ fresh_ini; out=$(game full_game.exe rovbadarchive)
 check "left alone, the rest working; a line for each parse" "has '$OPEN_OK' && [ \$(count 'The OPEN archive test3.rpf has an implausible entry table (1048577 entries) - left as it is.') -eq 2 ]"
 check "reported once, as a problem after the start-up summary" "[ \$(count 'PROBLEM: Unencrypted (OPEN) RPF archive test3.rpf could not be prepared: its entry table is implausible (1048577 entries) - its files may not load.') -eq 1 ] && log_has 'Problem after the start-up summary not shown (ERROR_POPUP=0): 1 problem'"
 
+echo "== R1c an OPEN archive whose entry table cannot be read (a field moved by a game update would do that), parsed twice: left alone, logged each time, reported once"
+fresh_ini; out=$(game full_game.exe rovbadtable)
+check "left alone, nothing written through the pointer, the rest working; a line for each parse" "has '$OPEN_OK' && [ \$(count 'The OPEN archive test4.rpf has an entry table that cannot be read (4 entries at 0x[0-9A-F]* (outside the game)) - left as it is.') -eq 2 ]"
+check "reported once, as a problem after the start-up summary" "[ \$(count 'PROBLEM: Unencrypted (OPEN) RPF archive test4.rpf could not be prepared: its entry table cannot be read (4 entries at 0x[0-9A-F]* (outside the game)) - its files may not load.') -eq 1 ] && log_has 'Problem after the start-up summary not shown (ERROR_POPUP=0): 1 problem'"
+
 echo "== R2 CONSOLE=1: the call that hides the console is NOPed"
 fresh_ini; setkey CONSOLE 1; out=$(game full_game.exe)
 check "6 NOPs, logged with the bytes they replace" "has 'console: 90 90 90 90 90 90 |' && log_has 'Console hide call patched: FF 15 55 66 77 08 -> 90 90 90 90 90 90.'"
@@ -157,9 +162,10 @@ check "harness survived" "grep -q 'loaded' harness.out"
 check "the three parts reported" "log_has 'PROBLEM: The RPF cache check is not skipped' && log_has 'PROBLEM: Files in the mods folder are not used' && log_has 'PROBLEM: Unencrypted (OPEN) RPF archives cannot be loaded'"
 check "one start-up summary for both moments (shown after the one-time start-up)" "[ \$(count 'Start-up summary not shown (ERROR_POPUP=0)') -eq 1 ]"
 
-echo "== R16 FreeLibrary while hooked: TweaksV.asi stays loaded (pinned), its hooks called afterwards still work"
+echo "== R16 FreeLibrary while hooked, eight times over: TweaksV.asi stays loaded (pinned), its hooks called afterwards still work"
+# one FreeLibrary would not tell: TweaksV's own threads hold references of their own for a while (the start-up check, 30 s)
 fresh_ini; out=$(game full_game.exe unload); echo "      $out"
-check "still loaded after FreeLibrary; the file functions and the OPEN calls work through the hooks afterwards; the pin not reported" "has 'unload: still loaded |' && has '$FILES_OK' && has '$OPEN_OK' && log_lacks 'could not be pinned'"
+check "still loaded after 8 x FreeLibrary; the file functions and the OPEN calls work through the hooks afterwards; the pin not reported" "has 'unload: still loaded after 8 x FreeLibrary |' && has '$FILES_OK' && has '$OPEN_OK' && log_lacks 'could not be pinned'"
 
 echo "== R17 the mods file cannot be opened: OpenBulk gives the game that failure, never its own file, and says so"
 # 7 calls of OpenBulk cannot open their mods file: the redirect test and the refusal test call both devices once

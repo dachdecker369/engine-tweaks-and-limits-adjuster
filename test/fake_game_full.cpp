@@ -52,8 +52,9 @@
 //   nodyncode      no code may be changed or made once TweaksV loads (Windows' dynamic code policy)
 //   lockedlog      while TweaksV starts, holds the TweaksV.log in its folder open as another program
 //                  might: for reading, shared for reading only
-//   unload         frees TweaksV.asi once it has started (an ASI loader that unloads it), says whether it
-//                  is still loaded, and reports as usual - which calls the hooked functions
+//   unload         frees TweaksV.asi once it has started (an ASI loader that unloads it) until it is gone or
+//                  8 times, says whether it is still loaded, and reports as usual - which calls the hooked
+//                  functions
 //   wait           stays 11 seconds longer before it reports
 //   waitlong       stays 31 seconds longer before it reports (TweaksV's DirectStorage factory check comes 30 s in)
 #include <windows.h>
@@ -1127,11 +1128,16 @@ int wmain(int argc, wchar_t** argv)
 	}
 	RovFirstTimeRequest();	// the game asks for the time: RageOpenV's hook runs its one-time start-up
 	Sleep(1500); // the start-up summary thread runs
-	if (HasOption(argc, argv, L"unload"))	// TweaksV pins itself: freed, it must stay, and its hooks with it
-	{
-		FreeLibrary(module);
-		Sleep(300);
-		wprintf(L"unload: %ls | ", GetModuleHandleW(asi) ? L"still loaded" : L"unloaded");
+	if (HasOption(argc, argv, L"unload"))	// TweaksV pins itself: freed, it must stay, and its hooks with it. One FreeLibrary
+	{										// would not show that: TweaksV's own threads hold references of their own for a while
+		int frees = 0;						// (RageOpenV's start-up check, 30 s), so it is freed until it is gone, or 8 times -
+		while (frees < 8 && GetModuleHandleW(asi))	// pinned, it stays however often
+		{
+			FreeLibrary(module);
+			frees++;
+			Sleep(100);
+		}
+		wprintf(L"unload: %ls after %d x FreeLibrary | ", GetModuleHandleW(asi) ? L"still loaded" : L"unloaded", frees);
 	}
 	CallBoxSearches();	// the box streamer searches, as the game would call them
 	if (dstorage && HasOption(argc, argv, L"dsnofactory"))
