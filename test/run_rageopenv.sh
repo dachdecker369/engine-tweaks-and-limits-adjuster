@@ -161,12 +161,17 @@ echo "== R16 FreeLibrary while hooked: TweaksV.asi stays loaded (pinned), its ho
 fresh_ini; out=$(game full_game.exe unload); echo "      $out"
 check "still loaded after FreeLibrary; the file functions and the OPEN calls work through the hooks afterwards; the pin not reported" "has 'unload: still loaded |' && has '$FILES_OK' && has '$OPEN_OK' && log_lacks 'could not be pinned'"
 
-echo "== R17 the mods file cannot be opened: OpenBulk hands the game its own path next, and says so once"
+echo "== R17 the mods file cannot be opened: OpenBulk gives the game that failure, never its own file, and says so"
+# 7 calls of OpenBulk cannot open their mods file: the redirect test and the refusal test call both devices once
+# each, the spellings test OpenBulk 1 three times (two spellings of the file and the folder)
 fresh_ini; out=$(game full_game.exe rovopenfail); echo "      $out"
-check "the fall-back: the mods path first, the game's own path next; the other six hooks redirect as before" "has 'fallback ok' && has 'redirect 6/8, pass 8/8,' && has '$OPEN_OK'"
-check "the first fall-back reported, once, as a problem after the start-up summary" "[ \$(count 'PROBLEM: A file in the mods folder could not be opened - the game.s own file was used instead: mods/test/file.txt.') -eq 1 ] && log_has 'Problem after the start-up summary not shown (ERROR_POPUP=0): 1 problem'"
+check "the failure and the game's last error returned, the mods path the only one asked for; every hook redirects" "has 'refusal ok' && has '$FILES_OK' && has 'spellings ok, folder ok, outside ok' && has '$OPEN_OK'"
+check "each one logged without DIAGNOSTIC_MODE, by the hook that could not open it" "[ \$(count 'RageOpenV\] OpenBulk 1 could not open mods/') -eq 5 ] && [ \$(count 'RageOpenV\] OpenBulk 2 could not open mods/') -eq 2 ] && log_has 'OpenBulk 1 could not open mods/test/file.txt - the game gets that failure, not its own file.'"
+check "the first one reported, once, as a problem after the start-up summary" "[ \$(count 'PROBLEM: A file in the mods folder could not be opened - the game gets that failure, not its own file: mods/test/file.txt.') -eq 1 ] && log_has 'Problem after the start-up summary not shown (ERROR_POPUP=0): 1 problem'"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe rovopenfail)
-check "DIAGNOSTIC_MODE: each fall-back logged, none of them as served; the other functions' files served" "log_has 'DIAGNOSTIC: OpenBulk 1 fell back to test/file.txt' && log_has 'DIAGNOSTIC: OpenBulk 2 fell back to test/file.txt' && log_lacks 'OpenBulk [12] served' && log_has 'DIAGNOSTIC: GetFileTime 1 served mods/test/file.txt'"
+check "DIAGNOSTIC_MODE: the same lines, none of them as served; the other functions' files served" "[ \$(count 'RageOpenV\] OpenBulk [12] could not open mods/') -eq 7 ] && log_lacks 'OpenBulk [12] served' && log_has 'DIAGNOSTIC: GetFileTime 1 served mods/test/file.txt'"
+fresh_ini; out=$(game full_game.exe rovopenfail rovflood)
+check "20,007 that cannot be opened: 20000 lines, then the cap line once; reported once" "[ \$(count 'could not open mods/') -eq 20000 ] && [ \$(count '20000 lines of mods files that could not be opened written - from now on they are only counted.') -eq 1 ] && [ \$(count 'PROBLEM: A file in the mods folder could not be opened') -eq 1 ] && has '$FILES_OK'"
 
 echo "== R18 R-E-K1 matches twice (a second copy of the cache check's call site): not used, the cache check left on, the rest on"
 fresh_ini; out=$(game full_game.exe tworovk1)

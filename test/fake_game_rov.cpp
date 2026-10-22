@@ -14,8 +14,10 @@
 //   tworovk1           a second copy of the RPF cache check's call site (R-E-K1 matches twice)
 //   rovconsolenopped   the call that hides the console is NOPs already (another mod's patch)
 //   rovflood           20,000 file requests before the usual ones: more than the diagnostic lines' cap lets through
-//   rovopenfail        the fake OpenBulk functions fail for a path under mods/, so the hook must fall back to the game's own
-//                      file; waits 1.5 s before its report ends, for the problem after the start-up summary
+//                      (with rovopenfail, 20,000 requests of a file the mods folder has, which then cannot be opened)
+//   rovopenfail        the fake file functions fail for a path under mods/ (0, with the last error ERROR_SHARING_VIOLATION),
+//                      so the OpenBulk hooks must give the game that failure; waits 1.5 s before its report ends, for the
+//                      problem after the start-up summary
 //   rovbadarchive      parses an OPEN archive whose entry count is implausible, twice; waits 1.5 s the same way
 //   rovprofile         asks OpenBulk 1 for a file under %USERPROFILE%, in the ANSI code page
 //   rovnotime          never asks for the time (a game TweaksV's time hook does not reach): waits 35 s instead
@@ -33,13 +35,16 @@
 __declspec(allocate(".fakefn")) unsigned char g_fakeCode[0x2000] = { 0xCC };
 
 // What the fake game functions were called with, and what they return: 1, or 0 for a path under mods/
-// with the option rovopenfail, as a game function that could not open the file.
+// with the option rovopenfail, as a game function that could not open the file - with the last error set.
 static std::vector<std::string> g_fileCalls;
 static bool g_openFail = false;
 static uint64_t RecordFile(const char* p)
 {
 	g_fileCalls.push_back(p ? p : "(null)");
-	return g_openFail && p && strncmp(p, "mods/", 5) == 0 ? 0 : 1;
+	if (!g_openFail || !p || strncmp(p, "mods/", 5) != 0)
+		return 1;
+	SetLastError(ERROR_SHARING_VIOLATION);
+	return 0;
 }
 static uint64_t (*volatile g_recordFile)(const char*) = RecordFile;
 
@@ -300,8 +305,9 @@ void RovReport()
 	{
 		if (g_flood)	// 20,000 requests before the usual ones: more than the cap lets through as lines
 		{
+			const char* const flooded = g_openFail ? "test/file.txt" : "test/none.txt";	// with rovopenfail: 20,000 that cannot be opened
 			for (int i = 0; i < 20000; i++)
-				reinterpret_cast<uint64_t (*)(void*, const char*, int64_t*)>(FnStart(F_OPENBULK1))(nullptr, "test/none.txt", nullptr);
+				reinterpret_cast<uint64_t (*)(void*, const char*, int64_t*)>(FnStart(F_OPENBULK1))(nullptr, flooded, nullptr);
 			g_fileCalls.clear();
 		}
 		int redirected = 0, passed = 0;
@@ -317,12 +323,19 @@ void RovReport()
 				passed++;
 		}
 		wprintf(L", redirect %d/8, pass %d/8", redirected, passed);
-		if (g_openFail)	// the mods file could not be opened: the hook must hand the game's own path to the game's function next
-		{
-			g_fileCalls.clear();
-			reinterpret_cast<uint64_t (*)(void*, const char*, int64_t*)>(FnStart(F_OPENBULK1))(nullptr, "test/file.txt", nullptr);
-			const bool fallback = g_fileCalls.size() == 2 && g_fileCalls[0] == "mods/test/file.txt" && g_fileCalls[1] == "test/file.txt";
-			wprintf(L", fallback %ls", fallback ? L"ok" : L"no");
+		if (g_openFail)	// the mods file could not be opened: both OpenBulk hooks must give the game that failure and its last
+		{				// error, and never ask for the game's own path
+			bool refused = true;
+			for (size_t i : { F_OPENBULK1, F_OPENBULK2 })
+			{
+				g_fileCalls.clear();
+				SetLastError(ERROR_SUCCESS);
+				const uint64_t result = reinterpret_cast<uint64_t (*)(void*, const char*, int64_t*)>(FnStart(i))(nullptr, "test/file.txt", nullptr);
+				const DWORD error = GetLastError();
+				refused = refused && result == 0 && error == ERROR_SHARING_VIOLATION && g_fileCalls.size() == 1 &&
+					g_fileCalls[0] == "mods/test/file.txt";
+			}
+			wprintf(L", refusal %ls", refused ? L"ok" : L"no");
 		}
 
 		// The same lookup with the game's other spellings, a folder, and paths that must never be

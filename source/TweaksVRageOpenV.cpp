@@ -11,7 +11,10 @@
 //                         file system call, no memory allocation, no lock. Both spellings of a path
 //                         (slashes, case) match, a path with ".." or one that is not relative is never
 //                         redirected, and a file the folder does not have reaches the game's own
-//                         function untouched. Without a mods folder, or an empty one, nothing is hooked.
+//                         function untouched. A mods file that cannot be opened is never replaced by
+//                         the game's own: OpenBulk gives the game that failure, as the game's function
+//                         would for any file it cannot open, logged and reported once. Without a mods
+//                         folder, or an empty one, nothing is hooked.
 //   OPEN_RPF              five calls of the archive code (R-E-E1..E5: FindEncryption, DecryptHeader,
 //                         DecryptHeader2 twice, ParseHeader) are redirected through call stubs, so that
 //                         an archive whose header says OPEN is read without decryption. The encryption
@@ -85,11 +88,11 @@ namespace TweaksV
 		};
 		EventKind g_requests{ "file requests" };
 		EventKind g_served{ "files served from the mods folder" };
-		EventKind g_fallBacks{ "fall-backs to the game's own file" };
+		EventKind g_notOpened{ "mods files that could not be opened", false };
 		EventKind g_archives{ "archive headers" };
 		EventKind g_unprepared{ "OPEN archives left as they are", false };
 		std::atomic<uint64_t> g_openArchives{ 0 };
-		std::atomic<bool> g_fallBackReported{ false };		// the first fall-back of a session is a problem
+		std::atomic<bool> g_notOpenedReported{ false };		// the first mods file that cannot be opened is a problem
 		std::atomic<bool> g_unpreparedReported{ false };	// so is the first OPEN archive left as it is
 
 		// Counts the event; true if it still gets a line of its own. The first event past the cap says so.
@@ -154,13 +157,13 @@ namespace TweaksV
 			}
 		}
 
-		// The fall-backs and the OPEN archives left as they are only when there are any.
+		// The mods files that could not be opened and the OPEN archives left as they are only when there are any.
 		void LogSummary()
 		{
-			const uint64_t fallBacks = g_fallBacks.count.load(), unprepared = g_unprepared.count.load();
+			const uint64_t notOpened = g_notOpened.count.load(), unprepared = g_unprepared.count.load();
 			WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(g_requests.count.load()) + " file requests so far, " +
 				std::to_string(g_served.count.load()) + " of them served from the mods folder" +
-				(fallBacks ? " (" + std::to_string(fallBacks) + " fell back to the game's own file)" : std::string()) + "; " +
+				(notOpened ? " and " + std::to_string(notOpened) + " whose mods file could not be opened" : std::string()) + "; " +
 				std::to_string(g_archives.count.load()) + " archive headers read, " + std::to_string(g_openArchives.load()) + " of them OPEN" +
 				(unprepared ? " (" + std::to_string(unprepared) + " left as they are)" : std::string()) + ".");
 		}
@@ -172,7 +175,7 @@ namespace TweaksV
 			for (DWORD wait = kFirstSummaryMs;; wait = kSummaryEveryMs)
 			{
 				Sleep(wait);
-				const uint64_t now = g_requests.count.load() + g_served.count.load() + g_fallBacks.count.load() + g_archives.count.load() +
+				const uint64_t now = g_requests.count.load() + g_served.count.load() + g_notOpened.count.load() + g_archives.count.load() +
 					g_openArchives.load() + g_unprepared.count.load();
 				if (now == last)
 					continue;
@@ -382,16 +385,17 @@ namespace TweaksV
 		OpenBulkFunction g_originalOpenBulk[kDevices] = {};
 		PathFunction g_originalPath[kDevices][kFunctionsPerDevice - 1] = {};	// GetFileTime, GetFileSize, GetAttributes
 
-		// The mods file could not be opened, so OpenBulk opens the game's own: a line with DIAGNOSTIC_MODE
-		// (capped), and the first fall-back of a session is reported - the player's file is not used.
-		void FellBack(const char* function, const char* path, const char* modsPath)
+		// The mods file could not be opened, and the game gets that failure, not its own file: a line for
+		// each (capped), and the first of a session is reported - the player's file is not used.
+		void NotOpened(const char* function, const char* modsPath)
 		{
 			try
 			{
-				if (g_diagnostic && Counted(g_fallBacks))
-					WriteLog(kTag, std::string("DIAGNOSTIC: ") + function + " fell back to " + PathText(path));
-				if (!g_fallBackReported.load(std::memory_order_relaxed) && !g_fallBackReported.exchange(true))
-					ReportFailure(kTag, "A file in the mods folder could not be opened - the game's own file was used instead: " +
+				if (Counted(g_notOpened))
+					WriteLog(kTag, std::string(function) + " could not open " + PathText(modsPath) +
+						" - the game gets that failure, not its own file.");
+				if (!g_notOpenedReported.load(std::memory_order_relaxed) && !g_notOpenedReported.exchange(true))
+					ReportFailure(kTag, "A file in the mods folder could not be opened - the game gets that failure, not its own file: " +
 						PathText(modsPath) + ".");
 			}
 			catch (...)
@@ -399,29 +403,27 @@ namespace TweaksV
 			}
 		}
 
-		// One hook per device for OpenBulk: a file the mods folder has is opened from there, and the
-		// game's own if that fails. A file served is logged once it is open, the game's last error kept.
+		// One hook per device for OpenBulk: a file the mods folder has is opened from there, and what the
+		// game's function returns for it - a failure too - is what the game gets. A file served is logged once
+		// it is open; the game's last error is kept around either line.
 		template <size_t Device> HANDLE OpenBulkHook(void* device, const char* path, int64_t* offset)
 		{
 			if (g_diagnostic)
 				LogRequest(kFunctionNames[Device][0], path);
 			char modsPath[kMaxModsPath + kModsPrefixSize + 1];
-			if (ModsPath(path, modsPath))
-			{
-				const HANDLE result = g_originalOpenBulk[Device](device, modsPath, offset);
-				if (result && result != INVALID_HANDLE_VALUE)
-				{
-					if (g_diagnostic)
-					{
-						const DWORD lastError = GetLastError();
-						LogServed(kFunctionNames[Device][0], modsPath);
-						SetLastError(lastError);
-					}
-					return result;
-				}
-				FellBack(kFunctionNames[Device][0], path, modsPath);
-			}
-			return g_originalOpenBulk[Device](device, path, offset);
+			if (!ModsPath(path, modsPath))
+				return g_originalOpenBulk[Device](device, path, offset);
+			const HANDLE result = g_originalOpenBulk[Device](device, modsPath, offset);
+			const bool opened = result && result != INVALID_HANDLE_VALUE;
+			if (opened && !g_diagnostic)
+				return result;
+			const DWORD lastError = GetLastError();
+			if (opened)
+				LogServed(kFunctionNames[Device][0], modsPath);
+			else
+				NotOpened(kFunctionNames[Device][0], modsPath);
+			SetLastError(lastError);
+			return result;
 		}
 
 		// One hook per device and function for GetFileTime, GetFileSize and GetAttributes: a file the

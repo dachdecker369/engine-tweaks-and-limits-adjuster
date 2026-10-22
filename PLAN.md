@@ -15,6 +15,8 @@ The order of work for a change to TweaksV, phase by phase, each phase ending wit
 2. The packfile hook keeps writing exactly the new size over the configured archive count, also when that lowers it. Documented only (phase 5).
 3. The game facts this change needs come from my dump of 1.0.1158.16 and go into PATTERNS.md in the phase that uses them.
 4. The box streamer keeps refusing its job under `DIAGNOSTIC_MODE` when a tree-search call cannot be redirected; the documents name it as the one exception to "the switches work the same for every part" (phase 5).
+5. The four file functions share one rule: no fall-back. When a mods file cannot be opened, OpenBulk gives the game that failure, as the game's own function would for any file it cannot open - the player's file is never replaced by the game's own behind their back. Each such call is logged (capped like the OPEN archives' line, without `DIAGNOSTIC: `) and the first of a session reported once, naming the mods file; GetFileTime, GetFileSize and GetAttributes keep answering for the mods file. Phase 3 kept the fall-back, so a commit of its own removes it before phase 4.
+6. The release after these fixes is 2.1.0; the version bump and its line in NOTES.md's "Versions" are mine, after my boot.
 
 ## Phase 0: the plan
 
@@ -41,11 +43,15 @@ Only `test\`, SPECIFICATIONS 14 and the check count in NOTES.md change.
 ## Phase 3: RageOpenV (findings 4-7, 16-19, 21, 22)
 
 - The mods folder: the depth limit skips only the deep folder; folders that cannot be read are counted and reported, an unreadable root is no longer called empty; a game that runs in another folder than the game folder is reported.
-- OpenBulk's fall-back is logged after the fact and reported once as a late problem; the three path functions stay as they are.
+- OpenBulk's fall-back is logged after the fact and reported once as a late problem; the three path functions stay as they are (the fall-back went in the commit after this phase, decision 5).
 - OPEN archives: an archive that cannot be prepared is reported once and its line capped; `ParseHeaderHook` consumes the encryption tag (insurance: my dump shows every successful ParseHeader passes FindEncryption).
 - The cache check's function already hooked by another mod is left alone; "hooked on top and chains through" is documented as holding for the four computed starts only.
 - A fallback thread reports a start-up that never ran because the game never asked for the time.
 - The small ones: a console call already NOPed, the left-out line's two reasons, the last error kept, the game's path converted for the log, rooted and drive paths never redirected, the mods list never destroyed. The double-byte code pages are left: they cannot be tested here.
+
+## Decision 5: OpenBulk without a fall-back
+
+A commit of its own before phase 4: OpenBulk returns what the game's function returned for the mods path, a failure too, with the game's last error; each such call gets a line (`OpenBulk 1 could not open mods/... - the game gets that failure, not its own file.`, 20,000 at most, then only counted) and the first of a session is reported (`A file in the mods folder could not be opened - the game gets that failure, not its own file: mods/....`). R17 becomes the refusal's scenario, with a flood past the cap. Commit: `Audit fixes, RageOpenV: no fall-back for a mods file that cannot be opened ...`
 
 ## Phase 4: DirectStorage (findings 8, 9, 26-30)
 
@@ -74,9 +80,8 @@ This file back to its heading, its first paragraph and "Next steps" with what wa
 
 ## Next steps
 
-- Phases 0 to 3 are committed (463 checks); next is phase 4, DirectStorage.
+- Phases 0 to 3 and decision 5's commit are committed (465 checks); next is phase 4, DirectStorage.
 - Skipped so far: the double-byte ANSI code pages (phase 3, finding 22). On a Japanese, Chinese or Korean Windows the mods list and the game's paths are folded byte by byte, so a name whose second byte is 0x5C (a backslash) or a capital letter never matches; the suites cannot set the ANSI code page, so no fix could be tested here.
-- A decision for me: OpenBulk falls back to the game's own file when a mods file cannot be opened, and the first fall-back of a session is reported (phase 3, finding 4), while GetFileTime, GetFileSize and GetAttributes still answer for the mods file and never fall back. One rule for all four is open: no fall-back at all, or a fall-back in all four - which needs the three functions' failure values from my dump.
 - Done differently from the plan, decided and kept:
   - Phase 1: the fakes' `TEMP` and `TMP` are `object\TestTemp`, next to `object\TestRun` and not inside it, because `object\TestRun` is the fake game's folder and the temp files must lie outside the game folder, as the real `%TEMP%` does (the DirectStorage scenarios open them as files outside it); `run_all.sh` deletes it with `object\TestRun` and `object\Test`. `/WX` on the fakes showed a warning they always had (an ignored `write` attribute of `.fakefn`), now gone.
   - Phase 2: past the expected number the reference count's refusal says `N or more` (the scan stops one past it), as the core's line for the scanned loads does; a scan that finds the right number but a site no anchor names gets a refusal of its own, `the reference to the <array> at RVA ... is not one its patterns name (...)`; the scan's `DIAGNOSTIC: reference at RVA ... (scan)` lines give the RVA of the rel32, as the anchors' lines do, so that the two lists pair up.
@@ -84,8 +89,12 @@ This file back to its heading, its first paragraph and "Next steps" with what wa
   - The new problem lines agree in number: `1 folder deeper than 32 levels was skipped.`, `1 folder could not be read (...)`.
   - A folder that Windows says holds nothing, not even `.` (a drive's root behind a junction), counts as empty, not as unreadable.
   - The current directory is read at any length, and the problem that the game runs in another folder comes only with `MODS_FOLDER=1`.
-  - The diagnostic summary adds the fall-backs and the OPEN archives left as they are, when there are any, because the cap line of those two kinds points to it; the OPEN archives' cap line, which comes without `DIAGNOSTIC_MODE` too, has no `DIAGNOSTIC: ` and names the summary only when there is one.
+  - The diagnostic summary adds the fall-backs (since decision 5, the mods files that could not be opened) and the OPEN archives left as they are, when there are any, because the cap line of those two kinds points to it; a cap line of a kind that comes without `DIAGNOSTIC_MODE` too has no `DIAGNOSTIC: ` and names the summary only when there is one.
   - The cache check refuses a target that is not a function start with `its function at RVA ... is not a function start (...)`.
   - `StartModuleThread` is public (`TweaksVSummary.h`) for the start-up check, and its line for a module reference it cannot take reads `The <what> thread could not be started (...)`, like its other failure; `FinalPathOf` is new in `TweaksVFiles`; ParseHeader's work moved into `PrepareArchive`, so that one exit restores the game's last error.
-  - Tests: the fake changes its own current directory (`rovcwd DIR`), because Git Bash resolves a junction when it changes into one; scenarios for a game path under the profile folder (R21), the console call NOPed already (R2b) and the fall-back with `DIAGNOSTIC_MODE` (R17); `common.sh` has one `deny` behind `deny_writes` and the new `deny_listing`.
-- Waiting on me: the decision above and the phase 3 list; nothing else until the last phase is committed.
+  - Tests: the fake changes its own current directory (`rovcwd DIR`), because Git Bash resolves a junction when it changes into one; scenarios for a game path under the profile folder (R21), the console call NOPed already (R2b) and the fall-back with `DIAGNOSTIC_MODE` (R17, the refusal's since decision 5); `common.sh` has one `deny` behind `deny_writes` and the new `deny_listing`.
+- Done beyond the plan in decision 5's commit, mine to keep or undo (each recommended to keep):
+  - The refusal's line names the hook and the mods path (`OpenBulk 1 could not open mods/... - the game gets that failure, not its own file.`), and its cap line reads `20000 lines of mods files that could not be opened written - from now on they are only counted.`; the diagnostic summary says ` and F whose mods file could not be opened` after the files served.
+  - Tests: the fake's failing file functions set the last error (`ERROR_SHARING_VIOLATION`), so R17 checks that the game gets it back after TweaksV's line, and the lines are counted per hook; a third R17 run floods 20,007 refusals past the cap.
+  - SPECIFICATIONS 12's list of the capped kinds names the OPEN archives left as they are too, which phase 3 had left out, and says the minute summary comes where `DIAGNOSTIC_MODE` gives one; README's RageOpenV section has a sentence on a mods file that cannot be opened.
+- Waiting on me: the phase 3 list and the decision 5 list above; nothing else until the last phase is committed.
