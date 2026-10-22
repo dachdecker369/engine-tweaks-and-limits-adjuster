@@ -21,18 +21,26 @@ check "the time hook switches itself off after the one-time start-up" "has 'rov 
 check "RPF cache check skipped (C3 90 at the callee)" "has 'rpf: C3 90 5C |'"
 check "console call left alone (CONSOLE=0)" "has 'console: FF 15 55 66 77 08 |'"
 check "mods folder: 8 functions hooked; a file in mods\\ is used, any other passes through" "has '$FILES_OK'"
-check "mods folder read once (2 entries); other spellings and the folder found, '..' and too-long paths never redirected" "has 'spellings ok, folder ok, outside ok' && log_has 'The mods folder has 2 files and folders.'"
-check "OPEN archives: 5 calls redirected; OPEN not decrypted, others decrypted; entries marked" "has '$OPEN_OK'"
-check "an OPEN archive with an implausible entry count is left alone and said so" "log_has 'The OPEN archive test3.rpf has an implausible entry table (1048577 entries) - left as it is.'"
+check "mods folder read once (2 entries); other spellings and the folder found; '..', rooted, network, drive and too-long paths never redirected" "has 'spellings ok, folder ok, outside ok' && log_has 'The mods folder has 2 files and folders.'"
+check "OPEN archives: 5 calls redirected; OPEN not decrypted, others decrypted; entries marked, and not again by a parse without its own FindEncryption" "has '$OPEN_OK'"
 check "status lines; no line per hooked function without DIAGNOSTIC_MODE" "log_has 'Files in the mods folder are used (8 file functions hooked)' && log_has 'Unencrypted (OPEN) RPF archives can be loaded (5 calls redirected)' && log_lacks ' hooked at RVA'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'splash: E9 86 01 00 00 90' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack sizes: D3=12000 '"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
 check "the 6 redirected calls each lead to a call stub that is read+execute, never writable" "has 'stubs: 6, all RX'"
 check "no problems; DIAGNOSTIC_MODE off, so no hot-path lines; nothing of newmods" "log_lacks 'PROBLEM' && log_lacks ' asked for ' && log_lacks ' served ' && log_lacks 'newmods'"
 
+echo "== R1b an OPEN archive with an implausible entry count, parsed twice: left alone, logged each time, reported once after the start-up summary"
+fresh_ini; out=$(game full_game.exe rovbadarchive)
+check "left alone, the rest working; a line for each parse" "has '$OPEN_OK' && [ \$(count 'The OPEN archive test3.rpf has an implausible entry table (1048577 entries) - left as it is.') -eq 2 ]"
+check "reported once, as a problem after the start-up summary" "[ \$(count 'PROBLEM: Unencrypted (OPEN) RPF archive test3.rpf could not be prepared: its entry table is implausible (1048577 entries) - its files may not load.') -eq 1 ] && log_has 'Problem after the start-up summary not shown (ERROR_POPUP=0): 1 problem'"
+
 echo "== R2 CONSOLE=1: the call that hides the console is NOPed"
 fresh_ini; setkey CONSOLE 1; out=$(game full_game.exe)
 check "6 NOPs, logged with the bytes they replace" "has 'console: 90 90 90 90 90 90 |' && log_has 'Console hide call patched: FF 15 55 66 77 08 -> 90 90 90 90 90 90.'"
+
+echo "== R2b CONSOLE=1 and another mod NOPed the call already: left as it is"
+fresh_ini; setkey CONSOLE 1; out=$(game full_game.exe rovconsolenopped)
+check "the NOPs as they were, logged as another mod's" "has 'console: 90 90 90 90 90 90 |' && log_has 'Console hide call already patched (another mod did it) - left as it is.' && log_lacks 'Console hide call patched' && log_lacks 'unexpected bytes'"
 
 echo "== R3 each switch on its own"
 fresh_ini; setkey MODS_FOLDER 0 RAGEOPENV; out=$(game full_game.exe)
@@ -53,11 +61,12 @@ echo "== R4c an empty mods folder: the file functions are not hooked, not a prob
 fresh_ini; mv mods mods_off; mkdir mods; out=$(game full_game.exe); rmdir mods; mv mods_off mods
 check "no file hooks, the rest on; logged, no problem" "has 'file hooks 0/8 |' && has '$OPEN_OK' && log_has 'The mods folder is empty - the file functions are not hooked.' && log_lacks 'PROBLEM'"
 
-echo "== R4b crafted mods folders: deeper than the limit; a name outside the Basic Multilingual Plane"
-fresh_ini; deep=mods/deep; for i in $(seq 1 33); do deep="$deep/d"; done; mkdir -p "$deep"
+echo "== R4b crafted mods folders: deeper than the limit, read before the rest; a name outside the Basic Multilingual Plane"
+# zdeep sorts after test, so it is read first: the reading must go on after it
+fresh_ini; deep=mods/zdeep; for i in $(seq 1 33); do deep="$deep/d"; done; mkdir -p "$deep"
 out=$(game full_game.exe)
-check "too deep: reported, the rest of the folder still used" "log_has 'PROBLEM: Only part of the mods folder is used' && has '$FILES_OK'"
-rm -rf mods/deep
+check "too deep: that folder skipped and reported, the rest of the folder still read and used" "log_has 'PROBLEM: Only part of the mods folder is used this session: 1 folder deeper than 32 levels was skipped.' && has '$FILES_OK'"
+rm -rf mods/zdeep
 # An emoji is a character outside the Basic Multilingual Plane, which no ANSI code page holds but UTF-8
 # (65001): the name is listed there and left out, counted in the log, on every other code page - single- or
 # double-byte; the lookup works either way.
@@ -66,10 +75,17 @@ fresh_ini; touch "mods/test/😀.txt"; out=$(game full_game.exe)
 if [ "$acp" = 65001 ]; then
 	check "a name outside the Basic Multilingual Plane on the UTF-8 code page: listed, nothing left out" "log_has 'The mods folder has 3 files and folders.' && log_lacks 'left out of the list'"
 else
-	check "a name outside the Basic Multilingual Plane on code page ${acp:-?}: left out and counted, the rest listed" "log_has 'The mods folder has 2 files and folders.' && log_has 'Names in the mods folder left out of the list: 1 - the game asks with paths in the ANSI code page (${acp:-[0-9]*}), which cannot hold them'"
+	check "a name outside the Basic Multilingual Plane on code page ${acp:-?}: left out and counted, the rest listed" "log_has 'The mods folder has 2 files and folders.' && log_has 'Names in the mods folder left out of the list: 1 that the ANSI code page (${acp:-[0-9]*}) cannot hold - the game asks with paths in that code page.'"
 fi
 check "the lookup still works with the name there" "has 'spellings ok, folder ok, outside ok' && has '$FILES_OK'"
 rm -f "mods/test/😀.txt"
+
+echo "== R4d a folder in the mods folder that cannot be listed: counted and reported, the rest used; the mods folder itself: not called empty"
+fresh_ini; mkdir -p mods/locked; touch mods/locked/inner.txt; deny_listing mods/locked; out=$(game full_game.exe); allow_writes mods/locked
+check "the folder logged and reported with its Windows error, the rest of the folder used" "log_has 'The folder mods.locked could not be read (Windows error 5, access denied) - its files are not used.' && log_has 'PROBLEM: Only part of the mods folder is used this session: 1 folder could not be read (Windows error 5, access denied).' && has '$FILES_OK'"
+rm -rf mods/locked
+fresh_ini; deny_listing mods; out=$(game full_game.exe); allow_writes mods
+check "the mods folder cannot be listed: reported as such, not as empty; nothing hooked, the rest on" "log_has 'PROBLEM: Files in the mods folder are not used this session: the mods folder could not be read (Windows error 5, access denied).' && log_lacks 'is empty' && has 'file hooks 0/8 |' && has '$OPEN_OK'"
 
 echo "== R5 DRY_RUN=1: the time hook is installed so the checks run at their moment; nothing else written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
@@ -130,6 +146,11 @@ fresh_ini; out=$(game full_game.exe rovcachepatched)
 check "bytes as they were (C3 89 5C)" "has 'rpf: C3 89 5C |'"
 check "logged, no problem" "log_has 'The RPF cache check is already skipped (another mod did it)' && log_lacks 'PROBLEM'"
 
+echo "== R14b another mod hooked the RPF cache check's function (a jmp at its start): left alone, not a problem"
+fresh_ini; out=$(game full_game.exe rovcachehooked)
+check "bytes as they were (E9 00 00), the rest on" "has 'rpf: E9 00 00 |' && has '$FILES_OK' && has '$OPEN_OK'"
+check "logged, no problem" "log_has 'The RPF cache check.s function is already hooked by another mod - left as it is.' && log_lacks 'PROBLEM'"
+
 echo "== R15 none of the game code present (plain fake game): each part reported, no crash"
 fresh_ini; out=$(game plain_game.exe)
 check "harness survived" "grep -q 'loaded' harness.out"
@@ -140,14 +161,41 @@ echo "== R16 FreeLibrary while hooked: TweaksV.asi stays loaded (pinned), its ho
 fresh_ini; out=$(game full_game.exe unload); echo "      $out"
 check "still loaded after FreeLibrary; the file functions and the OPEN calls work through the hooks afterwards; the pin not reported" "has 'unload: still loaded |' && has '$FILES_OK' && has '$OPEN_OK' && log_lacks 'could not be pinned'"
 
-echo "== R17 the mods file cannot be opened: OpenBulk hands the game its own path next"
+echo "== R17 the mods file cannot be opened: OpenBulk hands the game its own path next, and says so once"
 fresh_ini; out=$(game full_game.exe rovopenfail); echo "      $out"
 check "the fall-back: the mods path first, the game's own path next; the other six hooks redirect as before" "has 'fallback ok' && has 'redirect 6/8, pass 8/8,' && has '$OPEN_OK'"
+check "the first fall-back reported, once, as a problem after the start-up summary" "[ \$(count 'PROBLEM: A file in the mods folder could not be opened - the game.s own file was used instead: mods/test/file.txt.') -eq 1 ] && log_has 'Problem after the start-up summary not shown (ERROR_POPUP=0): 1 problem'"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe rovopenfail)
+check "DIAGNOSTIC_MODE: each fall-back logged, none of them as served; the other functions' files served" "log_has 'DIAGNOSTIC: OpenBulk 1 fell back to test/file.txt' && log_has 'DIAGNOSTIC: OpenBulk 2 fell back to test/file.txt' && log_lacks 'OpenBulk [12] served' && log_has 'DIAGNOSTIC: GetFileTime 1 served mods/test/file.txt'"
 
 echo "== R18 R-E-K1 matches twice (a second copy of the cache check's call site): not used, the cache check left on, the rest on"
 fresh_ini; out=$(game full_game.exe tworovk1)
 check "the cache check left on; the file and OPEN hooks on" "has 'rpf: 48 89 5C |' && has '$FILES_OK' && has '$OPEN_OK'"
 check "the scanner says why; the problem names the pattern" "log_has 'Scanner\] Pattern R-E-K1 matches 2 or more times - not used (the site must be unique).' && log_has 'PROBLEM: The RPF cache check is not skipped this session: R-E-K1 was not found.'"
+
+echo "== R19 the game never asks for the time: 30 seconds in, RageOpenV says so, shows the start-up summary and switches its hook off"
+fresh_ini; out=$(game full_game.exe rovnotime); echo "      $out"
+check "reported, the start-up summary shown, the time hook off again" "log_has 'PROBLEM: RageOpenV.s start-up never ran: the game did not ask for the time through GetSystemTimeAsFileTime - the mods folder, OPEN archives and the cache check skip are off this session.' && log_has 'Start-up summary not shown (ERROR_POPUP=0): 1 problem' && has 'rov api hook: yes' && has 'rov api hook afterwards: removed'"
+check "nothing of RageOpenV done; the parts that start in DllMain on" "has '$NOTHING' && has 'rpf: 48 89 5C |' && has 'heap: 1024 MB'"
+
+echo "== R20 the game runs in another folder than the game folder: said and reported; a junction to the game folder is the game folder"
+fresh_ini; mkdir -p notgame; out=$(game full_game.exe rovcwd notgame); rmdir notgame
+check "another folder: logged, and the mods folder of the game folder reported as not used; nothing hooked" "has 'cwd set |' && log_has 'The current directory is .*notgame, not the game folder - the mods folder is looked for there.' && log_has 'PROBLEM: Files in the mods folder are not used this session: the game runs in .*notgame, not in the game folder.' && has 'file hooks 0/8 |'"
+if ! cmd //c "$(cygpath -w "$T/junction.cmd")" "$(cygpath -w "$B/samegame")" "$(cygpath -w "$B")"; then
+	check "the junction could be made (a check of the test itself) - the scenario stops here" "false"
+else
+	fresh_ini; out=$(game full_game.exe rovcwd samegame)
+	cmd //c "$(cygpath -w "$T/junction.cmd")" remove "$(cygpath -w "$B/samegame")"
+	check "a junction to the game folder as the current directory: the same folder - nothing said, the mods folder used" "has 'cwd set |' && log_lacks 'not the game folder' && log_lacks 'PROBLEM' && has '$FILES_OK'"
+fi
+
+echo "== R21 DIAGNOSTIC_MODE=1 and a request under a profile folder whose name is not ASCII: written as %USERPROFILE%"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(USERPROFILE='C:\Users\Jürgen' game full_game.exe rovprofile)
+if has 'profile path not in the ANSI code page'; then
+	skip "the profile folder's name is not in this machine's ANSI code page (${acp:-?}), so no request can name it"
+else
+	check "the request, from the ANSI code page, logged under %USERPROFILE% and not redirected; the name nowhere in the log" "has 'profile path asked' && log_has 'OpenBulk 1 asked for %USERPROFILE%.Documents.tweaksv.txt' && log_lacks 'rgen'"
+fi
 
 echo
 echo "RAGEOPENV SCENARIOS: $pass passed, $fail failed"

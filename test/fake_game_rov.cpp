@@ -10,9 +10,17 @@
 //   rovdecrypt2        the two DecryptHeader2 calls lead to different functions
 //   rovredirected      the DecryptHeader call already leads outside the game
 //   rovcachepatched    the RPF cache check function already starts with a ret
+//   rovcachehooked     the RPF cache check function already starts with a jump (another mod's hook)
 //   tworovk1           a second copy of the RPF cache check's call site (R-E-K1 matches twice)
+//   rovconsolenopped   the call that hides the console is NOPs already (another mod's patch)
 //   rovflood           20,000 file requests before the usual ones: more than the diagnostic lines' cap lets through
-//   rovopenfail        the fake OpenBulk functions fail for a path under mods/, so the hook must fall back to the game's own file
+//   rovopenfail        the fake OpenBulk functions fail for a path under mods/, so the hook must fall back to the game's own
+//                      file; waits 1.5 s before its report ends, for the problem after the start-up summary
+//   rovbadarchive      parses an OPEN archive whose entry count is implausible, twice; waits 1.5 s the same way
+//   rovprofile         asks OpenBulk 1 for a file under %USERPROFILE%, in the ANSI code page
+//   rovnotime          never asks for the time (a game TweaksV's time hook does not reach): waits 35 s instead
+//   rovcwd DIR         runs in DIR, not in its own folder (a shortcut that sets another working folder): it changes
+//                      its current directory before it loads TweaksV.asi
 #include <windows.h>
 #include <cstdint>
 #include <cstdio>
@@ -49,7 +57,9 @@ static __declspec(noinline) bool FakeParseHeader(void*, const char*, bool, void*
 volatile unsigned char g_rovConsole[] = { 0xFF, 0x15, 0x11, 0x22, 0x33, 0x44, 0x48, 0x85, 0xC0, 0x74, 0x08, 0x48, 0x89, 0xC1, 0x31, 0xD2,
 	0xFF, 0x15, 0x55, 0x66, 0x77, 0x08, 0xCC };
 volatile unsigned char g_rovCacheSite[] = { 0xE8, 0, 0, 0, 0, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0x48, 0x8D, 0x15, 0, 0, 0, 0, 0x48, 0x8D, 0x35, 0xCC };
-volatile unsigned char g_rovCacheCallee[] = { 0x48, 0x89, 0x5C, 0x24, 0x08, 0xCC };
+// the function the call leads to, at +1: the CC before it is padding, so it is a function start without unwind data
+volatile unsigned char g_rovCacheCallee[] = { 0xCC, 0x48, 0x89, 0x5C, 0x24, 0x08, 0xCC };
+static unsigned char* CacheFunction() { return const_cast<unsigned char*>(g_rovCacheCallee) + 1; }
 // a second copy of the call site, to the same function: its first byte becomes E8 only with "tworovk1"
 volatile unsigned char g_rovCacheSiteCopy[] = { 0xCC, 0, 0, 0, 0, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0x48, 0x8D, 0x15, 0, 0, 0, 0, 0x48, 0x8D, 0x35,
 	0xCC };
@@ -200,19 +210,30 @@ static bool Has(int argc, wchar_t** argv, const wchar_t* option)
 }
 
 static unsigned char g_apiBefore[5];
-static bool g_flood = false;
+static bool g_flood = false, g_badArchive = false, g_profile = false, g_noTime = false;
+static const wchar_t* g_cwdResult = nullptr;	// with rovcwd: whether the current directory could be changed
 
 void RovSetup(int argc, wchar_t** argv)
 {
+	for (int i = 2; i + 1 < argc; i++)
+		if (wcscmp(argv[i], L"rovcwd") == 0)
+			g_cwdResult = SetCurrentDirectoryW(argv[i + 1]) ? L"set" : L"NOT set";
 	BuildFakeCode(Has(argc, argv, L"rovnotstart"), Has(argc, argv, L"rovmissing"), Has(argc, argv, L"rovjump"));
 	g_flood = Has(argc, argv, L"rovflood");
 	g_openFail = Has(argc, argv, L"rovopenfail");
+	g_badArchive = Has(argc, argv, L"rovbadarchive");
+	g_profile = Has(argc, argv, L"rovprofile");
+	g_noTime = Has(argc, argv, L"rovnotime");
 
-	SetCallTarget(g_rovCacheSite, const_cast<unsigned char*>(g_rovCacheCallee));
+	SetCallTarget(g_rovCacheSite, CacheFunction());
 	if (Has(argc, argv, L"rovcachepatched"))
-		g_rovCacheCallee[0] = 0xC3;
+		CacheFunction()[0] = 0xC3;
+	if (Has(argc, argv, L"rovcachehooked"))	// another mod's hook: a jmp at the start (here to the next instruction)
+		memcpy(CacheFunction(), "\xE9\x00\x00\x00\x00", 5);
 	if (Has(argc, argv, L"tworovk1"))
-		SetCallTarget(g_rovCacheSiteCopy, const_cast<unsigned char*>(g_rovCacheCallee));
+		SetCallTarget(g_rovCacheSiteCopy, CacheFunction());
+	if (Has(argc, argv, L"rovconsolenopped"))
+		memset(const_cast<unsigned char*>(g_rovConsole) + 16, 0x90, 6);
 	SetCallTarget(g_rovFindEnc, reinterpret_cast<const void*>(&FakeFindEncryption));
 	SetCallTarget(g_rovDecrypt, Has(argc, argv, L"rovredirected") ? RovOutside() : reinterpret_cast<const void*>(&FakeDecryptHeader));
 	SetCallTarget(g_rovDecrypt2a, reinterpret_cast<const void*>(&FakeDecryptHeader2));
@@ -245,21 +266,29 @@ static const unsigned char* TimeApi()
 
 // The first GetSystemTimeAsFileTime call after TweaksV.asi has loaded. Whether RageOpenV
 // had hooked it is noted first: the hook removes itself once its one-time start-up has run.
+// With rovnotime the game never asks: it waits past the 30 seconds after which RageOpenV says so.
 static bool g_apiHookedAtFirstRequest = false;
 void RovFirstTimeRequest()
 {
 	g_apiHookedAtFirstRequest = memcmp(TimeApi(), g_apiBefore, 5) != 0;
+	if (g_noTime)
+	{
+		Sleep(35000);
+		return;
+	}
 	FILETIME now{};
 	GetSystemTimeAsFileTime(&now);
 }
 
 void RovReport()
 {
+	if (g_cwdResult)
+		wprintf(L"cwd %ls | ", g_cwdResult);
 	wprintf(L"rov api hook: %ls | ", g_apiHookedAtFirstRequest ? L"yes" : L"no");
 	wprintf(L"rov api hook afterwards: %ls | ", memcmp(TimeApi(), g_apiBefore, 5) != 0 ? L"still there" : L"removed");
 	wprintf(L"console: %02X %02X %02X %02X %02X %02X | ", g_rovConsole[16], g_rovConsole[17], g_rovConsole[18], g_rovConsole[19],
 		g_rovConsole[20], g_rovConsole[21]);	// the call that hides the console: 6 bytes
-	wprintf(L"rpf: %02X %02X %02X | ", g_rovCacheCallee[0], g_rovCacheCallee[1], g_rovCacheCallee[2]);
+	wprintf(L"rpf: %02X %02X %02X | ", CacheFunction()[0], CacheFunction()[1], CacheFunction()[2]);
 
 	// The file functions (MinHook writes a jmp at their start).
 	int hooked = 0;
@@ -297,7 +326,8 @@ void RovReport()
 		}
 
 		// The same lookup with the game's other spellings, a folder, and paths that must never be
-		// redirected: one that climbs out with "..", and one longer than any path TweaksV looks up.
+		// redirected: one that climbs out with "..", ones that are not relative - from the drive's root, a
+		// network path, with a drive - and one longer than any path TweaksV looks up.
 		const auto call = [](const char* path)
 		{
 			g_fileCalls.clear();
@@ -305,10 +335,30 @@ void RovReport()
 			return g_fileCalls.size() == 1 ? g_fileCalls[0] : std::string("?");
 		};
 		const std::string longPath = std::string(300, 'a') + "/file.txt";
-		const bool spellings = call("TEST\\File.TXT") == "mods/TEST\\File.TXT" && call("/test//file.txt") == "mods//test//file.txt";
+		const bool spellings = call("TEST\\File.TXT") == "mods/TEST\\File.TXT" && call("test//file.txt") == "mods/test//file.txt";
 		const bool folder = call("test") == "mods/test";
-		const bool outside = call("test/../test/file.txt") == "test/../test/file.txt" && call(longPath.c_str()) == longPath;
+		const bool outside = call("test/../test/file.txt") == "test/../test/file.txt" && call("/test/file.txt") == "/test/file.txt" &&
+			call("\\\\server\\share\\test\\file.txt") == "\\\\server\\share\\test\\file.txt" && call("C:test\\file.txt") == "C:test\\file.txt" &&
+			call("C:\\test\\file.txt") == "C:\\test\\file.txt" && call(longPath.c_str()) == longPath;
 		wprintf(L", spellings %ls, folder %ls, outside %ls", spellings ? L"ok" : L"no", folder ? L"ok" : L"no", outside ? L"ok" : L"no");
+		if (g_profile)	// a file under the profile folder, in the ANSI code page the game asks with (as UTF-8 on 65001)
+		{
+			wchar_t profile[MAX_PATH] = {};
+			const DWORD length = GetEnvironmentVariableW(L"USERPROFILE", profile, MAX_PATH);
+			const std::wstring wide = std::wstring(profile, length < MAX_PATH ? length : 0) + L"\\Documents\\tweaksv.txt";
+			char path[MAX_PATH * 3] = {};
+			BOOL lossy = FALSE;
+			const int size = GetACP() == CP_UTF8
+				? WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, path, sizeof(path), nullptr, nullptr)
+				: WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wide.c_str(), -1, path, sizeof(path), nullptr, &lossy);
+			if (length > 0 && length < MAX_PATH && size > 0 && !lossy)
+			{
+				const bool untouched = call(path) == path;
+				wprintf(L", profile path %ls", untouched ? L"asked" : L"REDIRECTED");
+			}
+			else
+				wprintf(L", profile path not in the ANSI code page");
+		}
 	}
 	wprintf(L" | ");
 
@@ -362,18 +412,28 @@ void RovReport()
 		ok = ok && enc1 == 0xFEFFFFF && enc2 == 1 && enc3 == 1 && offset == 0xFEFFFFF;
 		memcpy(entries[1] + 12, &one, 4);
 		memset(packfile + 0xB4 + 8, 0, 4);
+		ok = ok && parse(packfile, "test.rpf", true, nullptr);					// no FindEncryption for this parse: the
+		memcpy(&enc1, entries[1] + 12, 4); memcpy(&offset, packfile + 0xB4 + 8, 4);	// last one's OPEN was used up, left alone
+		ok = ok && enc1 == 1 && offset == 0;
 		findEncryption(0x0FE00000);											// not OPEN: left alone
 		ok = ok && parse(packfile, "test2.rpf", true, nullptr);
 		memcpy(&enc1, entries[1] + 12, 4); memcpy(&offset, packfile + 0xB4 + 8, 4);
 		ok = ok && enc1 == 1 && offset == 0;
-		// an OPEN archive whose header claims more entries than plausible: left alone, said in the log
-		const int32_t tooMany = 0x100001;
-		memcpy(packfile + 0x28 + 8, &tooMany, 4);
-		findEncryption(0x4E45504F);
-		ok = ok && parse(packfile, "test3.rpf", true, nullptr);
-		memcpy(&enc1, entries[1] + 12, 4); memcpy(&offset, packfile + 0xB4 + 8, 4);
-		ok = ok && enc1 == 1 && offset == 0;
+		if (g_badArchive)	// an OPEN archive whose header claims more entries than plausible, parsed twice: left alone
+		{
+			const int32_t tooMany = 0x100001;
+			memcpy(packfile + 0x28 + 8, &tooMany, 4);
+			for (int i = 0; i < 2; i++)
+			{
+				findEncryption(0x4E45504F);
+				ok = ok && parse(packfile, "test3.rpf", true, nullptr);
+			}
+			memcpy(&enc1, entries[1] + 12, 4); memcpy(&offset, packfile + 0xB4 + 8, 4);
+			ok = ok && enc1 == 1 && offset == 0;
+		}
 		wprintf(L", behaviour %ls", ok ? L"ok" : L"WRONG");
 	}
 	wprintf(L" | ");
+	if (g_badArchive || g_openFail)
+		Sleep(1500);	// a problem after the start-up summary is shown (or logged) a second after it is reported
 }

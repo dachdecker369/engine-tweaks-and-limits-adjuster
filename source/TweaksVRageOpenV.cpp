@@ -5,17 +5,19 @@
 // is not as expected, plus the console patch:
 //   MODS_FOLDER           the game's eight file functions - OpenBulk, GetFileTime, GetFileSize and
 //                         GetAttributes of its two file devices (R-E-F1..F8) - are hooked, so that a
-//                         path that exists under mods\ is served from there. The folder is read once at
-//                         start-up into a list, and every call looks its path up in that list and does
-//                         nothing else: no file system call, no memory allocation, no lock. Both
-//                         spellings of a path (slashes, case) match, a path with ".." is never
+//                         path that exists under mods\ (in the game's current directory, normally the
+//                         game folder) is served from there. The folder is read once at start-up into a
+//                         list, and every call looks its path up in that list and does nothing else: no
+//                         file system call, no memory allocation, no lock. Both spellings of a path
+//                         (slashes, case) match, a path with ".." or one that is not relative is never
 //                         redirected, and a file the folder does not have reaches the game's own
 //                         function untouched. Without a mods folder, or an empty one, nothing is hooked.
 //   OPEN_RPF              five calls of the archive code (R-E-E1..E5: FindEncryption, DecryptHeader,
 //                         DecryptHeader2 twice, ParseHeader) are redirected through call stubs, so that
 //                         an archive whose header says OPEN is read without decryption. The encryption
-//                         tag is kept per thread, so archives opened at the same time never mix, and an
-//                         encrypted archive's entry table is never walked.
+//                         tag is kept per thread and used up by the parse it was found for, so archives
+//                         opened at the same time never mix, and an encrypted archive's entry table is
+//                         never walked.
 //   SKIP_RPF_CACHE_CHECK  the function the RPF cache check calls (R-E-K1) returns at once: C3 90.
 //   CONSOLE=1             the call that would hide the console (R-E-C1) becomes NOPs.
 //   DIAGNOSTIC_MODE       every site and write; then every file request, every file served from mods\
@@ -24,8 +26,12 @@
 //                         change.
 // The game's file system is not up in DllMain, so the part hooks GetSystemTimeAsFileTime and does its
 // work when the game first asks for the time; then it shows the start-up summary and switches that
-// hook off again. A function another mod has already hooked is hooked on top and chains through; a
-// call another mod has redirected, and a cache check another mod has skipped, are left alone.
+// hook off again - or, if the game has not asked 30 seconds in, a thread says so, shows the summary and
+// switches the hook off. A file function another mod has already hooked is hooked on top and chains
+// through - for the four found by a pattern inside them (GetFileTime and GetFileSize of both devices):
+// a hook on OpenBulk or GetAttributes changes the bytes their patterns match at the function's start,
+// so the pattern is not found and the mods folder is not used. A call another mod has redirected, and
+// a cache check another mod has skipped or hooked, are left alone.
 // Written for TweaksV; the patterns, the archive facts and the idea come from RageOpenV by
 // Chiheb-Bacha, which builds on ClosedIV by martonp96 (CREDITS.md).
 
@@ -42,6 +48,7 @@
 #include <vector>
 
 #include "TweaksVConflicts.h"
+#include "TweaksVFiles.h"
 #include "TweaksVIni.h"
 #include "TweaksVLog.h"
 #include "TweaksVPatch.h"
@@ -73,12 +80,17 @@ namespace TweaksV
 		struct EventKind
 		{
 			const char* name;						// "file requests"
+			bool diagnostic = true;					// its lines come only with DIAGNOSTIC_MODE
 			std::atomic<uint64_t> count{ 0 };
 		};
 		EventKind g_requests{ "file requests" };
 		EventKind g_served{ "files served from the mods folder" };
+		EventKind g_fallBacks{ "fall-backs to the game's own file" };
 		EventKind g_archives{ "archive headers" };
+		EventKind g_unprepared{ "OPEN archives left as they are", false };
 		std::atomic<uint64_t> g_openArchives{ 0 };
+		std::atomic<bool> g_fallBackReported{ false };		// the first fall-back of a session is a problem
+		std::atomic<bool> g_unpreparedReported{ false };	// so is the first OPEN archive left as it is
 
 		// Counts the event; true if it still gets a line of its own. The first event past the cap says so.
 		bool Counted(EventKind& kind)
@@ -87,15 +99,21 @@ namespace TweaksV
 			if (n <= kMaxLinesPerKind)
 				return true;
 			if (n == kMaxLinesPerKind + 1)
-				WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(kMaxLinesPerKind) + " lines of " + kind.name +
-					" written - from now on they are only counted; the summary every minute has the numbers.");
+				WriteLog(kTag, std::string(kind.diagnostic ? "DIAGNOSTIC: " : "") + std::to_string(kMaxLinesPerKind) + " lines of " + kind.name +
+					" written - from now on they are only counted" + (g_diagnostic ? "; the summary every minute has the numbers." : "."));
 			return false;
 		}
 
-		// A path as the game passed it, for a log line.
+		// A path as the game passed it, for a log line: at most kMaxPathText bytes in the ANSI code page
+		// the game asks with, written as UTF-8 as every line is - so that %USERPROFILE% is replaced in it too.
 		std::string PathText(const char* path)
 		{
-			return path ? std::string(path, strnlen(path, kMaxPathText)) : std::string("(null)");
+			if (!path)
+				return "(null)";
+			const int length = static_cast<int>(strnlen(path, kMaxPathText));
+			wchar_t wide[kMaxPathText];
+			const int converted = length > 0 ? MultiByteToWideChar(CP_ACP, 0, path, length, wide, static_cast<int>(kMaxPathText)) : 0;
+			return converted > 0 ? ToUtf8(std::wstring_view(wide, static_cast<size_t>(converted))) : std::string(path, static_cast<size_t>(length));
 		}
 
 		// The lines from the hooks: nothing may throw back into the game.
@@ -136,11 +154,15 @@ namespace TweaksV
 			}
 		}
 
+		// The fall-backs and the OPEN archives left as they are only when there are any.
 		void LogSummary()
 		{
+			const uint64_t fallBacks = g_fallBacks.count.load(), unprepared = g_unprepared.count.load();
 			WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(g_requests.count.load()) + " file requests so far, " +
-				std::to_string(g_served.count.load()) + " of them served from the mods folder; " + std::to_string(g_archives.count.load()) +
-				" archive headers read, " + std::to_string(g_openArchives.load()) + " of them OPEN.");
+				std::to_string(g_served.count.load()) + " of them served from the mods folder" +
+				(fallBacks ? " (" + std::to_string(fallBacks) + " fell back to the game's own file)" : std::string()) + "; " +
+				std::to_string(g_archives.count.load()) + " archive headers read, " + std::to_string(g_openArchives.load()) + " of them OPEN" +
+				(unprepared ? " (" + std::to_string(unprepared) + " left as they are)" : std::string()) + ".");
 		}
 
 		// The first summary 10 seconds in, then one a minute while the numbers change.
@@ -150,7 +172,8 @@ namespace TweaksV
 			for (DWORD wait = kFirstSummaryMs;; wait = kSummaryEveryMs)
 			{
 				Sleep(wait);
-				const uint64_t now = g_requests.count.load() + g_served.count.load() + g_archives.count.load() + g_openArchives.load();
+				const uint64_t now = g_requests.count.load() + g_served.count.load() + g_fallBacks.count.load() + g_archives.count.load() +
+					g_openArchives.load() + g_unprepared.count.load();
 				if (now == last)
 					continue;
 				last = now;
@@ -181,18 +204,25 @@ namespace TweaksV
 		};
 
 		// Every file and folder under mods\, as the list spells it: relative, lower case, '/' between the
-		// names. Filled once, before the hooks go on; never changed afterwards.
-		std::unordered_set<std::string, PathHash, std::equal_to<>> g_modsList;
+		// names. Filled once, before the hooks go on; never changed afterwards. Allocated once and never
+		// freed - a deliberate leak at the end of the process: the hooks stay on until then, and a list
+		// destroyed with TweaksV's static objects at DLL_PROCESS_DETACH could still be looked up.
+		using ModsList = std::unordered_set<std::string, PathHash, std::equal_to<>>;
+		ModsList* g_modsList = nullptr;
 
-		// The list's spelling of a game path: lower case (ASCII), '/' between the names, no leading or
-		// doubled '/'. False for an empty path or one longer than kMaxModsPath.
+		// The list's spelling of a game path: lower case (ASCII), '/' between the names, a doubled '/'
+		// inside collapsed. False for an empty path, one longer than kMaxModsPath, and one that is not
+		// relative - it starts with a separator or a drive ("C:"): only a relative path names a file of
+		// the game folder.
 		bool ListSpelling(const char* path, char (&out)[kMaxModsPath + 1], size_t& length)
 		{
 			length = 0;
+			if (path[0] == '\\' || path[0] == '/' || (path[0] != '\0' && path[1] == ':'))
+				return false;
 			for (const char* p = path; *p; p++)
 			{
 				char c = *p == '\\' ? '/' : *p;
-				if (c == '/' && (length == 0 || out[length - 1] == '/'))
+				if (c == '/' && length > 0 && out[length - 1] == '/')
 					continue;
 				if (c >= 'A' && c <= 'Z')
 					c = static_cast<char>(c - 'A' + 'a');
@@ -204,13 +234,20 @@ namespace TweaksV
 			return length > 0;
 		}
 
-		// What reading the mods folder found: the entries in the list, the names left out, whether a limit
-		// stopped the reading, and the ANSI code page the names were spelled in.
+		// What reading the mods folder found: the entries in the list; the names left out, the two reasons
+		// apart; the folders not read - at the depth limit, or that could not be listed, the first one's
+		// Windows error kept; whether the folder itself could not be listed, or the list filled up; and the
+		// ANSI code page the names were spelled in.
 		struct ModsFolderRead
 		{
 			size_t entries = 0;
-			size_t leftOut = 0;
-			bool complete = true;
+			size_t notConvertible = 0;			// names the ANSI code page cannot hold
+			size_t tooLong = 0;					// names whose path in the list would be longer than kMaxModsPath bytes
+			size_t tooDeep = 0;					// folders at the depth limit: listed, what they hold not read
+			size_t unreadable = 0;				// folders that could not be listed
+			DWORD firstError = ERROR_SUCCESS;	// why the first of them, or the mods folder itself, could not be
+			bool rootUnreadable = false;
+			bool full = false;					// the list stopped at kMaxModsEntries
 			UINT codePage = 0;
 		};
 
@@ -218,7 +255,8 @@ namespace TweaksV
 		// "mods/..." too - into g_modsList. A name the ANSI code page cannot hold, or longer than the
 		// limit, is left out and counted: the game, which asks with ANSI paths, could not ask for it either.
 		// A UTF-8 code page (65001) takes neither WC_NO_BEST_FIT_CHARS nor a default character - the call
-		// would fail for every name - so its names are converted as UTF-8.
+		// would fail for every name - so its names are converted as UTF-8. A folder at the depth limit, and
+		// one that cannot be listed, is counted and the reading goes on; only the entry limit ends it.
 		ModsFolderRead ReadModsFolder()
 		{
 			struct Folder { std::wstring path; std::string relative; size_t depth; };
@@ -226,8 +264,9 @@ namespace TweaksV
 			ModsFolderRead read;
 			read.codePage = GetACP();
 			const bool utf8 = read.codePage == CP_UTF8;
-			bool& complete = read.complete;
-			while (!todo.empty() && complete)
+			if (!g_modsList)
+				g_modsList = new ModsList();
+			while (!todo.empty() && !read.full)
 			{
 				const Folder folder = std::move(todo.back());
 				todo.pop_back();
@@ -235,7 +274,22 @@ namespace TweaksV
 				const HANDLE find = FindFirstFileExW((folder.path + L"\\*").c_str(), FindExInfoBasic, &found, FindExSearchNameMatch,
 					nullptr, FIND_FIRST_EX_LARGE_FETCH);
 				if (find == INVALID_HANDLE_VALUE)
+				{
+					const DWORD error = GetLastError();
+					if (error == ERROR_FILE_NOT_FOUND)	// nothing in it, not even "." - a drive's root behind a junction
+						continue;
+					if (folder.relative.empty())
+					{
+						read.rootUnreadable = true;
+						read.firstError = error;
+						break;
+					}
+					if (read.unreadable++ == 0)
+						read.firstError = error;
+					if (read.unreadable <= kMaxLinesPerKind)
+						WriteLog(kTag, "The folder " + ToUtf8(folder.path) + " could not be read (" + DescribeError(error) + ") - its files are not used.");
 					continue;
+				}
 				do
 				{
 					if (wcscmp(found.cFileName, L".") == 0 || wcscmp(found.cFileName, L"..") == 0)
@@ -247,34 +301,57 @@ namespace TweaksV
 						: WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, found.cFileName, -1, name, sizeof(name), nullptr, &lossy);
 					if (size <= 1 || lossy)
 					{
-						read.leftOut++;
+						if (size == 0 && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+							read.tooLong++;
+						else
+							read.notConvertible++;
 						continue;
 					}
 					std::string relative = folder.relative.empty() ? std::string(name) : folder.relative + "/" + name;
 					if (relative.size() > kMaxModsPath)
 					{
-						read.leftOut++;
+						read.tooLong++;
 						continue;
 					}
 					for (char& c : relative)
 						if (c >= 'A' && c <= 'Z')
 							c = static_cast<char>(c - 'A' + 'a');
-					if (g_modsList.size() >= kMaxModsEntries)
+					if (g_modsList->size() >= kMaxModsEntries)
 					{
-						complete = false;
+						read.full = true;
 						break;
 					}
 					const bool isFolder = (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 					if (isFolder && folder.depth >= kMaxModsDepth)
-						complete = false;
+						read.tooDeep++;	// listed; what it holds is not read
 					else if (isFolder)
 						todo.push_back({ folder.path + L"\\" + found.cFileName, relative, folder.depth + 1 });
-					g_modsList.insert(std::move(relative));
+					g_modsList->insert(std::move(relative));
 				} while (FindNextFileW(find, &found));
 				FindClose(find);
 			}
-			read.entries = g_modsList.size();
+			read.entries = g_modsList->size();
 			return read;
+		}
+
+		// "1 folder", "2 folders"
+		std::string Folders(size_t count)
+		{
+			return std::to_string(count) + (count == 1 ? " folder" : " folders");
+		}
+
+		// The line for the names left out of the list, each reason with its count.
+		std::string LeftOutLine(const ModsFolderRead& read)
+		{
+			std::string line = "Names in the mods folder left out of the list:";
+			if (read.notConvertible)
+				line += " " + std::to_string(read.notConvertible) + " that the ANSI code page (" + std::to_string(read.codePage) +
+					") cannot hold - the game asks with paths in that code page";
+			if (read.notConvertible && read.tooLong)
+				line += ";";
+			if (read.tooLong)
+				line += " " + std::to_string(read.tooLong) + " whose path is longer than " + std::to_string(kMaxModsPath) + " bytes";
+			return line + ".";
 		}
 
 		// The path to hand the game's function for a file or folder the mods folder has: "mods/" and the
@@ -283,7 +360,7 @@ namespace TweaksV
 		{
 			char spelling[kMaxModsPath + 1];
 			size_t length = 0;
-			if (!path || !ListSpelling(path, spelling, length) || !g_modsList.contains(std::string_view(spelling, length)))
+			if (!path || !g_modsList || !ListSpelling(path, spelling, length) || !g_modsList->contains(std::string_view(spelling, length)))
 				return false;
 			const size_t original = strnlen(path, kMaxModsPath + 1);
 			if (original > kMaxModsPath)
@@ -305,8 +382,25 @@ namespace TweaksV
 		OpenBulkFunction g_originalOpenBulk[kDevices] = {};
 		PathFunction g_originalPath[kDevices][kFunctionsPerDevice - 1] = {};	// GetFileTime, GetFileSize, GetAttributes
 
+		// The mods file could not be opened, so OpenBulk opens the game's own: a line with DIAGNOSTIC_MODE
+		// (capped), and the first fall-back of a session is reported - the player's file is not used.
+		void FellBack(const char* function, const char* path, const char* modsPath)
+		{
+			try
+			{
+				if (g_diagnostic && Counted(g_fallBacks))
+					WriteLog(kTag, std::string("DIAGNOSTIC: ") + function + " fell back to " + PathText(path));
+				if (!g_fallBackReported.load(std::memory_order_relaxed) && !g_fallBackReported.exchange(true))
+					ReportFailure(kTag, "A file in the mods folder could not be opened - the game's own file was used instead: " +
+						PathText(modsPath) + ".");
+			}
+			catch (...)
+			{
+			}
+		}
+
 		// One hook per device for OpenBulk: a file the mods folder has is opened from there, and the
-		// game's own if that fails.
+		// game's own if that fails. A file served is logged once it is open, the game's last error kept.
 		template <size_t Device> HANDLE OpenBulkHook(void* device, const char* path, int64_t* offset)
 		{
 			if (g_diagnostic)
@@ -314,11 +408,18 @@ namespace TweaksV
 			char modsPath[kMaxModsPath + kModsPrefixSize + 1];
 			if (ModsPath(path, modsPath))
 			{
-				if (g_diagnostic)
-					LogServed(kFunctionNames[Device][0], modsPath);
 				const HANDLE result = g_originalOpenBulk[Device](device, modsPath, offset);
 				if (result && result != INVALID_HANDLE_VALUE)
+				{
+					if (g_diagnostic)
+					{
+						const DWORD lastError = GetLastError();
+						LogServed(kFunctionNames[Device][0], modsPath);
+						SetLastError(lastError);
+					}
 					return result;
+				}
+				FellBack(kFunctionNames[Device][0], path, modsPath);
 			}
 			return g_originalOpenBulk[Device](device, path, offset);
 		}
@@ -419,18 +520,27 @@ namespace TweaksV
 
 			// 2. the folder, read once before the hooks go on
 			const ModsFolderRead read = ReadModsFolder();
+			if (read.rootUnreadable)
+			{
+				fail("the mods folder could not be read (" + DescribeError(read.firstError) + ").");
+				return;
+			}
 			WriteLog(kTag, "The mods folder has " + std::to_string(read.entries) + " files and folders.");
-			if (read.leftOut)
-				WriteLog(kTag, "Names in the mods folder left out of the list: " + std::to_string(read.leftOut) + " - the game asks with paths in the "
-					"ANSI code page (" + std::to_string(read.codePage) + "), which cannot hold them, or they are longer than " +
-					std::to_string(kMaxModsPath) + " characters.");
-			if (!read.complete)
-				ReportFailure(kTag, "Only part of the mods folder is used this session: it has more than " + std::to_string(kMaxModsEntries) +
-					" files and folders, or folders more than " + std::to_string(kMaxModsDepth) + " levels deep.");
+			const size_t leftOut = read.notConvertible + read.tooLong;
+			if (leftOut)
+				WriteLog(kTag, LeftOutLine(read));
+			const auto partly = [](const std::string& why) { ReportFailure(kTag, "Only part of the mods folder is used this session: " + why); };
+			if (read.full)
+				partly("the list stopped at " + std::to_string(kMaxModsEntries) + " files and folders.");
+			if (read.tooDeep)
+				partly(Folders(read.tooDeep) + " deeper than " + std::to_string(kMaxModsDepth) + " levels " + (read.tooDeep == 1 ? "was" : "were") +
+					" skipped.");
+			if (read.unreadable)
+				partly(Folders(read.unreadable) + " could not be read (" + DescribeError(read.firstError) + ").");
 			if (read.entries == 0)	// nothing to serve: the hooks would only cost
 			{
-				if (read.leftOut)
-					fail("none of the " + std::to_string(read.leftOut) + " names in the mods folder can be used (see the line above).");
+				if (leftOut)
+					fail("none of the " + std::to_string(leftOut) + " names in the mods folder can be used (see the line above).");
 				else
 					WriteLog(kTag, "The mods folder is empty - the file functions are not hooked.");
 				return;
@@ -471,7 +581,8 @@ namespace TweaksV
 		constexpr size_t kSecondDecryptHeader2 = 3;			// ...share one original, so they must lead to the same function
 		constexpr size_t kCallSize = 5;						// "call rel32"
 
-		thread_local uint32_t t_encryption = 0;				// what FindEncryption saw last on this thread, for the hooks that follow
+		thread_local uint32_t t_encryption = 0;				// what FindEncryption saw last on this thread, for the hooks that follow;
+															// ParseHeader uses it up
 		void (*g_originalDecryptHeader)(uint32_t salt, char* table, int size) = nullptr;
 		void (*g_originalDecryptHeader2)(uint32_t encryption, uint32_t salt, char* header, int size) = nullptr;
 		bool (*g_originalParseHeader)(void* packfile, const char* name, bool readHeader, void* customHeader) = nullptr;
@@ -509,44 +620,61 @@ namespace TweaksV
 				g_originalDecryptHeader2(encryption, salt, header, size);
 		}
 
-		// After the game has read an OPEN archive's header, its named binary entries and its current
-		// offset are marked as the game expects them; any other archive is left as it is.
+		// Once the game has read an archive's header: an OPEN archive's named binary entries and its
+		// current offset are marked as the game expects them; any other archive is left as it is, and so
+		// is an OPEN one whose entry table is implausible - logged (capped) and, the first time in a
+		// session, reported. Can throw (a log line).
+		void PrepareArchive(void* packfile, const char* name, bool open)
+		{
+			uint8_t* const fields = static_cast<uint8_t*>(packfile) + kPackfileShift;
+			char* const table = Field<char*>(fields, kEntryTableField);
+			const int32_t count = Field<int32_t>(fields, kFileCountField);
+			if (g_diagnostic)
+				LogArchive(name, count, open);
+			if (!open)
+				return;
+			g_openArchives.fetch_add(1, std::memory_order_relaxed);
+			if (!table || count < 0 || count > kMaxArchiveEntries)
+			{
+				if (Counted(g_unprepared))
+					WriteLog(kTag, "The OPEN archive " + PathText(name) + " has an implausible entry table (" + std::to_string(count) +
+						" entries) - left as it is.");
+				if (!g_unpreparedReported.load(std::memory_order_relaxed) && !g_unpreparedReported.exchange(true))
+					ReportFailure(kTag, "Unencrypted (OPEN) RPF archive " + PathText(name) + " could not be prepared: its entry table is "
+						"implausible (" + std::to_string(count) + " entries) - its files may not load.");
+				return;
+			}
+			for (int32_t i = 0; i < count; i++)
+			{
+				uint8_t* const entry = reinterpret_cast<uint8_t*>(table) + static_cast<size_t>(i) * kEntrySize;
+				const uint32_t type = Field<uint32_t>(entry, kEntryTypeField);
+				if (type == kFolderType || (type & kResourceBit) != 0)
+					continue;
+				if (Field<uint16_t>(entry, kEntryNameField) > 0 && Field<uint32_t>(entry, kEntryEncryptedField) != 0)
+					SetField<uint32_t>(entry, kEntryEncryptedField, kEntryMark);
+			}
+			SetField<int32_t>(fields, kCurrentOffsetField, static_cast<int32_t>(kEntryMark));
+		}
+
+		// The game's parser, then the archive prepared. The tag is used up here, on every exit, so that only
+		// a FindEncryption made for this archive counts (the game's ParseHeader makes that call before it
+		// can succeed); the game's last error stands, whatever a log line does.
 		bool ParseHeaderHook(void* packfile, const char* name, bool readHeader, void* customHeader)
 		{
 			const bool parsed = g_originalParseHeader(packfile, name, readHeader, customHeader);
+			const uint32_t encryption = t_encryption;
+			t_encryption = 0;
 			if (!parsed || !packfile)
 				return parsed;
+			const DWORD lastError = GetLastError();
 			try
 			{
-				const bool open = t_encryption == kOpenTag;
-				uint8_t* const fields = static_cast<uint8_t*>(packfile) + kPackfileShift;
-				char* const table = Field<char*>(fields, kEntryTableField);
-				const int32_t count = Field<int32_t>(fields, kFileCountField);
-				if (g_diagnostic)
-					LogArchive(name, count, open);
-				if (!open)
-					return parsed;
-				g_openArchives.fetch_add(1, std::memory_order_relaxed);
-				if (!table || count < 0 || count > kMaxArchiveEntries)
-				{
-					WriteLog(kTag, "The OPEN archive " + PathText(name) + " has an implausible entry table (" + std::to_string(count) +
-						" entries) - left as it is.");
-					return parsed;
-				}
-				for (int32_t i = 0; i < count; i++)
-				{
-					uint8_t* const entry = reinterpret_cast<uint8_t*>(table) + static_cast<size_t>(i) * kEntrySize;
-					const uint32_t type = Field<uint32_t>(entry, kEntryTypeField);
-					if (type == kFolderType || (type & kResourceBit) != 0)
-						continue;
-					if (Field<uint16_t>(entry, kEntryNameField) > 0 && Field<uint32_t>(entry, kEntryEncryptedField) != 0)
-						SetField<uint32_t>(entry, kEntryEncryptedField, kEntryMark);
-				}
-				SetField<int32_t>(fields, kCurrentOffsetField, static_cast<int32_t>(kEntryMark));
+				PrepareArchive(packfile, name, encryption == kOpenTag);
 			}
 			catch (...)
 			{
 			}
+			SetLastError(lastError);
 			return parsed;
 		}
 
@@ -636,9 +764,20 @@ namespace TweaksV
 				fail("the call at " + DescribeAddress(call) + " is not a call into the game (another mod may have hooked it already).");
 				return;
 			}
+			std::string detail;
+			if (!IsFunctionStart(function, detail))
+			{
+				fail("its function at " + DescribeAddress(function) + " is not a function start (" + detail + ").");
+				return;
+			}
 			if (function[0] == 0xC3)
 			{
 				WriteLog(kTag, "The RPF cache check is already skipped (another mod did it) - left as it is.");
+				return;
+			}
+			if (StartsWithJump(function))
+			{
+				WriteLog(kTag, "The RPF cache check's function is already hooked by another mod - left as it is.");
 				return;
 			}
 			if (g_diagnostic)
@@ -668,13 +807,20 @@ namespace TweaksV
 				return;
 			}
 			uint8_t* const call = match + kCallOffset;
-			if (!IsReadable(call, kCallSizeIndirect) || call[0] != 0xFF || call[1] != 0x15)
+			const std::vector<uint8_t> nops(kCallSizeIndirect, 0x90);
+			const bool readable = IsReadable(call, kCallSizeIndirect);
+			if (readable && memcmp(call, nops.data(), kCallSizeIndirect) == 0)
+			{
+				WriteLog(kTag, "Console hide call already patched (another mod did it) - left as it is.");
+				return;
+			}
+			if (!readable || call[0] != 0xFF || call[1] != 0x15)
 			{
 				WriteLog(kTag, "Console: unexpected bytes at " + DescribeAddress(call) + " - left as they are, so the game may hide the console.");
 				return;
 			}
 			const std::string before = HexBytes(call, kCallSizeIndirect);
-			if (!WriteCode({ { call, std::vector<uint8_t>(kCallSizeIndirect, 0x90), "console hide call" } }, kTag))
+			if (!WriteCode({ { call, nops, "console hide call" } }, kTag))
 				WriteLog(kTag, "Console: the game code could not be changed - the game may hide the console.");
 			else if (!IsDryRun())
 				WriteLog(kTag, "Console hide call patched: " + before + " -> 90 90 90 90 90 90.");
@@ -686,30 +832,49 @@ namespace TweaksV
 		void (WINAPI* g_originalGetSystemTimeAsFileTime)(LPFILETIME time) = nullptr;
 		void* g_timeFunction = nullptr;		// GetSystemTimeAsFileTime itself, to switch the hook off again
 
-		// The mods folder is looked for in the current directory, where the game's own file functions
-		// resolve "mods/..." too; the log says so when that is not the game folder.
-		void LogCurrentDirectory()
+		// Whether two folders are the same one: by their final paths, every link followed, so that two
+		// spellings of a folder (a short name, a junction) are one - or by their text, without a separator
+		// at the end, when a final path cannot be read.
+		bool SameFolder(const std::wstring& a, const std::wstring& b)
 		{
-			wchar_t current[MAX_PATH] = {};
-			const DWORD length = GetCurrentDirectoryW(MAX_PATH, current);
-			if (length == 0 || length >= MAX_PATH)
-				return;
-			std::wstring game = GetGameFolder();
-			std::wstring here = current;
-			const auto trim = [](std::wstring& folder)
+			const std::wstring finalA = FinalPathOf(a), finalB = FinalPathOf(b);
+			if (!finalA.empty() && !finalB.empty())
+				return _wcsicmp(finalA.c_str(), finalB.c_str()) == 0;
+			const auto trimmed = [](std::wstring folder)
 			{
 				while (!folder.empty() && (folder.back() == L'\\' || folder.back() == L'/'))
 					folder.pop_back();
+				return folder;
 			};
-			trim(game);
-			trim(here);
-			if (_wcsicmp(game.c_str(), here.c_str()) != 0)
-				WriteLog(kTag, "The current directory is " + ToUtf8(here) + ", not the game folder - the mods folder is looked for there.");
+			return _wcsicmp(trimmed(a).c_str(), trimmed(b).c_str()) == 0;
+		}
+
+		// The mods folder is looked for in the current directory, where the game's own file functions
+		// resolve "mods/..." too. When that is not the game folder the log says so, and with MODS_FOLDER=1 a
+		// mods folder in the game folder, which the game then does not use, is a problem.
+		void CheckCurrentDirectory()
+		{
+			const DWORD size = GetCurrentDirectoryW(0, nullptr);	// the size Windows needs: a long directory too
+			if (size == 0)
+				return;
+			std::wstring here(size, L'\0');
+			const DWORD length = GetCurrentDirectoryW(size, here.data());
+			if (length == 0 || length >= size)
+				return;
+			here.resize(length);
+			const std::wstring& game = GetGameFolder();
+			if (SameFolder(here, game))
+				return;
+			WriteLog(kTag, "The current directory is " + ToUtf8(here) + ", not the game folder - the mods folder is looked for there.");
+			const DWORD attributes = GetFileAttributesW((game + L"\\mods").c_str());
+			if (IsOn(kModsFolder) && attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+				ReportFailure(kTag, "Files in the mods folder are not used this session: the game runs in " + ToUtf8(here) +
+					", not in the game folder.");
 		}
 
 		void StartUp()
 		{
-			LogCurrentDirectory();
+			CheckCurrentDirectory();
 			KeepConsole();
 			SkipCacheCheck();
 			HookModsFolder();
@@ -725,6 +890,30 @@ namespace TweaksV
 			else
 				ReportFailure(kTag, "DIAGNOSTIC: the summary thread could not be started (" + DescribeError(GetLastError()) +
 					") - the requests are counted but never summed up.");
+		}
+
+		// If the game never asks for the time through the hooked function, the start-up never runs, and with
+		// it the start-up summary of every part: 30 seconds in, this thread - which holds a reference to
+		// TweaksV.asi - claims the start-up, says so, shows the summary and switches the hook off.
+		constexpr DWORD kStartUpWaitMs = 30000;
+
+		DWORD WINAPI StartUpCheckThread(LPVOID module)
+		{
+			Sleep(kStartUpWaitMs);
+			if (!g_started.load(std::memory_order_relaxed) && !g_started.exchange(true))
+			{
+				try	// nothing may leave a thread of this module
+				{
+					ReportFailure(kTag, "RageOpenV's start-up never ran: the game did not ask for the time through GetSystemTimeAsFileTime - the "
+						"mods folder, OPEN archives and the cache check skip are off this session.");
+					ShowStartupSummaryLater();
+					DisableHook(g_timeFunction, kTag);
+				}
+				catch (...)
+				{
+				}
+			}
+			FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
 		}
 
 		// Runs the start-up once, on whichever thread first asks for the time; the claim is made before
@@ -768,6 +957,7 @@ namespace TweaksV
 				"OPEN archives and the cache check skip are off this session.");
 			return false;
 		}
+		StartModuleThread(StartUpCheckThread, "RageOpenV start-up check");	// one that cannot start is logged
 		return true;
 	}
 }

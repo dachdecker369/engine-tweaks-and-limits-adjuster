@@ -87,10 +87,14 @@ count() { grep -c -- "$1" TweaksV.log; }
 
 # deny_writes DIR: DIR becomes read-only for this user, as a folder under C:\Program Files is - a deny entry
 # on the folder alone (not on the files in it) lets nothing be added to it, which also stops a rename inside
-# it. allow_writes DIR takes this user's deny entries off DIR again. sid: this user's SID.
+# it. deny_listing DIR: what is in DIR cannot be listed by this user, as in a folder copied from another
+# user's account. allow_writes DIR takes this user's deny entries off DIR again, of either kind. sid: this
+# user's SID.
 sid=""
-deny_writes() {
+deny() {	# deny DIR RIGHTS
 	[ -n "$sid" ] || sid=$(MSYS_NO_PATHCONV=1 "$(cygpath -S)/whoami.exe" /user /fo csv /nh | tr -d '\r' | sed -n 's/.*,"\(S-[0-9-]*\)"$/\1/p')
-	MSYS_NO_PATHCONV=1 icacls "$(cygpath -w "$1")" /deny "*$sid:(WD,AD)" > /dev/null
+	MSYS_NO_PATHCONV=1 icacls "$(cygpath -w "$1")" /deny "*$sid:($2)" > /dev/null
 }
+deny_writes() { deny "$1" WD,AD; }
+deny_listing() { deny "$1" RD; }
 allow_writes() { MSYS_NO_PATHCONV=1 icacls "$(cygpath -w "$1")" /remove:d "*$sid" > /dev/null; }

@@ -34,7 +34,7 @@ With `DIAGNOSTIC_MODE=1` the part logs how many decal definitions are registered
 
 ### RageOpenV
 
-Three switches under `[RAGEOPENV]`. With `MODS_FOLDER=1`, a file that exists under the `mods` folder in the game folder is served instead of the game's own, by the same path (`mods\update\update.rpf` for `update\update.rpf`); the folder is read once at start-up, so a file added while the game runs is seen at the next start. With `OPEN_RPF=1`, RPF archives that are not encrypted - the kind OpenIV writes, marked OPEN - load. With `SKIP_RPF_CACHE_CHECK=1`, the game's check of its RPF cache is skipped, which modified archives need. Replaces RageOpenV; OpenIV's `OpenIV.asi` and `OpenRPF.asi` do the same job and must not be installed next to TweaksV. The experimental newmods folder of the original is not carried over.
+Three switches under `[RAGEOPENV]`. With `MODS_FOLDER=1`, a file that exists under the `mods` folder in the game's current directory, normally the game folder, is served instead of the game's own, by the same path (`mods\update\update.rpf` for `update\update.rpf`); the folder is read once at start-up, so a file added while the game runs is seen at the next start. With `OPEN_RPF=1`, RPF archives that are not encrypted - the kind OpenIV writes, marked OPEN - load. With `SKIP_RPF_CACHE_CHECK=1`, the game's check of its RPF cache is skipped, which modified archives need. Replaces RageOpenV; OpenIV's `OpenIV.asi` and `OpenRPF.asi` do the same job and must not be installed next to TweaksV. The experimental newmods folder of the original is not carried over.
 
 With `DIAGNOSTIC_MODE=1` the part logs every file the game asks for, every file served from the mods folder and every archive header read, 20,000 lines of each kind at most, with a summary 10 seconds in and then every minute.
 
@@ -72,7 +72,7 @@ TweaksV writes `TweaksV.ini` next to `TweaksV.asi` on the first start - or in `%
 | `[PACKFILE_LIMIT]` | `PACKFILEARRAY_SIZE` | 13000 | the number of RPF archives, up to 65535 (the game's own: 7260); it also replaces the archive count of `gameconfig.xml` |
 | `[BOXSTREAMER]` | `TRAVERSAL_LIST_SIZE` | 10000 | map boxes one search of the box streamer can return, 1000 to 100000 (the game's own: 1000) |
 | `[DECALS]` | `DECALDEFS_SIZE` | 2048 | decal definitions the game can hold, 260 to 16384 (the game's own: 260) |
-| `[RAGEOPENV]` | `MODS_FOLDER` | 1 | replacement files from the `mods` folder in the game folder |
+| `[RAGEOPENV]` | `MODS_FOLDER` | 1 | replacement files from the `mods` folder in the game's current directory, normally the game folder |
 | | `OPEN_RPF` | 1 | unencrypted ("OPEN") RPF archives can be loaded |
 | | `SKIP_RPF_CACHE_CHECK` | 1 | skips the game's RPF cache check (needed for modified archives; 0 only for testing) |
 | `[STRAIGHTTOSTORYMODE]` | `SKIP_SPLASH_SCREEN` | 1 | skips the splash screen |
@@ -137,6 +137,7 @@ Add these switches to the `msbuild` line above:
 - **gameconfig.xml:** a gameconfig that raises the archive count has no effect while the Packfile part is on - TweaksV replaces that count with `PACKFILEARRAY_SIZE` when the game reads its configuration. Everything else in a gameconfig works as usual.
 - **Zolika Patch:** the ModkitLimit Extender's author warned that its modkit patch may not be compatible with Zolika Patch's; the same goes for TweaksV's Modkit part.
 - **DecalPatch.asi**, a closed-source plugin that raises the box streamer list and the decal definitions limit for GTA V Enhanced, is detected as an old plugin: TweaksV switches its decal definitions part and its box streamer part off while it is installed, so nothing is patched twice. Delete it - TweaksV replaces both halves.
+- **Mods that hook the game's file functions:** TweaksV's RageOpenV part hooks on top of another mod's hook on GetFileTime or GetFileSize and chains through it. A hook on OpenBulk or GetAttributes changes the bytes TweaksV finds those two functions by: the mods folder is then not used, and the start-up message names the pattern that was not found.
 - **Script Hook V, ScriptHookVDotNet, OpenIV:** neither needed nor touched. Only the ASI loader file from the Script Hook V download is used, and OpenIV's `OpenIV.asi` must not be installed next to TweaksV (its job is TweaksV's RageOpenV part).
 
 ## Reporting a problem

@@ -74,9 +74,18 @@ This file back to its heading, its first paragraph and "Next steps" with what wa
 
 ## Next steps
 
-- Phases 0, 1 and 2 are committed (450 checks); next is phase 3, RageOpenV.
-- Skipped so far: nothing.
+- Phases 0 to 3 are committed (463 checks); next is phase 4, DirectStorage.
+- Skipped so far: the double-byte ANSI code pages (phase 3, finding 22). On a Japanese, Chinese or Korean Windows the mods list and the game's paths are folded byte by byte, so a name whose second byte is 0x5C (a backslash) or a capital letter never matches; the suites cannot set the ANSI code page, so no fix could be tested here.
+- A decision for me: OpenBulk falls back to the game's own file when a mods file cannot be opened, and the first fall-back of a session is reported (phase 3, finding 4), while GetFileTime, GetFileSize and GetAttributes still answer for the mods file and never fall back. One rule for all four is open: no fall-back at all, or a fall-back in all four - which needs the three functions' failure values from my dump.
 - Done differently from the plan, decided and kept:
   - Phase 1: the fakes' `TEMP` and `TMP` are `object\TestTemp`, next to `object\TestRun` and not inside it, because `object\TestRun` is the fake game's folder and the temp files must lie outside the game folder, as the real `%TEMP%` does (the DirectStorage scenarios open them as files outside it); `run_all.sh` deletes it with `object\TestRun` and `object\Test`. `/WX` on the fakes showed a warning they always had (an ignored `write` attribute of `.fakefn`), now gone.
   - Phase 2: past the expected number the reference count's refusal says `N or more` (the scan stops one past it), as the core's line for the scanned loads does; a scan that finds the right number but a site no anchor names gets a refusal of its own, `the reference to the <array> at RVA ... is not one its patterns name (...)`; the scan's `DIAGNOSTIC: reference at RVA ... (scan)` lines give the RVA of the rel32, as the anchors' lines do, so that the two lists pair up.
-- Waiting on me: nothing until the last phase is committed.
+- Done beyond the plan in phase 3, mine to keep or undo (each recommended to keep):
+  - The new problem lines agree in number: `1 folder deeper than 32 levels was skipped.`, `1 folder could not be read (...)`.
+  - A folder that Windows says holds nothing, not even `.` (a drive's root behind a junction), counts as empty, not as unreadable.
+  - The current directory is read at any length, and the problem that the game runs in another folder comes only with `MODS_FOLDER=1`.
+  - The diagnostic summary adds the fall-backs and the OPEN archives left as they are, when there are any, because the cap line of those two kinds points to it; the OPEN archives' cap line, which comes without `DIAGNOSTIC_MODE` too, has no `DIAGNOSTIC: ` and names the summary only when there is one.
+  - The cache check refuses a target that is not a function start with `its function at RVA ... is not a function start (...)`.
+  - `StartModuleThread` is public (`TweaksVSummary.h`) for the start-up check, and its line for a module reference it cannot take reads `The <what> thread could not be started (...)`, like its other failure; `FinalPathOf` is new in `TweaksVFiles`; ParseHeader's work moved into `PrepareArchive`, so that one exit restores the game's last error.
+  - Tests: the fake changes its own current directory (`rovcwd DIR`), because Git Bash resolves a junction when it changes into one; scenarios for a game path under the profile folder (R21), the console call NOPed already (R2b) and the fall-back with `DIAGNOSTIC_MODE` (R17); `common.sh` has one `deny` behind `deny_writes` and the new `deny_listing`.
+- Waiting on me: the decision above and the phase 3 list; nothing else until the last phase is committed.

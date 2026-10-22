@@ -44,4 +44,9 @@ namespace TweaksV
 	// otherwise nothing is renamed and unsafe says why. Comes back without a handle: error is
 	// ERROR_SUCCESS once the file has its new name.
 	OwnFile RenameOwnFile(const std::wstring& folder, const wchar_t* name, const wchar_t* newName, FileFolder where);
+
+	// The path of an existing file or folder as Windows resolves it - every link on the way followed,
+	// without the "\\?\" in front - so that two spellings of one folder (a short name, a junction) can be
+	// told to be the same. Empty if it cannot be opened or its path not read.
+	std::wstring FinalPathOf(const std::wstring& path);
 }

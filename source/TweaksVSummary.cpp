@@ -29,31 +29,6 @@ namespace TweaksV
 		bool g_lateThread = false;			// under g_lock: that thread runs
 		int g_lateBoxes = 0;				// only that thread uses it
 
-		// Starts thread with an extra reference to this module, which the thread drops when it ends, so
-		// TweaksV.asi cannot be unloaded while the thread still runs its code. False if it cannot start.
-		bool StartModuleThread(LPTHREAD_START_ROUTINE thread, const char* what)
-		{
-			HMODULE module = nullptr;
-			if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(thread), &module))
-			{
-				const DWORD error = GetLastError();
-				WriteLog("TweaksV", std::string("The ") + what + " cannot be shown (" + DescribeError(error) + ").");
-				return false;
-			}
-			// Allowed inside DllMain as long as DllMain does not wait for the thread: it starts
-			// running once the loader lock is released.
-			const HANDLE handle = CreateThread(nullptr, 0, thread, module, 0, nullptr);
-			if (!handle)
-			{
-				const DWORD error = GetLastError();
-				FreeLibrary(module);
-				WriteLog("TweaksV", std::string("The ") + what + " thread could not be started (" + DescribeError(error) + ").");
-				return false;
-			}
-			CloseHandle(handle);
-			return true;
-		}
-
 		void ShowBox(const std::wstring& heading, const std::vector<std::string>& items, size_t dropped)
 		{
 #ifdef TWEAKSV_TEST_BUILD
@@ -150,6 +125,29 @@ namespace TweaksV
 			}
 			FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
 		}
+	}
+
+	bool StartModuleThread(LPTHREAD_START_ROUTINE thread, const char* what)
+	{
+		HMODULE module = nullptr;
+		if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(thread), &module))
+		{
+			const DWORD error = GetLastError();
+			WriteLog("TweaksV", std::string("The ") + what + " thread could not be started (" + DescribeError(error) + ").");
+			return false;
+		}
+		// Allowed inside DllMain as long as DllMain does not wait for the thread: it starts
+		// running once the loader lock is released.
+		const HANDLE handle = CreateThread(nullptr, 0, thread, module, 0, nullptr);
+		if (!handle)
+		{
+			const DWORD error = GetLastError();
+			FreeLibrary(module);
+			WriteLog("TweaksV", std::string("The ") + what + " thread could not be started (" + DescribeError(error) + ").");
+			return false;
+		}
+		CloseHandle(handle);
+		return true;
 	}
 
 	void ReportFailure(const char* plugin, const std::string& what)

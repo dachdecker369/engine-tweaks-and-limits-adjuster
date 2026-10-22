@@ -201,4 +201,15 @@ namespace TweaksV
 		result.handle = INVALID_HANDLE_VALUE;
 		return result;
 	}
+
+	std::wstring FinalPathOf(const std::wstring& path)
+	{
+		const HANDLE handle = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+			nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);	// FILE_FLAG_BACKUP_SEMANTICS: a folder too
+		if (handle == INVALID_HANDLE_VALUE)
+			return {};
+		const std::wstring finalPath = FinalPath(handle);
+		CloseHandle(handle);
+		return finalPath;
+	}
 }
