@@ -39,7 +39,13 @@
 //   decalfull      260 decal definitions are registered (the game's own array is full)
 //   decalmany      300 decal definitions are registered
 //   dstorage       loads the stand-in dstorage.dll (fake_dstorage.cpp) before TweaksV, calls it after
-//   dsotherinterface  with dstorage: first asks for a DirectStorage interface TweaksV does not know
+//   dsotherinterface  with dstorage: first asks for a DirectStorage interface TweaksV does not know, then for the known one
+//   dsotherlater   with dstorage: asks for an interface TweaksV does not know after the known one and its files
+//   dsotheronly    with dstorage: asks only for an interface TweaksV does not know - no factory TweaksV knows, no file;
+//                  stays 1.5 s longer after "wait", for the problem TweaksV reports 10 s after that request
+//   dsnofactory    with dstorage: never asks for a factory
+//   dsflood        with dstorage: 20,001 more OpenFile calls of a file TweaksV refuses, after "wait" or "waitlong"
+//   dsopenflood    opens 100,001 files in its folder that are not there, each by another name, after TweaksV has started
 //   fileopens      opens files in its folder (and one outside, in %TEMP%) after TweaksV has started
 //   nodyncode      no code may be changed or made once TweaksV loads (Windows' dynamic code policy)
 //   lockedlog      while TweaksV starts, holds the TweaksV.log in its folder open as another program
@@ -47,6 +53,7 @@
 //   unload         frees TweaksV.asi once it has started (an ASI loader that unloads it), says whether it
 //                  is still loaded, and reports as usual - which calls the hooked functions
 //   wait           stays 11 seconds longer before it reports
+//   waitlong       stays 31 seconds longer before it reports (TweaksV's DirectStorage factory check comes 30 s in)
 #include <windows.h>
 #include <cstdint>
 #include <cstdio>
@@ -762,10 +769,20 @@ static void CheckStub(const unsigned char* callTarget)
 }
 
 // DirectStorage (TweaksV's UNLOCK_FILES and DIAGNOSTIC_MODE): the calls the game makes into dstorage.dll,
-// and the factory's OpenFile for 3 archives (one with a full path), 3 other files in the game folder and
-// 3 paths outside it.
-static wchar_t g_dstorageResult[400];
-static void CallDStorage(HMODULE dstorage, bool otherInterfaceFirst)
+// and the factory's OpenFile for 19 paths: 4 archives in the game folder (one with a full path, one
+// .CACHE), 7 other files in it (one with '/', one with a \\?\ prefix, one named x.rpf.txt, one whose
+// extension is too long for TweaksV's table of types), 7 paths outside it (a save, temp files - one an
+// archive - a sibling folder whose name starts with the game folder's, a path that leaves the game folder
+// through "..", a network path in its \\?\UNC\ form, its prefix in upper and in lower case) and one too long
+// to check.
+enum class OtherInterface { None, First, Later, Only };
+static const GUID g_factoryId = { 0x6924EA0C, 0xC3CD, 0x4826, { 0xB1, 0x0A, 0xF6, 0x4F, 0x4E, 0xD9, 0x27, 0xC1 } };
+static const GUID g_otherId = { 0x12345678, 0x1234, 0x5678, { 0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78 } };
+using OpenFileFn = HRESULT(STDMETHODCALLTYPE*)(void*, const wchar_t*, REFIID, void**);
+static void* g_factory = nullptr;			// for dsflood
+static OpenFileFn g_openFile = nullptr;
+static wchar_t g_dstorageResult[1024];
+static void CallDStorage(HMODULE dstorage, OtherInterface other)
 {
 	using GetFactory = HRESULT(WINAPI*)(REFIID, void**);
 	using SetConfiguration = HRESULT(WINAPI*)(const void*);
@@ -774,52 +791,103 @@ static void CallDStorage(HMODULE dstorage, bool otherInterfaceFirst)
 	const auto getFactory = reinterpret_cast<GetFactory>(GetProcAddress(dstorage, "DStorageGetFactory"));
 	using FakeOpenFileCalls = long(WINAPI*)();
 	const auto openFileCalls = reinterpret_cast<FakeOpenFileCalls>(GetProcAddress(dstorage, "FakeOpenFileCalls"));
+	const size_t size = sizeof(g_dstorageResult) / sizeof(g_dstorageResult[0]);
 	if (!setConfiguration || !setConfiguration1 || !getFactory || !openFileCalls)
 	{
-		swprintf(g_dstorageResult, 400, L"dstorage: exports missing | ");
+		swprintf(g_dstorageResult, size, L"dstorage: exports missing | ");
 		return;
 	}
 	const uint32_t configuration[8] = { 4, 0xFFFFFFFF, 0, 1, 0, 0, 1, 1 };
-	static const GUID factoryId = { 0x6924EA0C, 0xC3CD, 0x4826, { 0xB1, 0x0A, 0xF6, 0x4F, 0x4E, 0xD9, 0x27, 0xC1 } };
-	void* factory = nullptr;
 	const HRESULT a = setConfiguration(configuration);
 	const HRESULT b = setConfiguration1(configuration);
-	if (otherInterfaceFirst)	// dsotherinterface: first an interface TweaksV does not know
+	void* otherFactory = nullptr;
+	if (other == OtherInterface::Only)	// dsotheronly: an interface TweaksV does not know, and nothing else
 	{
-		static const GUID otherId = { 0x12345678, 0x1234, 0x5678, { 0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78 } };
-		void* other = nullptr;
-		getFactory(otherId, &other);
+		const HRESULT c = getFactory(g_otherId, &otherFactory);
+		swprintf(g_dstorageResult, size, L"dstorage: configuration 0x%lX/0x%lX, other interface only 0x%lX | ", static_cast<unsigned long>(a),
+			static_cast<unsigned long>(b), static_cast<unsigned long>(c));
+		return;
 	}
-	const HRESULT c = getFactory(factoryId, &factory);
-	int length = swprintf(g_dstorageResult, 400, L"dstorage: configuration 0x%lX/0x%lX, factory 0x%lX %ls | ",
+	if (other == OtherInterface::First)	// dsotherinterface: first an interface TweaksV does not know
+		getFactory(g_otherId, &otherFactory);
+	void* factory = nullptr;
+	const HRESULT c = getFactory(g_factoryId, &factory);
+	int length = swprintf(g_dstorageResult, size, L"dstorage: configuration 0x%lX/0x%lX, factory 0x%lX %ls | ",
 		static_cast<unsigned long>(a), static_cast<unsigned long>(b), static_cast<unsigned long>(c), factory ? L"set" : L"null");
 	if (FAILED(c) || !factory || length < 0)
 		return;
 
-	using OpenFileFn = HRESULT(STDMETHODCALLTYPE*)(void*, const wchar_t*, REFIID, void**);
 	const auto openFile = reinterpret_cast<OpenFileFn>((*reinterpret_cast<void***>(factory))[4]);
-	wchar_t absolute[MAX_PATH + 32] = {};
-	GetCurrentDirectoryW(MAX_PATH, absolute);
-	wcscat_s(absolute, L"\\update\\update.RPF");
-	// outside the game folder, like the game's saves (Documents\...\Profiles\...\SGTA50000), its
-	// cloud files in %TEMP% and a network path in its \\?\UNC\ form: these must always reach DirectStorage
+	g_factory = factory;
+	g_openFile = openFile;
+	wchar_t folder[MAX_PATH + 1] = {};
+	GetCurrentDirectoryW(MAX_PATH, folder);
+	wchar_t absolute[MAX_PATH + 64] = {}, prefixed[MAX_PATH + 64] = {}, sibling[MAX_PATH + 64] = {}, dotdot[MAX_PATH + 64] = {};
+	swprintf(absolute, MAX_PATH + 64, L"%ls\\update\\update.RPF", folder);
+	swprintf(prefixed, MAX_PATH + 64, L"\\\\?\\%ls\\prefixed.txt", folder);		// in the game folder after all
+	swprintf(sibling, MAX_PATH + 64, L"%ls2\\sibling.txt", folder);			// "...\TestRun2": not in the game folder
+	swprintf(dotdot, MAX_PATH + 64, L"%ls\\..\\outside.txt", folder);		// out of it again
+	// outside the game folder, like the game's saves (Documents\...\Profiles\...\SGTA50000) - here in the
+	// folder above it, outside %TEMP% too - its cloud files in %TEMP% and a network path in its
+	// \\?\UNC\ form: these must always reach DirectStorage
 	wchar_t save[MAX_PATH + 64] = {};
-	wchar_t temp[MAX_PATH + 64] = {};
-	GetTempPathW(MAX_PATH, save);
-	wcscpy_s(temp, save);
-	wcscat_s(save, L"tweaksv_profile\\SGTA50000");
-	wcscat_s(temp, L"cloud_tweaksv.dat");
-	const wchar_t* paths[9] = { L"x64a.rpf", absolute, L"rpf.cache", L"locktest.txt", L"TweaksV.asi", L"noextension", save, temp,
-		L"\\\\?\\UNC\\localhost\\tweaksv_share\\cloud.dat" };
-	unsigned long results[9];
-	for (int i = 0; i < 9; i++)
+	wcscpy_s(save, folder);
+	if (wchar_t* const slash = wcsrchr(save, L'\\'))
+		*slash = L'\0';
+	wcscat_s(save, L"\\tweaksv_profile\\SGTA50000");
+	wchar_t tempFolder[MAX_PATH + 1] = {}, temp[MAX_PATH + 64] = {}, tempArchive[MAX_PATH + 64] = {};
+	GetTempPathW(MAX_PATH, tempFolder);
+	swprintf(temp, MAX_PATH + 64, L"%lscloud_tweaksv.dat", tempFolder);
+	swprintf(tempArchive, MAX_PATH + 64, L"%lsoutside.rpf", tempFolder);
+	static wchar_t tooLong[3001];	// more than the 2047 characters TweaksV checks: passed on unchecked
+	wmemset(tooLong, L'a', 3000);
+	tooLong[3000] = L'\0';
+	const struct { const wchar_t* name; const wchar_t* path; } files[] = { { L"rpf", L"x64a.rpf" }, { L"RPF", absolute },
+		{ L"cache", L"rpf.cache" }, { L"txt", L"locktest.txt" }, { L"asi", L"TweaksV.asi" }, { L"none", L"noextension" },
+		{ L"save", save }, { L"temp", temp }, { L"unc", L"\\\\?\\UNC\\localhost\\tweaksv_share\\cloud.dat" },
+		{ L"slash", L"ds_dir/slash.txt" }, { L"prefixed", prefixed }, { L"sibling", sibling }, { L"dotdot", dotdot },
+		{ L"rpftxt", L"x.rpf.txt" }, { L"CACHE", L"y.CACHE" }, { L"outrpf", tempArchive },
+		{ L"unc2", L"\\\\?\\unc\\localhost\\tweaksv_share\\cloud2.dat" }, { L"long", tooLong }, { L"manifest", L"other.manifest" } };
+	length += swprintf(g_dstorageResult + length, size - length, L"open:");
+	for (const auto& file : files)
+	{
+		void* opened = nullptr;
+		const HRESULT result = openFile(factory, file.path, g_factoryId, &opened);
+		length += swprintf(g_dstorageResult + length, size - length, L" %ls 0x%lX,", file.name, static_cast<unsigned long>(result));
+	}
+	swprintf(g_dstorageResult + length, size - length, L" reached %ld | ", openFileCalls());
+	if (other == OtherInterface::Later)	// dsotherlater: an interface TweaksV does not know, after the known one
+		getFactory(g_otherId, &otherFactory);
+}
+
+// dsflood: 20,001 more OpenFile calls of a file TweaksV refuses with UNLOCK_FILES.
+static wchar_t g_floodResult[64];
+static void FloodOpenFile()
+{
+	if (!g_openFile)
+		return;
+	int refused = 0;
+	for (int i = 0; i < 20001; i++)
 	{
 		void* file = nullptr;
-		results[i] = static_cast<unsigned long>(openFile(factory, paths[i], factoryId, &file));
+		if (g_openFile(g_factory, L"locktest.txt", g_factoryId, &file) == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
+			refused++;
 	}
-	swprintf(g_dstorageResult + length, 400 - length, L"open: rpf 0x%lX, RPF 0x%lX, cache 0x%lX, txt 0x%lX, asi 0x%lX, "
-		L"none 0x%lX, save 0x%lX, temp 0x%lX, unc 0x%lX, reached %ld | ", results[0], results[1], results[2], results[3], results[4],
-		results[5], results[6], results[7], results[8], openFileCalls());
+	swprintf(g_floodResult, sizeof(g_floodResult) / sizeof(g_floodResult[0]), L"flood: %d refused | ", refused);
+}
+
+// dsopenflood: 100,001 opens in the game folder of files that are not there, each by another name - more than
+// the tables of TweaksV's open summary take.
+static void FloodOpens()
+{
+	for (int i = 0; i < 100001; i++)
+	{
+		wchar_t name[32];
+		swprintf(name, sizeof(name) / sizeof(name[0]), L"dsflood_%06d.txt", i);
+		const HANDLE file = CreateFileW(name, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (file != INVALID_HANDLE_VALUE)
+			CloseHandle(file);
+	}
 }
 
 // File opens in the game folder (TweaksV's DIAGNOSTIC_MODE): one file 6 times with the same sharing,
@@ -1054,14 +1122,24 @@ int wmain(int argc, wchar_t** argv)
 		wprintf(L"unload: %ls | ", GetModuleHandleW(asi) ? L"still loaded" : L"unloaded");
 	}
 	CallBoxSearches();	// the box streamer searches, as the game would call them
-	if (dstorage)
-		CallDStorage(dstorage, HasOption(argc, argv, L"dsotherinterface"));
-	if (HasOption(argc, argv, L"dsotherinterface"))
-		Sleep(1500);	// the problem after the start-up summary is shown (or logged) a second after it is reported
+	if (dstorage && HasOption(argc, argv, L"dsnofactory"))
+		swprintf(g_dstorageResult, sizeof(g_dstorageResult) / sizeof(g_dstorageResult[0]), L"dstorage: not called | ");
+	else if (dstorage)
+		CallDStorage(dstorage, HasOption(argc, argv, L"dsotherinterface") ? OtherInterface::First
+			: HasOption(argc, argv, L"dsotherlater") ? OtherInterface::Later
+			: HasOption(argc, argv, L"dsotheronly") ? OtherInterface::Only : OtherInterface::None);
 	if (HasOption(argc, argv, L"fileopens"))
 		OpenFiles();
+	if (HasOption(argc, argv, L"dsopenflood"))
+		FloodOpens();
 	if (HasOption(argc, argv, L"wait"))
-		Sleep(11000);	// TweaksV's DirectStorage summary comes 10 s after the first OpenFile
+		Sleep(11000);	// TweaksV's DirectStorage summary comes 10 s after the first OpenFile, its interface check 10 s after the request
+	if (HasOption(argc, argv, L"waitlong"))
+		Sleep(31000);	// TweaksV's DirectStorage factory check comes 30 s after it started
+	if (HasOption(argc, argv, L"dsotheronly"))
+		Sleep(1500);	// the problem after the start-up summary is shown (or logged) a second after it is reported
+	if (HasOption(argc, argv, L"dsflood"))
+		FloodOpenFile();
 
 	unsigned int heap = 0;
 	for (int i = 0; i < 4; i++)
@@ -1079,7 +1157,7 @@ int wmain(int argc, wchar_t** argv)
 	PrintBoxStreamer();
 	PrintDecals();
 	RovReport();
-	wprintf(L"%ls%ls", g_dstorageResult, g_fileOpensResult);
+	wprintf(L"%ls%ls%ls", g_dstorageResult, g_floodResult, g_fileOpensResult);
 	CheckStub(Rel32Target(g_packCallSite));
 	for (const Site& site : g_boxCalls)
 		CheckStub(Rel32Target(site));
