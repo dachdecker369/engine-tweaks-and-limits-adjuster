@@ -61,7 +61,7 @@ TweaksV writes `TweaksV.ini` in the game folder, next to `GTA5_Enhanced.exe`, on
 | `[TWEAKSV]` | `ENABLED` | 1 | the master switch: 0 means TweaksV changes nothing |
 | | `LOG` | 1 | writes `TweaksV.log`, in the game folder or in `%LOCALAPPDATA%\TweaksV` when the game folder cannot take it |
 | | `DIAGNOSTIC_MODE` | 0 | testing: every part that is on logs every pattern, site and write, and runs its measurement - see "Diagnostics" below |
-| | `DRY_RUN` | 0 | testing: everything is looked for and checked; nothing in the game is written or hooked (only RageOpenV's one-shot hook on `GetSystemTimeAsFileTime`, which runs its checks and switches itself off) |
+| | `DRY_RUN` | 0 | testing: everything is looked for and checked; nothing in the game is written or hooked (only RageOpenV's one-shot hook on `GetSystemTimeAsFileTime`, which runs its checks and switches itself off); RageOpenV's hooks are off too, so the mods folder is not served - measuring with that part off alone means its own `ENABLED=0`, not `DRY_RUN` |
 | | `CONSOLE` | 0 | a console window that mirrors the log |
 | | `ERROR_POPUP` | 1 | a message box when something could not be applied, and one for a part that stops working later (at most three per session) |
 | | `CONFLICT_CHECK` | 1 | looks for the old plugins TweaksV replaces, in the game folder and its `scripts` and `plugins` subfolders, and switches the matching part off while they are there |

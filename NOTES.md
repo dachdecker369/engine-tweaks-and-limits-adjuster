@@ -11,7 +11,7 @@ What each part does and the checks it makes, the measurements, the open issues a
 - **`TweaksV.log`:** one log with a header (versions, paths, switches).
   - Paths in the Windows user's profile folder are written as `%USERPROFILE%\...`, also where the folder has its short form (`C:\Users\NAME~1`, as `%TEMP%` often has): logs get posted in public, and that folder is usually named after the user.
   - It grows to 64 MB at most, room for hours of the logs for testing; a last line says when it stops. Every kind of line that comes per event stops after 20,000 lines; the events are then only counted, with a summary every minute where the part has one.
-- **Read-only game folders:** both files go to `%LOCALAPPDATA%\TweaksV` when the game folder is read-only, for example an install under `C:\Program Files` whose folder the game cannot write to.
+- **Read-only game folders:** both files go to `%LOCALAPPDATA%\TweaksV` when the game folder cannot be written to.
   - A `TweaksV.ini` in the game folder always wins.
   - A read-only folder is normal, so it is only logged; it shows no message box. Any other reason, such as a `TweaksV.log` that another program holds open, is a problem in the start-up summary.
 - **Links:** TweaksV writes only to its own files, never through a link to another file - which matters when the game runs as administrator:
