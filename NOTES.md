@@ -174,6 +174,12 @@ Known bugs and open issues in TweaksV.
 - **Status:** accepted: no other thread runs that code at that point of the start-up.
 - **When it goes:** when `WriteCode` freezes the game's other threads around a write made after `DllMain`, as MinHook does - at the latest when a game build runs one of those sites on another thread that early.
 
+### T-UNLOCK: a factory request that never comes is only logged
+
+- **What:** with `UNLOCK_FILES=1` the DirectStorage part frees the files the game keeps locked when the game creates its DirectStorage factory. When the game has not asked for the factory within 30 seconds of TweaksV's start, the part logs that nothing is unlocked and TweaksV may have been loaded too late - a log line only: the files stay locked and nothing says so on screen.
+- **Status:** open, found by the documentation audit; a job not done is a problem by the specification's never-silent rule.
+- **When it goes:** 2.1.1, the next patch: the line becomes a `PROBLEM` line with a box of its own, 30 seconds in, as a part that stops working after the start-up gets.
+
 ## Bugs Found in the Originals
 
 What the merge found in the five original projects, with the file and line in the originals as they were when merged, and what TweaksV does instead - the list to work from if they are ever reported upstream. Since 2.0.0 TweaksV carries none of the originals' code but RageOpenV's console opener and the pattern parser their plugins carried, so this is history: what the rewrite had to do better. An open issue that carries one of these bugs uses its ID; B-ROV-18 did, until newmods went in 2.0.0. Severity: crash = could crash or close the game, corrupt = could silently corrupt memory or behaviour, robust = fragile or unsafe practice, hygiene = cleanliness; "latent" = only reached in some situations, such as a pattern miss after a game update. Two entries concerned the Legacy code, which TweaksV does not carry.

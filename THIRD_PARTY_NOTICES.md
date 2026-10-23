@@ -8,7 +8,7 @@ This file reproduces the copyright notices and license texts that this code requ
 
 | Component | Copyright | License | Where in TweaksV |
 |---|---|---|---|
-| [MinHook](https://github.com/TsudaKageyu/minhook) 1.3.4 | Tsuda Kageyu; the Hacker Disassembler Engine in it by Vyacheslav Patkov | BSD-2-Clause | `vendor\MinHook`, unchanged; `hook.c`, `buffer.c`, `trampoline.c` and `hde64.c` are compiled into `TweaksV.asi`. The search for free memory near the game in `TweaksVPatch.cpp` follows its `buffer.c` |
+| [MinHook](https://github.com/TsudaKageyu/minhook) 1.3.4 | Tsuda Kageyu; the Hacker Disassembler Engine in it by Vyacheslav Patkov | BSD-2-Clause | `vendor\MinHook`, unchanged; `hook.c`, `buffer.c`, `trampoline.c` and `hde64.c` are compiled into `TweaksV.asi`. The search for free memory near the game in `TweaksVPatch.cpp` is an adapted version of its `buffer.c` |
 | [ScriptHookVDotNet](https://github.com/scripthookvdotnet/scripthookvdotnet) memory scanner | crosire, kagikn; the C++ port by Chiheb-Bacha | zlib | the pattern parser in `TweaksVScanner.cpp`, an altered version (see the notes) |
 | [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV) | Chiheb-Bacha | GPL-3.0 | the console opener in `TweaksVLog.cpp`, carried over as it was |
 

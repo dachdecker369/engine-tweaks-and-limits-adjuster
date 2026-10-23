@@ -17,6 +17,6 @@ Security fixes go into the latest version only.
 
 ## Scope
 
-- **This repository:** TweaksV's own code and the two pieces of third-party code in its own files, the pattern parser and the console opener ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); MinHook, carried unchanged in `vendor\MinHook`, as far as the way TweaksV builds and uses it.
+- **This repository:** TweaksV's own code and the three pieces of third-party code in its own files - the pattern parser, the console opener and the free-memory search adapted from MinHook's buffer.c ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); MinHook, carried unchanged in `vendor\MinHook`, as far as the way TweaksV builds and uses it.
 - **Elsewhere:** a problem in MinHook itself goes to [its authors](https://github.com/TsudaKageyu/minhook); one in the game, the ASI loader or Script Hook V goes to theirs.
 - **Known:** MinHook keeps its trampolines in memory that is writable and executable. This is accepted; see T-HARDEN in [NOTES.md](NOTES.md).
