@@ -54,7 +54,7 @@ TweaksV's own part; the idea comes from alloc8or's [DirectStorageFix](https://gi
 
 ## TweaksV.ini
 
-TweaksV writes `TweaksV.ini` in the game folder, next to `GTA5_Enhanced.exe`, on the first start - or in `%LOCALAPPDATA%\TweaksV` if the game folder cannot be written to - with every setting at its default, and adds back any setting that goes missing. `1` is on, `0` is off (`true` and `false` work too). The file carries a short header and no comment per key; this is what each key does.
+TweaksV writes `TweaksV.ini` in the game folder, next to `GTA5_Enhanced.exe`, on the first start - or in `%LOCALAPPDATA%\TweaksV` if the game folder cannot be written to - with every setting at its default, and adds back any setting that goes missing. `1` is on, `0` is off (`true` and `false` work too). The file carries a short header and no comment per key; this is what each key does. The settings are read once, at start-up: TweaksV's parts patch the game before it runs, so a live panel would change nothing - there is none, by my choice; a changed file takes effect at the next start.
 
 | Section | Key | Default | What it does |
 |---|---|---|---|
