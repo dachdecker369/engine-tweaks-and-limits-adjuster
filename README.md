@@ -150,7 +150,7 @@ Please report a security problem privately, not in a public issue: [SECURITY.md]
 
 ## Credits
 
-TweaksV's parts are rewritten from the five plugins by Chiheb-Bacha and build on the research of everyone listed in [CREDITS.md](CREDITS.md), which also credits the ideas behind TweaksV's own parts. All credit for the original research and code goes to them.
+Five of TweaksV's parts are rewritten from the five plugins by Chiheb-Bacha and build on the research of everyone listed in [CREDITS.md](CREDITS.md), which also credits the ideas behind TweaksV's own three parts: BoxStreamer, Decals and DirectStorage. All credit for the original research and code goes to them.
 
 Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

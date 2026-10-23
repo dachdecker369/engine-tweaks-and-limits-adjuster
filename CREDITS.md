@@ -1,6 +1,6 @@
 # Credits
 
-TweaksV's parts are rewritten from the projects below; the research and the original code are theirs, and what little of their code TweaksV still carries is named in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). All credit for them goes to their authors.
+Five of TweaksV's parts are rewritten from Chiheb-Bacha's plugins below, and the other three - BoxStreamer, Decals and DirectStorage - are TweaksV's own, from the ideas credited below; the research and the original code are theirs, and what little of their code TweaksV still carries is named in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). All credit for them goes to their authors.
 
 ## Chiheb-Bacha - https://github.com/Chiheb-Bacha
 

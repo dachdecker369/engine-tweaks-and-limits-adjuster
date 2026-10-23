@@ -1,12 +1,12 @@
 # Patterns
 
-Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game build each one was last verified on. TweaksV searches only the game's code (its executable sections). Each pattern is defined once, in the table in `source\TweaksVPatterns.h`, under the label it has here (`H-E1`, `P-E-R31a`, ...), and is written here exactly as there; `?` matches any byte. The tests check that this file and the table list the same patterns, and `TweaksV.log` names each pattern by its label. RVA is where each pattern matched on 1.0.1158.16, counted from the start of `GTA5_Enhanced.exe` in memory. What each part does with a match - the reference, limit, call or function it holds - is in [SPECIFICATIONS.md](SPECIFICATIONS.md).
+Every byte pattern TweaksV searches for in `GTA5_Enhanced.exe`, and the game build each one was last verified on. TweaksV searches only the game's code (its executable sections). Each pattern is defined once, in the table in `source\TweaksVPatterns.h`, under the label it has here (`H-E1`, `P-E-R31a`, ...), and is written here exactly as there; `?` matches any byte. The tests check that this file and the table list the same patterns, and `TweaksV.log` names each pattern by its label. RVA is where each pattern matched on 1.0.1158.16, counted from the start of `GTA5_Enhanced.exe` in memory. What each match holds - the reference, limit, call or function - is here; what each part does with it is in [SPECIFICATIONS.md](SPECIFICATIONS.md).
 
 ## Status
 
 | | |
 |---|---|
-| **Game Build** | 1.0.1158.16 |
+| **Game Build** | 1.0.1158.16 (PE timestamp 0x6AA45F10) |
 | **Found** | 1.0.1158.16 uses 89 of the table's 92 patterns, and the check boot (`DIAGNOSTIC_MODE=1` and `CONSOLE=1`, every part on, with or without `DRY_RUN=1`) finds all 89; a normal boot looks for fewer (`R-E-C1` only with `CONSOLE=1`, `R-E-F1..F8` only with a mods folder in the game's current directory, normally the game folder, or with `DIAGNOSTIC_MODE=1`) |
 | **Untested** | None: the check boot looks for every pattern this build uses. A part with `ENABLED=0` looks for none of its patterns. |
 | **Matches** | All match exactly once, except `D-E-L12`, which matches exactly 7 times (the check seven decal-placing functions share). To check: boot once with `DIAGNOSTIC_MODE=1` and `CONSOLE=1`, every part on. Log lists each pattern address and number of matches, and the bytes around each match of a pattern that matches more than once. Every pattern must match exactly once (`D-E-L12`: exactly 7 times). |
@@ -15,7 +15,7 @@ The build uses 89 of the table's 92 patterns: Packfile picks one of three direct
 - `R-E-D3` belonged to code that was never used. Removed.
 - `R-E-M0`, `R-E-M1`, `R-E-M2`, `R-E-D1` and `R-E-D2` belonged to the newmods folder, which 2.0.0 drops. Removed.
 
-The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstorage.dll` and, on the factory the game gets for the interface `{6924EA0C-C3CD-4826-B10A-F64F4ED927C1}`, its function [4], `OpenFile` (`DStorageCore.dll+0x3F9D0` with DirectStorage 1.2.2311.1405 on 1.0.1158.16).
+The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstorage.dll` and, on the factory the game gets for the interface `{6924EA0C-C3CD-4826-B10A-F64F4ED927C1}`, its function [4], `OpenFile` (`DStorageCore.dll+0x3F9D0` with DirectStorage 1.2.2311.1405 on 1.0.1158.16). The game reads more than the game folder's files through that `OpenFile`: its saves and `pc_settings.bin` (in `Documents\Rockstar Games\GTAV Enhanced\Profiles`, the saves named `SGTA500xx`) and its cloud files in `%TEMP%` (`cloud_*.dat`) too.
 
 ### When Game Updates
 
@@ -29,11 +29,11 @@ The DirectStorage part uses no patterns. It hooks `DStorageGetFactory` in `dstor
 
 | Label | Pattern | Use | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
-| H-E1 | `BA ? ? ? ? 45 31 C0 41 B1 01 E8 ? ? ? ? 48 8D 0D` | +1: imm32 of `mov edx` - heap size in bytes | found | 0x13F7 |
+| H-E1 | `BA ? ? ? ? 45 31 C0 41 B1 01 E8 ? ? ? ? 48 8D 0D` | +1: imm32 of `mov edx` - heap size in bytes; 646 MB on current build | found | 0x13F7 |
 
 ## ModkitLimit
 
-References to modkit array (rel32 of a `lea` - moved to new array). The six are every reference the game's code has to the array (RVA 0x471E610 on the current build: 1024 entries of 2 bytes): no other instruction reaches it or into it, and no stored pointer holds its address; the relocation core checks the count with a scan for every `lea` and `mov` that reaches it.
+References to modkit array (rel32 of a `lea` - moved to new array). The six are every reference the game's code has to the array (RVA 0x471E610 on the current build: 1024 entries of 2 bytes): no other instruction reaches it or into it, and no stored pointer holds its address; the relocation core checks the count with a scan for every `lea` and `mov` that reaches it. Modkit IDs are 16-bit, which caps the array at 65536 entries.
 
 | Label | Pattern | Use | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
@@ -69,7 +69,7 @@ Sizes and the streaming configuration call (the two limit sites and the call the
 | P-E-I1 | `3b 05 ? ? ? ? 0f 8d ? ? ? ? 89 c0` | +2: rel32 to the indirect size variable, which holds N-4 (7256 on the current build) | found | 0x1279156 |
 | P-E-H1 | `89 48 ? 48 8d 0d ? ? ? ? 48 89 08 48 89 c1 e8` | +0x10: the streaming configuration call; 8512 archive count on current build | found | 0x5093D5 |
 
-References to the packfile array (rel32 moved to the new array). With the reference of the build (`R31a` or `R31b`) they are every reference the game's code has to the array (RVA 0x2C075B0 on the current build: 7260 entries of 8 bytes): 33 on 1.0.1158.16, 25 `lea` and the 8 `mov [rip+disp32], r64` of `P-E-R23..R30`; no other instruction reaches it or into it, and no stored pointer holds its address in the sections the dump holds. The relocation core checks the count with a scan for every `lea` and `mov` that reaches it.
+References to the packfile array (rel32 moved to the new array). With the reference of the build (`R31a` or `R31b`) they are every reference the game's code has to the array (RVA 0x2C075B0 on the current build: 7260 entries of 8 bytes): 33 on 1.0.1158.16, 25 `lea` and the 8 `mov [rip+disp32], r64` of `P-E-R23..R30`; no other instruction reaches it or into it, and no stored pointer holds its address in the sections the dump holds. The relocation core checks the count with a scan for every `lea` and `mov` that reaches it. Archive indices are 16-bit, which caps the array at 65535 entries.
 
 | Label | Pattern | Offset | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
@@ -123,7 +123,7 @@ The four sites that hand the traversal list's capacity to the tree search (`mov 
 
 The decal definitions array (260 entries of 80 bytes, at RVA 0x42EC8A0 on the current build) and the number of registered definitions, a dword 16 bytes before it (0x42EC890); the pair of constants 0x100 and 0x200 that `DecalPatch.asi` patches is not this build's decal definitions limit. The parser's "full" check `D-E-L1` gives the count's address (the disp32 of its `mov`) and N (its imm32 is N-1: 259, so N = 260, on the current build); the parser's `lea` `D-E-L2` gives the array's address, which MUST lie 16 bytes after the count, both inside the game. Every other site that carries the limit is found by its own pattern, MUST be the expected instruction and MUST hold N-1 or N: `D-E-L3` (FindById: three sites, two of them past the pattern's end, and a `lea` of the array), `D-E-L4` (PickVariant), `D-E-L5..L9` (the texture override; `L6` and `L9` also hold a `lea`), `D-E-L13..L16` (four decal-placing functions) and `D-E-L12`, the check seven more decal-placing functions share, which MUST match exactly 7 times. The decal manager's start-up loop, which zeroes the texture pointers of 26 entries per pass, gives its start offset and a `lea` of the array (`D-E-L10`) and the bytes one pass clears and its end (`D-E-L11`), which MUST be the start offset + N x 80. The array's loads have no pattern of their own: the game's code is scanned for every `lea r64, [rip+disp32]` that loads it, which MUST find exactly 31 - on the current build at RVAs 0xB195A8, 0xB3187E, 0xB31AD6, 0xB31FA7, 0xB324CA, 0xB326EF, 0xB32C71, 0xB32F2B, 0xB33423, 0xB338F6, 0xB33EF5, 0xB34892, 0xB34CF7, 0xB34F96, 0xCA0A1F, 0xCA11CE, 0xCA323B, 0xCA6DD5, 0xCA756C, 0xCA960E, 0xCAA2F7, 0xCAD859, 0xCADE17, 0xCB30C9, 0xCB386D, 0xCB3A4F, 0xCBEAE2, 0xCBF181, 0xCBF251, 0xCBF2D0 and 0xCD2B60. `DIAGNOSTIC_MODE=1` logs every one of them and every constant site.
 
-An entry, as the parser fills it from the `decals.dat` columns (80 bytes): +0x00 int32 decal id (the first column); +0x08, +0x10 and +0x18 pointers to the diffuse, normal and specular textures (0 until loaded - the only pointers in an entry, and the ones the start-up loop zeroes); +0x20 float size; +0x24 specular multiplier, +0x28 specular falloff, +0x2C specular intensity, +0x30 fresnel, +0x34 steep, +0x38 parallax scale and +0x3C emissive value, all floats; +0x40 byte texture rows, +0x41 columns, +0x42 id A, +0x43 id B, +0x44 texture wrap (0 or 1; the game sets 4 later for "rotate to camera"), +0x45 anisotropic, +0x46 washable, +0x47 underwater create, +0x48 underwater fade; +0x49 to +0x4F unused. No entry holds a pointer to another entry or into the array, nothing else in the game is sized by the number of definitions, and the count 16 bytes before the array is addressed only by its own instructions, never through the array (nor the array through it), which is why the count stays where it is. Entries are read with scalar loads and cleared with unaligned stores, so a page-aligned buffer needs no more alignment. On 1.0.1158.16 vanilla registers 259 definitions.
+An entry, as the parser fills it from the `decals.dat` columns (80 bytes): +0x00 int32 decal id (the first column); +0x08, +0x10 and +0x18 pointers to the diffuse, normal and specular textures (0 until loaded - the only pointers in an entry, and the ones the start-up loop zeroes); +0x20 float size; +0x24 specular multiplier, +0x28 specular falloff, +0x2C specular intensity, +0x30 fresnel, +0x34 steep, +0x38 parallax scale and +0x3C emissive value, all floats; +0x40 byte texture rows, +0x41 columns, +0x42 id A, +0x43 id B, +0x44 texture wrap (0 or 1; the game sets 4 later for "rotate to camera"), +0x45 anisotropic, +0x46 washable, +0x47 underwater create, +0x48 underwater fade; +0x49 to +0x4F unused. No entry holds a pointer to another entry or into the array, nothing else in the game is sized by the number of definitions, and the count 16 bytes before the array is addressed only by its own instructions, never through the array (nor the array through it), which is why the count stays where it is. Entries are read with scalar loads and cleared with unaligned stores, so a page-aligned buffer needs no more alignment. A definition's index is a uint16 in the game's decal instances. On 1.0.1158.16 vanilla registers 259 definitions.
 
 | Label | Pattern | Offset: what | 1.0.1158.16 | RVA |
 |---|---|---|---|---|
@@ -145,6 +145,8 @@ An entry, as the parser fills it from the `decals.dat` columns (80 bytes): +0x00
 | D-E-L16 | `89 C3 31 C0 81 FB 03 01 00 00 0F 8F` | 6: N-1 | found | 0xB34F70 |
 
 ## RageOpenV
+
+The RPF7 facts the OPEN archives rely on, which no pattern holds: the encryption field of an archive that is not encrypted holds the tag `OPEN` (0x4E45504F), and the game's FindEncryption (called at `R-E-E1`) answers yes, NG-encrypted, when `(encryption & 0x0FF00000) == 0x0FE00000`. In the entry table (entries of 16 bytes, their fields in "When Game Updates" item 5) an entry whose type at +4 is 0x7FFFFF00 is a folder and one whose type has bit 31 (0x80000000) set is a resource; every other entry is a binary file. For an unencrypted archive the game expects 0x0FEFFFFF in the encryption field (+12) of every binary entry whose name offset and encryption field are not zero, and in the packfile's current file offset (+0xBC from the `fiPackfile` object's start, item 5).
 
 | Label | Pattern | Use | 1.0.1158.16 | RVA |
 |---|---|---|---|---|

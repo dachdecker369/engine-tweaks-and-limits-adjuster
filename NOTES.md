@@ -120,7 +120,7 @@ What each part does and the checks it makes, the measurements, the open issues a
 Newest first; the tags carry the same numbers. One line per version with what it brought.
 
 - **2.1.0:** the fixes of the 2.0.0 audit - a pattern that matches twice is refused; the modkit and packfile arrays' references are cross-checked by a scan for every `lea` and `mov` that reaches them, with two more packfile references (`P-E-R32`, `P-E-R33`) and opcode checks for three sites; RageOpenV skips only a folder past the depth limit, counts and reports folders it cannot read and a game that runs outside the game folder, gives the game the failure for a mods file it cannot open instead of the game's own file, uses the encryption tag up per parse, leaves an OPEN archive with an implausible or unreadable entry table alone and says so, reports a start-up that never ran, never redirects a rooted or drive path; DirectStorage no longer reports a second interface as a problem, decides containment on the full path without heap memory, keeps its counts exclusive and its per-event lines capped, logs paths outside the game folder as a category and a file name, lists the refused files by type; a heap of 1024 MB or more is another adjuster's up to 4095 MB, and a size raised to the game's own is reported; the four measurements share one loop; the harness keeps the fakes' exit status and fails on build warnings; T-LAYOUT and T-CODEPAGE recorded; 485 checks.
-- **2.0.0:** every part rewritten as TweaksV's own code on shared code - the scanner, the patch module, the relocation core, the three tables; `TweaksV.ini` layout 2 (28 keys, `DIAGNOSTIC_MODE` as the one testing switch, a 1.x file renamed to `TweaksV.old.ini`); the newmods folder and the originals' archives gone; the lock guard; the mods list on a UTF-8 code page, a guard for the patched pages, the game's entries copied into a moved array, a named copyright holder; the release zip defined as five files.
+- **2.0.0:** every part rewritten as TweaksV's own code on shared code - the scanner, the patch module, the relocation core, the three tables; `TweaksV.ini` layout 2 (28 keys, `DIAGNOSTIC_MODE` as the one diagnostic switch, the per-part `LOG_` switches gone, a 1.x file renamed to `TweaksV.old.ini`); the newmods folder and the originals' archives gone; the lock guard; the mods list on a UTF-8 code page, a guard for the patched pages, the game's entries copied into a moved array, a named copyright holder; the release zip defined as five files.
 - **1.6.0:** the Decals part - the decal definitions array moved and its limit raised; `DecalPatch.asi` as an old plugin.
 - **1.5.0:** the box streamer's measurement, and the list's loads found by its address instead of a pattern.
 - **1.4.0:** the BoxStreamer part - the traversal list moved and its capacity raised; `TEST_DUMP_CODE` in test builds.
@@ -155,6 +155,24 @@ Known bugs and open issues in TweaksV.
 - **What:** RageOpenV folds the mods list and the game's paths byte by byte (lower case, `/` for `\`), and the game asks with paths in the ANSI code page. On a Windows whose ANSI code page is double-byte (Japanese 932, Simplified Chinese 936, Korean 949), a name with a two-byte character whose second byte is a backslash (0x5C) or a capital letter is folded wrongly and never matches, so that file is not served from the mods folder. Everything else works, and the names the code page cannot hold at all are counted in the log as before.
 - **Status:** open, found by the 2.0.0 audit. The suites cannot set the ANSI code page, so a fix could not be tested here.
 - **When it goes:** when it can be tested, on such a Windows or with a suite that runs the fake game under that code page: fold the paths by characters, not bytes, on a double-byte code page.
+
+### T-DIAG: a diagnostic aid that cannot be set up is logged, not reported
+
+- **What:** the console (`CONSOLE=1`), DirectStorage's call logging and the measurements (`DIAGNOSTIC_MODE=1`) are aids for testing. When one cannot be set up - the console cannot be opened or kept, a DirectStorage function cannot be hooked for the log, a measurement's thread cannot start - `TweaksV.log` says so, but it is no `PROBLEM` line and no item of the start-up summary, so nothing on screen tells of it.
+- **Status:** accepted. An aid is switched on for a test, by someone who reads `TweaksV.log` for what it gives - or misses the console's window - and finds the reason there; the game and every part's job go on as without the aid.
+- **When it goes:** when a player is meant to rely on one of these switches: then an aid that cannot be set up is reported like a job not done while its switch is on.
+
+### T-SUMMARY: no start-up summary when its thread cannot start
+
+- **What:** the start-up summary is shown from a thread of its own, because a message box must not block `DllMain` or the game's thread that first asks for the time. When Windows cannot start that thread, the log says so (`The start-up summary thread could not be started (Windows error N).`) and no box comes for the rest of the session: the problems of the start-up and every later one stand only in `TweaksV.log`.
+- **Status:** accepted as rare: Windows refuses a new thread only in an exceptional state, and the log says what happened.
+- **When it goes:** with the next change to the start-up summary (`TweaksVSummary`): the thread is tried again with the next problem reported, as a new thread is started for the next problem after a box that could not be built.
+
+### T-FREEZE: RageOpenV's start-up writes without freezing the other threads
+
+- **What:** the writes in `DllMain` happen while the game is still single-threaded. RageOpenV's start-up runs later, on the game's thread at its first request for the time, and writes its few bytes there - the cache check's `C3 90`, the console's NOPs, the five `E8 rel32` of the OPEN archives - without freezing the game's other threads, as MinHook does for the hooks. A thread that ran one of those instructions while it was written could execute it half old, half new.
+- **Status:** accepted: no other thread runs that code at that point of the start-up.
+- **When it goes:** when `WriteCode` freezes the game's other threads around a write made after `DllMain`, as MinHook does - at the latest when a game build runs one of those sites on another thread that early.
 
 ## Bugs Found in the Originals
 
