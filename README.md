@@ -20,7 +20,7 @@ TweaksV is one ASI plugin for GTA V Enhanced, `TweaksV.asi`, with eight parts: a
 
 The game's box streamer finds the map boxes to stream for the area around the player and keeps what one search returns in a list of 1000 entries. With heavy map mods a search returns more: the boxes the list has no room for are never streamed, and their LODs are missing.
 
-`TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER]` (default 10000, 1000 to 100000) moves the list to a larger one. TweaksV's own part; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy, and none of their code is used.
+`TRAVERSAL_LIST_SIZE` under `[BOXSTREAMER]` (default 10000, 1000 to 100000) moves the list to a larger one. TweaksV's own part; the idea comes from the CitizenFX Collective's fix for FiveM and 0x-FADED's port of it to GTA V Legacy, and none of their code was read or used.
 
 With `DIAGNOSTIC_MODE=1` the part counts the searches and logs, 10 seconds in and then every minute while the numbers change, how many map boxes the largest search returned and how many searches returned more than the game's own list could hold - so you can see whether your map load needs the larger list at all. Measure with a larger list: with `TRAVERSAL_LIST_SIZE=1000`, the game's own size, no search can return more than the list holds, and the log says so.
 

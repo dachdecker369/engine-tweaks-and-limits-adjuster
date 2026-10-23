@@ -27,14 +27,13 @@ The five plugins TweaksV 1.x merged and 2.0.0 rewrote as its own parts, and the 
 
 ## Ideas behind TweaksV's own parts
 
-Where a project's license allows no reuse, TweaksV took the idea alone: nothing of its code was copied or adapted, and every game fact behind the part was found anew in Enhanced ([PATTERNS.md](PATTERNS.md)).
+Where a project's license allows no reuse, TweaksV took the idea alone: nothing of its code was read, copied or adapted, and every game fact behind the part was found anew in Enhanced ([PATTERNS.md](PATTERNS.md)).
 
 - **alloc8or** - DirectStorageFix, the idea behind TweaksV's DirectStorage part. Its repository carries no license, so only its README was read and none of its code: the part is a clean-room implementation of the idea - https://github.com/alloc8or/DirectStorageFix
-- **CitizenFX Collective** - the box streamer traversal list fix and the decal definitions limit fix in FiveM, the ideas behind TweaksV's BoxStreamer and Decals parts. FiveM's `gta-streaming-five` component lies outside the folders its license frees, so that code is all rights reserved: none of it is used - https://github.com/citizenfx/fivem
-- **Tanuki / 0x-FADED** - the port of those fixes to GTA V Legacy. It carries an MIT license but says itself that it ports FiveM's code, which that license cannot cover; none of its code is used, and its Legacy layout differs from Enhanced's anyway - https://github.com/0x-FADED/GTA-V-fwBoxStreamerVariable-and-decals-limit-Patch
+- **CitizenFX Collective** - the box streamer traversal list fix and the decal definitions limit fix in FiveM, the ideas behind TweaksV's BoxStreamer and Decals parts. FiveM's `gta-streaming-five` component lies outside the folders its license frees, so that code is all rights reserved: none of it was read, and none of it is used - https://github.com/citizenfx/fivem
+- **Tanuki / 0x-FADED** - the port of those fixes to GTA V Legacy. It carries an MIT license but says itself that it ports FiveM's code, which that license cannot cover; none of its code was read or used, and its Legacy layout differs from Enhanced's anyway - https://github.com/0x-FADED/GTA-V-fwBoxStreamerVariable-and-decals-limit-Patch
 
 ## Libraries and tools
 
 - **Tsuda Kageyu** - MinHook, 1.3.4 unchanged in `vendor\MinHook` - https://github.com/TsudaKageyu/minhook
 - **Alexander Blade** - Script Hook V, whose ASI loader file (`xinput1_4.dll`) loads TweaksV. It is not bundled, and TweaksV does not use Script Hook V itself. - http://www.dev-c.com/gtav/scripthookv/
-- **ThirteenAG** - Ultimate ASI Loader, an alternative loader (not bundled) - https://github.com/ThirteenAG/Ultimate-ASI-Loader
