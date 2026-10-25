@@ -49,7 +49,7 @@ namespace TweaksV
 						continue;
 
 					++found;
-					// a part TweaksV.ini switches off has nothing to say about it. The file's own switch, not
+					// nothing is said for a part TweaksV.ini switches off - the file's own switch, not
 					// IsFeatureOn: an old plugin found before may have switched the part off already, and
 					// this one is still said, so the result does not depend on the order of the finds
 					if (!IsEnabledInIni(*feature.section))
