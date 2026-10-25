@@ -9,6 +9,9 @@
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" .
+# the game that never asks for its factory runs the test build: with ERROR_POPUP=1 the problem gets a message
+# box of its own after the start-up summary, and only a test build keeps that box off the screen
+cp "$R/object/Test/Release/TweaksV.asi" TweaksV_test.asi
 mkdir -p appdata
 rm -f DirectStorageFix.asi	# an old plugin another suite may have left
 
@@ -125,11 +128,12 @@ echo "== D11c the game asks only for an interface TweaksV does not know: 10 seco
 fresh_ini; out=$(game full_game.exe dstorage dsotheronly wait)
 check "reported, and given a message box of its own after the start-up summary (here ERROR_POPUP=0)" "has 'other interface only 0x0 |' && log_has 'PROBLEM: The files in the game folder are not unlocked this session: the game asked only for another DirectStorage interface, $OTHER, whose functions TweaksV does not know.' && log_has 'Problem after the start-up summary not shown (ERROR_POPUP=0): 1 problem(s)' && log_lacks 'also asked'"
 
-echo "== D12 the game never asks for its DirectStorage factory: 30 seconds in, a line, not a problem"
-fresh_ini; out=$(game full_game.exe dstorage dsnofactory waitlong)
-check "said in the log; no problem" "has 'dstorage: not called |' && log_has 'The game has not asked for its DirectStorage factory since TweaksV started - nothing is unlocked; TweaksV may have been loaded too late.' && log_lacks 'PROBLEM'"
+echo "== D12 the game never asks for its DirectStorage factory: 30 seconds in, a problem after the start-up summary, with a box of its own (the test build, ERROR_POPUP=1)"
+fresh_ini; setkey ERROR_POPUP 1; out=$(ASI=TweaksV_test.asi game full_game.exe dstorage dsnofactory waitlong)
+check "reported once: nothing is unlocked, TweaksV may have been loaded too late" "has 'dstorage: not called |' && [ \$(count 'PROBLEM') -eq 1 ] && log_has 'PROBLEM: The files in the game folder are not unlocked this session: the game has not asked for its DirectStorage factory since TweaksV started - TweaksV may have been loaded too late.'"
+check "after the start-up summary, so in a message box of its own (which the test build keeps off the screen)" "log_has 'Showing a problem after the start-up summary (1 problem(s)).' && log_has 'TEST BUILD: message box not shown (TWEAKSV_TEST_NO_BOXES=1): TweaksV: a part stopped working after the start-up:'"
 
-echo "== D13 20,001 refusals after the summary, 31 seconds in: the lines stop at the cap; the factory was asked for, so no such line"
+echo "== D13 20,001 refusals after the summary, 31 seconds in: the lines stop at the cap; the factory was asked for, so its check reports nothing"
 fresh_ini; out=$(game full_game.exe dstorage dsflood waitlong)
 check "the summary, then 20000 lines of late refusals and the cap line once" "has 'flood: 20001 refused |' && log_has 'UNLOCK_FILES: in its first 10 seconds' && [ \$(count 'UNLOCK_FILES: refused locktest.txt (in the game folder, not .rpf or .cache).') -eq 20000 ] && [ \$(count 'UNLOCK_FILES: 20000 lines of files refused after the summary written - from now on they are only counted.') -eq 1 ]"
 check "the factory check says nothing when the factory was asked for" "log_lacks 'has not asked for its DirectStorage factory' && log_lacks 'PROBLEM'"
