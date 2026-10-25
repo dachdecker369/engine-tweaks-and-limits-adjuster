@@ -2,23 +2,27 @@
 // TweaksV - DirectStorage: the files GTA V Enhanced keeps locked in its folder.
 //
 // With DirectStorage on, the game asks DirectStorage to open every file in its folder at start-up
-// (IDStorageFactory::OpenFile, read-only, shared for reading only) and keeps them open, so mods can
-// no longer write their own files there and scripts can no longer be reloaded while the game runs.
-//   UNLOCK_FILES    on by default: in the game folder, DirectStorage may open only the .rpf and .cache
-//                   files it reads; OpenFile refuses the folder's other files as not found, so they stay
-//                   free. Files outside the game folder are never refused: the game reads its saves and
-//                   settings (Documents\Rockstar Games\...\Profiles) through OpenFile, too. Whether a path
-//                   is in the game folder is decided on its full path, as Windows makes it ("." and ".."
-//                   collapsed), on the stack: no memory allocation and no lock of TweaksV's per call. A
-//                   summary 10 seconds after the first call counts the files and lists the refused ones
-//                   by type.
+// (IDStorageFactory::OpenFile), and DirectStorage opens each for reading while letting others only read
+// it (NtCreateFile, share R--) and keeps it open, so mods can no longer write their own files there and
+// scripts can no longer be reloaded while the game runs.
+//   UNLOCK_FILES    on by default: NtCreateFile is hooked at start-up, and an open of a file in the game
+//                   folder that is not .rpf or .cache, asks for reading only and already lets others read
+//                   gets write and delete sharing too before it goes on to Windows - whoever makes it, the
+//                   game, DirectStorage or a mods loader. The file opens and reads as before, and other
+//                   programs can write, rename and delete it while it is open; one that opens it for
+//                   writing while sharing nothing still gets a sharing violation. Archives, write and
+//                   exclusive opens, folders and everything outside the game folder are left as they are,
+//                   and nothing is refused. Decided per call before it, on the stack: no memory allocation
+//                   and no lock of TweaksV's. A summary 10 seconds after the first open in the game folder,
+//                   then every minute while the numbers change, counts the opens given the wider sharing,
+//                   their files by type, and the opens left as they were.
 //   DIAGNOSTIC_MODE the game's calls into DirectStorage (DStorageSetConfiguration, ...1,
-//                   DStorageGetFactory and the factory's OpenFile) with the code that made them, the
-//                   factory's functions and the configuration values, and every open (NtCreateFile) of
-//                   a file or folder inside the game folder: the access and sharing asked for, the
-//                   result and the code that asked for it, plus a summary every minute. A path outside
-//                   the game folder is logged as a category and its file name only, and every kind of
-//                   line that comes per call stops after 20,000.
+//                   DStorageGetFactory and the factory's OpenFile, which TweaksV passes on unchanged) with
+//                   the code that made them, the factory's functions and the configuration values, and every
+//                   open (NtCreateFile) of a file or folder inside the game folder: the access and sharing
+//                   asked for, the sharing UNLOCK_FILES gave it, the result and the code that asked for it,
+//                   plus a summary every minute. A path outside the game folder is logged as a category and
+//                   its file name only, and every kind of line that comes per call stops after 20,000.
 // Written for TweaksV; the idea comes from alloc8or's DirectStorageFix.
 
 #include "TweaksVDirectStorage.h"
@@ -72,7 +76,7 @@ namespace TweaksV
 		std::wstring g_gameFolder;				// without a trailing backslash
 		std::wstring g_tempFolders[2];			// %TEMP% as Windows gives it and in its long form, without one either
 
-		// This thread is inside one of the hooks below: whatever it opens there is not logged.
+		// This thread is inside one of the hooks below: whatever it opens there is left as it is and not logged.
 		thread_local bool t_inside = false;
 
 		// What a hook does after the game's call - its lines, a hook of its own: not on a thread that is
@@ -424,11 +428,425 @@ namespace TweaksV
 			return path.size() > 2 && path[0] == L'\\' && path[1] == L'\\' && path[2] != L'.' && path[2] != L'?';
 		}
 
-		// ---- the file opens (DIAGNOSTIC_MODE)
+		// ---- UNLOCK_FILES: the opens in the game folder (NtCreateFile), decided before the call
 
 		using NtCreateFileFn = NTSTATUS(NTAPI*)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PIO_STATUS_BLOCK,
 			PLARGE_INTEGER, ULONG, ULONG, ULONG, ULONG, PVOID, ULONG);
 		NtCreateFileFn g_originalNtCreateFile = nullptr;
+
+		// Access that writes or deletes: an open that asks for any of it is left as it is.
+		constexpr ACCESS_MASK kWriteAccess = GENERIC_WRITE | GENERIC_ALL | MAXIMUM_ALLOWED | DELETE | FILE_WRITE_DATA |
+			FILE_APPEND_DATA | FILE_WRITE_EA | FILE_WRITE_ATTRIBUTES | WRITE_DAC | WRITE_OWNER;
+		constexpr ULONG kWiderSharing = FILE_SHARE_WRITE | FILE_SHARE_DELETE;	// what UNLOCK_FILES adds
+
+		// What an open is to UNLOCK_FILES. Every open the hook examines lands in exactly one count, whatever
+		// its result, so the summary's figures add up; an open outside the game folder is not counted.
+		enum OpenKind : uint8_t
+		{
+			kNotCounted,	// outside the game folder, or not examined: UNLOCK_FILES=0, or TweaksV's own open
+			kWidened,		// a file other than .rpf and .cache, read-only, sharing reading: write and delete sharing added
+			kArchive,		// an .rpf or .cache file
+			kWriteOpen,		// asks for write or delete access
+			kExclusive,		// does not share reading
+			kDirectory,		// FILE_DIRECTORY_FILE, or the game folder itself
+			kUnexamined,	// its path could not be examined: unreadable, by file ID, or relative to another folder
+			kOpenKinds
+		};
+		std::atomic<uint64_t> g_openCounts[kOpenKinds];
+
+		// The game folder's identity, for an open relative to a folder handle - a relative path given to
+		// CreateFileW reaches NtCreateFile as a name relative to the current directory's handle: the volume's
+		// serial number and the folder's file ID, FileIdInformation's 128 bits or, on a file system without
+		// them, GetFileInformationByHandle's 64. Read once before the hook is made; the hook compares the
+		// handle's with it, one query of Windows per open relative to a folder handle.
+		enum class IdentityKind : uint8_t { None, FileId, FileIndex };
+		struct FolderIdentity
+		{
+			uint64_t volume = 0;
+			uint8_t file[16]{};
+
+			bool operator==(const FolderIdentity&) const = default;
+		};
+		IdentityKind g_identityKind = IdentityKind::None;	// None: the game folder's could not be read
+		FolderIdentity g_gameFolderIdentity;
+
+		// The identity of what handle refers to, read the way kind says; false if Windows cannot give it.
+		// Changes the thread's last error: the caller keeps it.
+		bool IdentityOf(HANDLE handle, IdentityKind kind, FolderIdentity& identity)
+		{
+			identity = {};
+			if (kind == IdentityKind::FileId)
+			{
+				FILE_ID_INFO info{};
+				if (!GetFileInformationByHandleEx(handle, FileIdInfo, &info, sizeof(info)))
+					return false;
+				identity.volume = info.VolumeSerialNumber;
+				static_assert(sizeof(info.FileId.Identifier) == sizeof(identity.file));
+				memcpy(identity.file, info.FileId.Identifier, sizeof(identity.file));
+				return true;
+			}
+			if (kind == IdentityKind::FileIndex)
+			{
+				BY_HANDLE_FILE_INFORMATION info{};
+				if (!GetFileInformationByHandle(handle, &info))
+					return false;
+				identity.volume = info.dwVolumeSerialNumber;
+				const uint64_t index = (static_cast<uint64_t>(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
+				memcpy(identity.file, &index, sizeof(index));
+				return true;
+			}
+			return false;
+		}
+
+		constexpr wchar_t FoldAscii(wchar_t c)
+		{
+			return c >= L'A' && c <= L'Z' ? static_cast<wchar_t>(c - L'A' + L'a') : c;
+		}
+
+		// a[0, n) and b[0, n) hold the same text, ASCII letters in any case
+		bool SameFolded(const wchar_t* a, const wchar_t* b, size_t n)
+		{
+			for (size_t i = 0; i < n; i++)
+				if (FoldAscii(a[i]) != FoldAscii(b[i]))
+					return false;
+			return true;
+		}
+
+		// The widened files by type, for the summary: a fixed table that the threads fill without a lock or an
+		// allocation, in the order the types come. A type is the extension with its dot, in lower case, packed
+		// into 8 bytes; one that does not fit - longer, or not plain ASCII - and every type past the table's end
+		// counts as "others".
+		constexpr uint64_t kNoExtension = 1;	// "(none)": a packed extension starts with its dot, so it is never 1
+		struct TypeCount
+		{
+			std::atomic<uint64_t> type{ 0 };	// 0: free
+			std::atomic<uint64_t> count{ 0 };
+		};
+		TypeCount g_types[kMaxTypesShown];
+		std::atomic<uint64_t> g_otherTypes{ 0 };
+
+		// extension[0, length), its dot included, packed as above: kNoExtension for none, 0 for one that does not fit
+		uint64_t PackedType(const wchar_t* extension, size_t length)
+		{
+			if (length == 0)
+				return kNoExtension;
+			if (length > sizeof(uint64_t))
+				return 0;
+			uint64_t packed = 0;
+			for (size_t i = 0; i < length; i++)
+			{
+				const wchar_t c = FoldAscii(extension[i]);
+				if (c <= L' ' || c > L'~')
+					return 0;
+				packed |= static_cast<uint64_t>(c) << (8 * i);
+			}
+			return packed;
+		}
+
+		void CountType(uint64_t type)
+		{
+			if (type != 0)
+				for (TypeCount& entry : g_types)
+				{
+					uint64_t current = entry.type.load(std::memory_order_acquire);
+					if (current == 0 && entry.type.compare_exchange_strong(current, type, std::memory_order_acq_rel))
+						current = type;	// taken for this type; on a race, current is what the other thread put there
+					if (current == type)
+					{
+						entry.count.fetch_add(1, std::memory_order_relaxed);
+						return;
+					}
+				}
+			g_otherTypes.fetch_add(1, std::memory_order_relaxed);
+		}
+
+		// ".txt 4, .asi 1, (none) 1, others 2"
+		std::string TypesText()
+		{
+			std::string text;
+			for (const TypeCount& entry : g_types)
+			{
+				const uint64_t type = entry.type.load(std::memory_order_acquire), count = entry.count.load();
+				if (type == 0 || count == 0)
+					continue;
+				std::string name = "(none)";
+				if (type != kNoExtension)
+				{
+					name.clear();
+					for (uint64_t rest = type; rest; rest >>= 8)
+						name += static_cast<char>(rest & 0xFF);
+				}
+				text += (text.empty() ? "" : ", ") + name + " " + std::to_string(count);
+			}
+			if (const uint64_t others = g_otherTypes.load())
+				text += (text.empty() ? "" : ", ") + std::string("others ") + std::to_string(others);
+			return text;
+		}
+
+		// The widened files, told apart for the summary by a hash of their path below the game folder: a fixed
+		// table of hashes with open addressing that the threads fill without a lock or an allocation. It takes
+		// kMaxFiles files, half its slots, so that a search stays short; the opens of more files are counted,
+		// their files not told apart.
+		constexpr size_t kFileSlots = 16384;		// a power of two
+		constexpr uint64_t kMaxFiles = kFileSlots / 2;
+		constexpr size_t kMaxProbes = 64;
+		std::atomic<uint64_t> g_fileSlots[kFileSlots];	// a file's hash, 0: free
+		std::atomic<uint64_t> g_files{ 0 };				// files told apart
+		std::atomic<uint64_t> g_untrackedOpens{ 0 };	// widened opens of files the full table could not take
+
+		enum class Tracked : uint8_t { Known, New, Full };
+
+		Tracked TrackFile(uint64_t hash)
+		{
+			if (hash == 0)
+				hash = 1;	// 0 marks a free slot
+			for (size_t probe = 0; probe < kMaxProbes; probe++)
+			{
+				std::atomic<uint64_t>& slot = g_fileSlots[static_cast<size_t>(hash + probe) & (kFileSlots - 1)];
+				uint64_t current = slot.load(std::memory_order_acquire);
+				if (current == 0)
+				{
+					if (g_files.load(std::memory_order_relaxed) >= kMaxFiles)
+						return Tracked::Full;
+					if (slot.compare_exchange_strong(current, hash, std::memory_order_acq_rel))
+					{
+						g_files.fetch_add(1, std::memory_order_relaxed);
+						return Tracked::New;
+					}
+					// another thread took the slot first: current is what it put there
+				}
+				if (current == hash)
+					return Tracked::Known;
+			}
+			return Tracked::Full;
+		}
+
+		// What the part of a path below the game folder says: the hash that tells its file apart (FNV-1a over
+		// its letters, ASCII in lower case, up to a stream), its type, and whether it is an archive. The
+		// extension is the last name's, from its last '.' that is not the name's first letter, up to a ':' that
+		// starts a stream - "x.rpf::$DATA" opens x.rpf.
+		struct PathFacts
+		{
+			uint64_t hash = 0;
+			uint64_t type = 0;
+			bool archive = false;
+		};
+
+		void ReadPathFacts(const wchar_t* path, size_t length, PathFacts& facts)
+		{
+			size_t nameStart = length;
+			while (nameStart > 0 && path[nameStart - 1] != L'\\')
+				nameStart--;
+			size_t nameEnd = nameStart;
+			while (nameEnd < length && path[nameEnd] != L':')
+				nameEnd++;
+			size_t afterDot = nameEnd;
+			while (afterDot > nameStart && path[afterDot - 1] != L'.')
+				afterDot--;
+			const bool hasExtension = afterDot > nameStart + 1;	// a '.' after the name's first letter
+			const wchar_t* const extension = hasExtension ? path + afterDot - 1 : path;
+			const size_t extensionLength = hasExtension ? nameEnd - afterDot + 1 : 0;
+			facts.type = PackedType(extension, extensionLength);
+			facts.archive = (extensionLength == 4 && SameFolded(extension, L".rpf", 4)) ||
+				(extensionLength == 6 && SameFolded(extension, L".cache", 6));
+			uint64_t hash = 14695981039346656037ull;
+			for (size_t i = 0; i < nameEnd; i++)
+			{
+				hash ^= FoldAscii(path[i]);
+				hash *= 1099511628211ull;
+			}
+			facts.hash = hash;
+		}
+
+		// The folder handle an NtCreateFile call's name is relative to, or nullptr; false if the
+		// OBJECT_ATTRIBUTES cannot be read.
+		bool ReadRoot(const OBJECT_ATTRIBUTES* attributes, HANDLE* root)
+		{
+			__try
+			{
+				if (!attributes)
+					return false;
+				*root = attributes->RootDirectory;
+				return true;
+			}
+			__except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+			{
+				return false;
+			}
+		}
+
+		// Where the name an NtCreateFile call asked for lies: Inside the game folder (facts filled), the game
+		// Folder itself, Outside it, or Unknown - a name that cannot be read. Read on the caller's memory within
+		// the length it gives; a bad pointer is caught. relative: the name is relative to the game folder (its
+		// handle was checked); otherwise it must be "\??\C:\..." - "\??\UNC\server\share\..." for a game folder
+		// on a network share - and every other spelling (a device, \Device\...) is outside.
+		enum class Place : uint8_t { Outside, Folder, Inside, Unknown };
+
+		Place ExamineName(const OBJECT_ATTRIBUTES* attributes, bool relative, PathFacts& facts)
+		{
+			__try
+			{
+				const UNICODE_STRING* const object = attributes->ObjectName;
+				if (!object)
+					return Place::Unknown;
+				const wchar_t* name = object->Buffer;
+				size_t length = object->Length / sizeof(wchar_t);
+				if (!name && length)
+					return Place::Unknown;
+				if (relative)
+				{
+					if (length == 0)
+						return Place::Folder;	// the game folder itself, opened again
+					if (name[0] == L'\\')
+						return Place::Unknown;	// not a name relative to it
+					ReadPathFacts(name, length, facts);
+					return Place::Inside;
+				}
+
+				if (length < 4 || name[0] != L'\\' || name[1] != L'?' || name[2] != L'?' || name[3] != L'\\')
+					return Place::Outside;
+				name += 4;
+				length -= 4;
+				const wchar_t* folder = g_gameFolder.data();
+				size_t n = g_gameFolder.size();
+				if (n > 2 && folder[0] == L'\\' && folder[1] == L'\\')
+				{
+					if (length < 3 || !SameFolded(name, L"unc", 3))
+						return Place::Outside;
+					name += 3;	// "\server\share\...", compared with the folder from its second backslash
+					length -= 3;
+					folder += 1;
+					n -= 1;
+				}
+				if (n == 0 || length < n || !SameFolded(name, folder, n))
+					return Place::Outside;
+				if (length == n || (length == n + 1 && name[n] == L'\\'))
+					return Place::Folder;
+				if (name[n] != L'\\')
+					return Place::Outside;	// a folder whose name only starts with the game folder's
+				ReadPathFacts(name + n + 1, length - n - 1, facts);
+				return Place::Inside;
+			}
+			__except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+			{
+				return Place::Unknown;
+			}
+		}
+
+		// UNLOCK_FILES' decision on one open, made before the call on the stack: no memory allocation, no lock
+		// of TweaksV's, nothing that can throw. The name says where the open lies - for one relative to a folder
+		// handle, that handle must be the game folder's - and then, in this order: a folder, an archive, write
+		// access, sharing that leaves reading out; every other open in the game folder is given write and
+		// delete sharing.
+		struct OpenCheck
+		{
+			OpenKind kind = kNotCounted;
+			PathFacts facts;	// for kWidened: the file's
+		};
+
+		OpenCheck CheckOpen(const OBJECT_ATTRIBUTES* attributes, ACCESS_MASK access, ULONG share, ULONG options)
+		{
+			OpenCheck check;
+			HANDLE root = nullptr;
+			if ((options & FILE_OPEN_BY_FILE_ID) || !ReadRoot(attributes, &root))
+			{
+				check.kind = kUnexamined;	// a name that is a file ID says nothing about the path
+				return check;
+			}
+			if (root)
+			{
+				const DWORD lastError = GetLastError();	// the caller's, kept
+				FolderIdentity identity;
+				const bool gameFolder = g_identityKind != IdentityKind::None && IdentityOf(root, g_identityKind, identity) &&
+					identity == g_gameFolderIdentity;
+				SetLastError(lastError);
+				if (!gameFolder)
+				{
+					check.kind = kUnexamined;	// relative to another folder: where it lies cannot be told
+					return check;
+				}
+			}
+			switch (ExamineName(attributes, root != nullptr, check.facts))
+			{
+			case Place::Outside:
+				return check;
+			case Place::Unknown:
+				check.kind = kUnexamined;
+				return check;
+			case Place::Folder:
+				check.kind = kDirectory;
+				return check;
+			case Place::Inside:
+				break;
+			}
+			if (options & FILE_DIRECTORY_FILE)
+				check.kind = kDirectory;
+			else if (check.facts.archive)
+				check.kind = kArchive;
+			else if (access & kWriteAccess)
+				check.kind = kWriteOpen;
+			else if (!(share & FILE_SHARE_READ))
+				check.kind = kExclusive;
+			else
+				check.kind = kWidened;
+			return check;
+		}
+
+		void CountOpen(const OpenCheck& check)
+		{
+			g_openCounts[check.kind].fetch_add(1, std::memory_order_relaxed);
+			if (check.kind != kWidened)
+				return;
+			switch (TrackFile(check.facts.hash))
+			{
+			case Tracked::New:
+				CountType(check.facts.type);
+				break;
+			case Tracked::Full:
+				g_untrackedOpens.fetch_add(1, std::memory_order_relaxed);
+				break;
+			case Tracked::Known:
+				break;
+			}
+		}
+
+		uint64_t CountedOpens()
+		{
+			uint64_t total = 0;
+			for (size_t kind = kWidened; kind < static_cast<size_t>(kOpenKinds); kind++)
+				total += g_openCounts[kind].load();
+			return total;
+		}
+
+		bool g_unlockSummaryWritten = false;	// only the measurement's thread uses it
+		HANDLE g_firstCounted = nullptr;		// an event the hook sets at the first open it counts: the summary's clock
+		std::atomic<bool> g_firstCountedSet{ false };
+
+		// The UNLOCK_FILES summary, 10 seconds after the first open counted and then every minute while the
+		// count changes. Each figure is read once, so the figures add up whatever comes meanwhile.
+		void LogUnlockSummary(uint64_t)
+		{
+			uint64_t counts[kOpenKinds];
+			for (size_t kind = 0; kind < static_cast<size_t>(kOpenKinds); kind++)
+				counts[kind] = g_openCounts[kind].load();
+			const uint64_t files = g_files.load(), untracked = g_untrackedOpens.load();
+			const std::string when = g_unlockSummaryWritten ? std::string("so far") :
+				"in its first " + std::to_string(kFirstSummaryMs / 1000) + " seconds";
+			g_unlockSummaryWritten = true;
+			const std::string types = TypesText();
+			WriteLog(kTag, "UNLOCK_FILES: " + when + ", " + std::to_string(counts[kWidened]) + " opens of " +
+				(untracked ? "more than " : "") + std::to_string(files) + " files in the game folder other than .rpf and .cache "
+				"were given write and delete sharing, so those files stay free for other programs" +
+				(types.empty() ? std::string() : "; by type: " + types) + "; left as they were: " +
+				std::to_string(counts[kArchive]) + " opens of archives, " + std::to_string(counts[kWriteOpen]) + " write opens, " +
+				std::to_string(counts[kExclusive]) + " exclusive opens, " + std::to_string(counts[kDirectory]) + " directories, " +
+				std::to_string(counts[kUnexamined]) + " whose path could not be examined.");
+		}
+
+		constexpr Measurement kUnlockMeasurement = { "UNLOCK_FILES summary", kFirstSummaryMs, &CountedOpens, &LogUnlockSummary,
+			&g_firstCounted };
+
+		// ---- the file opens (DIAGNOSTIC_MODE)
 
 		std::atomic<uint64_t> g_opens{ 0 };				// opens inside the game folder
 		std::atomic<uint64_t> g_lines{ 0 };				// open lines written
@@ -494,8 +912,10 @@ namespace TweaksV
 			return 1;
 		}
 
-		void LogFileOpen(const OBJECT_ATTRIBUTES* attributes, ACCESS_MASK access, ULONG share, ULONG disposition,
-			ULONG options, NTSTATUS status)
+		// share: the sharing the caller asked for; shareUsed: the sharing the open went to Windows with, wider
+		// where UNLOCK_FILES widened it.
+		void LogFileOpen(const OBJECT_ATTRIBUTES* attributes, ACCESS_MASK access, ULONG share, ULONG shareUsed,
+			ULONG disposition, ULONG options, NTSTATUS status)
 		{
 			wchar_t name[1024];
 			size_t length = 0;
@@ -509,13 +929,13 @@ namespace TweaksV
 
 			const uint64_t number = ++g_opens;
 			const bool folder = (options & FILE_DIRECTORY_FILE) != 0;
-			if (status >= 0 && !folder && !(share & FILE_SHARE_WRITE))
+			if (status >= 0 && !folder && !(shareUsed & FILE_SHARE_WRITE))
 				++g_noWriteSharing;
 			std::string caller;
 			const std::string callers = DescribeCallers(&caller);
 
 			const std::wstring lower = Lower(relative);
-			const std::wstring way = lower + L"|" + FromUtf8(caller) + L"|" + std::to_wstring(share & 7);
+			const std::wstring way = lower + L"|" + FromUtf8(caller) + L"|" + std::to_wstring(shareUsed & 7);
 			const std::wstring type = TypeOf(lower, folder);
 			uint64_t seen = 0;	// 0: the table of the ways of opening is full and this one is new
 			bool tracked = true;
@@ -550,9 +970,10 @@ namespace TweaksV
 				return;
 			}
 
-			char details[128];
+			const std::string sharing = ShareText(share) + (shareUsed != share ? " widened to " + ShareText(shareUsed) : std::string());
+			char details[160];
 			snprintf(details, sizeof(details), " | access 0x%08lX, share %s, %s, options 0x%08lX%s | from ",
-				static_cast<unsigned long>(access), ShareText(share).c_str(), DispositionText(disposition),
+				static_cast<unsigned long>(access), sharing.c_str(), DispositionText(disposition),
 				static_cast<unsigned long>(options), folder ? " (folder)" : "");
 			WriteLog(kTag, "open #" + std::to_string(number) + ": " + ToUtf8(relative) + " | " + StatusText(status) +
 				details + callers);
@@ -603,19 +1024,33 @@ namespace TweaksV
 		// The open summary, a minute in and then every minute while the count changes.
 		constexpr Measurement kMeasurement = { "DirectStorage open summary", kSummaryEveryMs, &Opens, &LogSummary };
 
+		// ---- the hook: both jobs on one NtCreateFile
+
 		NTSTATUS NTAPI HookNtCreateFile(PHANDLE fileHandle, ACCESS_MASK access, POBJECT_ATTRIBUTES attributes,
 			PIO_STATUS_BLOCK ioStatus, PLARGE_INTEGER allocationSize, ULONG fileAttributes, ULONG share,
 			ULONG disposition, ULONG options, PVOID eaBuffer, ULONG eaLength)
 		{
+			// UNLOCK_FILES decides before the call; what TweaksV opens inside a hook of its own is left as it is
+			OpenCheck check;
+			if (g_unlockFiles && !t_inside)
+				check = CheckOpen(attributes, access, share, options);
+			const ULONG shareUsed = check.kind == kWidened ? share | kWiderSharing : share;
 			const NTSTATUS status = g_originalNtCreateFile(fileHandle, access, attributes, ioStatus, allocationSize,
-				fileAttributes, share, disposition, options, eaBuffer, eaLength);
+				fileAttributes, shareUsed, disposition, options, eaBuffer, eaLength);
+			if (check.kind != kNotCounted)
+			{
+				CountOpen(check);
+				// the first open counted starts the summary's clock; its thread waits from the start-up on
+				if (!g_firstCountedSet.load(std::memory_order_relaxed) && !g_firstCountedSet.exchange(true) && g_firstCounted)
+					SetEvent(g_firstCounted);
+			}
 			// STATUS_ACCESS_VIOLATION: the caller's arguments could not even be read by the system
-			if (status != static_cast<NTSTATUS>(STATUS_ACCESS_VIOLATION))
-				AfterCall([&] { LogFileOpen(attributes, access, share, disposition, options, status); });
+			if (g_diagnostic && status != static_cast<NTSTATUS>(STATUS_ACCESS_VIOLATION))
+				AfterCall([&] { LogFileOpen(attributes, access, share, shareUsed, disposition, options, status); });
 			return status;
 		}
 
-		// ---- UNLOCK_FILES: the factory's OpenFile
+		// ---- the factory's OpenFile (DIAGNOSTIC_MODE): every call logged, none changed
 
 		// IDStorageFactory, whose function [4] is OpenFile (after IUnknown's 3 and CreateQueue)
 		constexpr GUID kFactoryId = { 0x6924EA0C, 0xC3CD, 0x4826, { 0xB1, 0x0A, 0xF6, 0x4F, 0x4E, 0xD9, 0x27, 0xC1 } };
@@ -634,27 +1069,11 @@ namespace TweaksV
 		std::atomic<bool> g_factoryAsked{ false };
 		std::atomic<uint64_t> g_openFileCalls{ 0 };
 		// each OpenFile call in exactly one of these, so that the summary's figures add up
-		std::atomic<uint64_t> g_archives{ 0 };		// .rpf and .cache files in the game folder: opened
-		std::atomic<uint64_t> g_refused{ 0 };		// the folder's other files, with UNLOCK_FILES: refused
-		std::atomic<uint64_t> g_otherInside{ 0 };	// the folder's other files, with UNLOCK_FILES=0: opened
-		std::atomic<uint64_t> g_outside{ 0 };		// paths outside the game folder: never refused
-		std::atomic<uint64_t> g_unreadable{ 0 };	// paths that could not be read or made full: passed on unchecked
-		std::atomic<uint64_t> g_openFileLines{ 0 };	// DIAGNOSTIC_MODE: OpenFile lines written
-		std::atomic<uint64_t> g_lateLines{ 0 };		// lines of refusals after the summary written
-		std::atomic<bool> g_openFileSummaryDone{ false };
-
-		// True for a path that ends in .rpf or .cache, in any case: the files DirectStorage reads.
-		bool IsArchive(std::wstring_view path)
-		{
-			const size_t slash = path.find_last_of(L"\\/");
-			const std::wstring_view name = slash == std::wstring_view::npos ? path : path.substr(slash + 1);
-			const size_t dot = name.find_last_of(L'.');
-			if (dot == std::wstring_view::npos)
-				return false;
-			const std::wstring_view extension = name.substr(dot);
-			return (extension.size() == 4 && _wcsnicmp(extension.data(), L".rpf", 4) == 0) ||
-				(extension.size() == 6 && _wcsnicmp(extension.data(), L".cache", 6) == 0);
-		}
+		std::atomic<uint64_t> g_archives{ 0 };		// .rpf and .cache files in the game folder
+		std::atomic<uint64_t> g_otherInside{ 0 };	// the folder's other files
+		std::atomic<uint64_t> g_outside{ 0 };		// paths outside the game folder
+		std::atomic<uint64_t> g_unreadable{ 0 };	// paths that could not be read or made full
+		std::atomic<uint64_t> g_openFileLines{ 0 };	// OpenFile lines written
 
 		// Copies a path the game passed (at most capacity - 1 characters); complete is false if it was
 		// longer. False if it cannot be read.
@@ -679,19 +1098,19 @@ namespace TweaksV
 			}
 		}
 
-		// An OpenFile path as DirectStorage opens it, worked out on the stack before the game's call - no
-		// memory allocation, nothing that can throw: copied (at most kMaxPathChars characters), '/' made '\'
-		// in the copy only (the game's path is passed on as it is), then made full - a "\\?\UNC\server\share"
-		// path, the prefix in any case, as "\\server\share", any other "\\?\" path without the prefix and as
-		// it is, as Windows takes it, every other path through GetFullPathNameW, which makes it absolute from
-		// the current directory, as DirectStorage does, and collapses "." and "..".
+		// An OpenFile path as DirectStorage opens it, worked out on the stack - no memory allocation, nothing
+		// that can throw: copied (at most kMaxPathChars characters), '/' made '\' in the copy only (the game's
+		// path is passed on as it is), then made full - a "\\?\UNC\server\share" path, the prefix in any case,
+		// as "\\server\share", any other "\\?\" path without the prefix and as it is, as Windows takes it,
+		// every other path through GetFullPathNameW, which makes it absolute from the current directory, as
+		// DirectStorage does, and collapses "." and "..".
 		struct OpenFilePath
 		{
 			wchar_t full[kMaxPathChars + 1];
 			size_t length = 0;
-			bool readable = false;	// false: it could not be read or made full, and is passed on unchecked
+			bool readable = false;	// false: it could not be read or made full
 			bool inside = false;	// in the game folder
-			bool archive = false;	// ends in .rpf or .cache
+			bool archive = false;	// .rpf or .cache
 
 			std::wstring_view Full() const { return { full, length }; }
 		};
@@ -729,7 +1148,9 @@ namespace TweaksV
 			std::wstring_view relative;
 			result.readable = true;
 			result.inside = InGameFolder(result.Full(), relative);
-			result.archive = IsArchive(result.Full());
+			PathFacts facts;
+			ReadPathFacts(result.full, result.length, facts);
+			result.archive = facts.archive;
 		}
 
 		// The name of an OpenFile path in a line: below the game folder for a path inside it ("x64a.rpf"),
@@ -749,101 +1170,17 @@ namespace TweaksV
 			return category + ToUtf8(name);
 		}
 
-		// The refused files by type, for the summary: a fixed table that the game's threads fill without a
-		// lock or an allocation, in the order the types come. A type is the extension with its dot, in lower
-		// case, packed into 8 bytes; one that does not fit - longer, or not plain ASCII - and every type past
-		// the table's end counts as "others".
-		constexpr uint64_t kNoExtension = 1;	// "(none)": a packed extension starts with its dot, so it is never 1
-		struct TypeCount
-		{
-			std::atomic<uint64_t> type{ 0 };	// 0: free
-			std::atomic<uint64_t> count{ 0 };
-		};
-		TypeCount g_refusedTypes[kMaxTypesShown];
-		std::atomic<uint64_t> g_refusedOthers{ 0 };
-
-		uint64_t PackedType(std::wstring_view path)
-		{
-			const size_t slash = path.find_last_of(L'\\');
-			const std::wstring_view name = slash == std::wstring_view::npos ? path : path.substr(slash + 1);
-			const size_t dot = name.find_last_of(L'.');
-			if (dot == std::wstring_view::npos || dot == 0)
-				return kNoExtension;
-			const std::wstring_view extension = name.substr(dot);
-			if (extension.size() > sizeof(uint64_t))
-				return 0;
-			uint64_t packed = 0;
-			for (size_t i = 0; i < extension.size(); i++)
-			{
-				wchar_t c = extension[i];
-				if (c >= L'A' && c <= L'Z')
-					c = static_cast<wchar_t>(c - L'A' + L'a');
-				if (c <= L' ' || c > L'~')
-					return 0;
-				packed |= static_cast<uint64_t>(c) << (8 * i);
-			}
-			return packed;
-		}
-
-		void CountRefusedType(uint64_t type)
-		{
-			if (type != 0)
-				for (TypeCount& entry : g_refusedTypes)
-				{
-					uint64_t current = entry.type.load(std::memory_order_acquire);
-					if (current == 0 && entry.type.compare_exchange_strong(current, type, std::memory_order_acq_rel))
-						current = type;	// taken for this type; on a race, current is what the other thread put there
-					if (current == type)
-					{
-						entry.count.fetch_add(1, std::memory_order_relaxed);
-						return;
-					}
-				}
-			g_refusedOthers.fetch_add(1, std::memory_order_relaxed);
-		}
-
-		// ".txt 4, .asi 1, (none) 1, others 2"
-		std::string RefusedTypesText()
-		{
-			std::string text;
-			for (const TypeCount& entry : g_refusedTypes)
-			{
-				const uint64_t type = entry.type.load(std::memory_order_acquire), count = entry.count.load();
-				if (type == 0 || count == 0)
-					continue;
-				std::string name = "(none)";
-				if (type != kNoExtension)
-				{
-					name.clear();
-					for (uint64_t rest = type; rest; rest >>= 8)
-						name += static_cast<char>(rest & 0xFF);
-				}
-				text += (text.empty() ? "" : ", ") + name + " " + std::to_string(count);
-			}
-			if (const uint64_t others = g_refusedOthers.load())
-				text += (text.empty() ? "" : ", ") + std::string("others ") + std::to_string(others);
-			return text;
-		}
-
 		void LogOpenFileSummary()
 		{
 			// each figure read once, and the calls their sum, so the figures add up whatever comes meanwhile
-			const uint64_t archives = g_archives.load(), refused = g_refused.load(), otherInside = g_otherInside.load(),
-				outside = g_outside.load(), unreadable = g_unreadable.load();
-			const uint64_t calls = archives + refused + otherInside + outside + unreadable;
-			const std::string seconds = std::to_string(kOpenFileSummaryMs / 1000);
-			const std::string unread = unreadable ? ", " + std::to_string(unreadable) + " with an unreadable path passed on" : "";
-			if (g_unlockFiles)
-				WriteLog(kTag, "UNLOCK_FILES: in its first " + seconds + " seconds the game asked DirectStorage for " +
-					std::to_string(calls) + " files: " + std::to_string(archives) + " .rpf and .cache files were opened, " +
-					std::to_string(refused) + " other files in the game folder refused, so they stay free for other programs" +
-					(outside ? ", " + std::to_string(outside) + " outside the game folder opened as usual" : "") + unread +
-					(refused ? "; refused by type: " + RefusedTypesText() : "") + ".");
-			else
-				WriteLog(kTag, "OpenFile: in its first " + seconds + " seconds the game asked DirectStorage for " +
-					std::to_string(calls) + " files: " + std::to_string(archives) + " .rpf and .cache files, " +
-					std::to_string(otherInside) + " other files in the game folder and " + std::to_string(outside) +
-					" outside it" + unread + " (UNLOCK_FILES=0 - all of them opened).");
+			const uint64_t archives = g_archives.load(), otherInside = g_otherInside.load(), outside = g_outside.load(),
+				unreadable = g_unreadable.load();
+			const uint64_t calls = archives + otherInside + outside + unreadable;
+			WriteLog(kTag, "OpenFile: in its first " + std::to_string(kOpenFileSummaryMs / 1000) + " seconds the game asked "
+				"DirectStorage for " + std::to_string(calls) + " files: " + std::to_string(archives) + " .rpf and .cache files, " +
+				std::to_string(otherInside) + " other files in the game folder and " + std::to_string(outside) + " outside it" +
+				(unreadable ? ", " + std::to_string(unreadable) + " with an unreadable path" : std::string()) +
+				" - all of them passed on to DirectStorage.");
 		}
 
 		DWORD WINAPI OpenFileSummaryThread(LPVOID module)
@@ -856,59 +1193,25 @@ namespace TweaksV
 			catch (...)
 			{
 			}
-			g_openFileSummaryDone = true;
 			FreeLibraryAndExitThread(static_cast<HMODULE>(module), 0);
 		}
 
-		// The summary 10 seconds after the first call. Without it every later refusal gets a line of its own,
-		// and with UNLOCK_FILES the part's status line is missing - a problem.
-		void StartOpenFileSummary()
+		// Every call, 20,000 lines at most; the name is made only for a line that is written.
+		void LogOpenFile(uint64_t number, const OpenFilePath& path, HRESULT result)
 		{
-			if (StartModuleThread(OpenFileSummaryThread, "OpenFile summary"))
+			if (!Counted(g_openFileLines, "DIAGNOSTIC: ", "OpenFile calls"))
 				return;
-			g_openFileSummaryDone = true;
-			if (g_unlockFiles)
-				ReportFailure(kTag, "The UNLOCK_FILES summary is not written this session: its thread could not be started (details in "
-					"TweaksV.log).");
-		}
-
-		// DIAGNOSTIC_MODE: every call; otherwise only the refusals after the summary. Each kind stops after
-		// kMaxLinesPerKind lines; the name is made only for a line that is written.
-		void LogOpenFile(uint64_t number, const OpenFilePath& path, bool refused, HRESULT result)
-		{
-			if (g_diagnostic)
-			{
-				if (!Counted(g_openFileLines, "DIAGNOSTIC: ", "OpenFile calls"))
-					return;
-				std::string text = "OpenFile #" + std::to_string(number) + ": " + LogName(path) + " -> " +
-					(refused ? std::string("refused (in the game folder, not .rpf or .cache)") : HResultText(result));
-				if (number == 1)
-					text += ", from " + DescribeCallers(nullptr);
-				WriteLog(kTag, text);
-			}
-			else if (refused && g_openFileSummaryDone.load() && Counted(g_lateLines, "UNLOCK_FILES: ", "files refused after the summary"))
-			{
-				WriteLog(kTag, "UNLOCK_FILES: refused " + LogName(path) + " (in the game folder, not .rpf or .cache).");
-			}
+			std::string text = "OpenFile #" + std::to_string(number) + ": " + LogName(path) + " -> " + HResultText(result);
+			if (number == 1)
+				text += ", from " + DescribeCallers(nullptr);
+			WriteLog(kTag, text);
 		}
 
 		HRESULT STDMETHODCALLTYPE HookOpenFile(void* factory, const WCHAR* path, REFIID riid, void** ppv)
 		{
 			OpenFilePath checked;
 			ReadOpenFilePath(path, checked);
-			const bool refuse = g_unlockFiles && checked.inside && !checked.archive;	// never outside the game folder: saves, settings
-
-			HRESULT result = S_OK;
-			if (refuse)
-			{
-				if (ppv)
-					*ppv = nullptr;
-				result = HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);	// as for a file that is not there
-			}
-			else
-			{
-				result = g_originalOpenFile(factory, path, riid, ppv);
-			}
+			const HRESULT result = g_originalOpenFile(factory, path, riid, ppv);	// passed on unchanged
 
 			const uint64_t number = ++g_openFileCalls;
 			if (!checked.readable)
@@ -917,29 +1220,21 @@ namespace TweaksV
 				++g_outside;
 			else if (checked.archive)
 				++g_archives;
-			else if (refuse)
-			{
-				++g_refused;
-				CountRefusedType(PackedType(checked.Full()));
-			}
 			else
 				++g_otherInside;
 			AfterCall([&]
 			{
-				if (number == 1)
-					StartOpenFileSummary();
-				LogOpenFile(number, checked, refuse, result);
+				if (number == 1)	// the summary 10 seconds after the first call; a thread that cannot start is logged
+					StartModuleThread(OpenFileSummaryThread, "OpenFile summary");
+				LogOpenFile(number, checked, result);
 			});
 			return result;
 		}
 
-		// A failure of the OpenFile hook: with UNLOCK_FILES a problem, for DIAGNOSTIC_MODE alone a log line.
+		// The OpenFile hook is a diagnostic aid: what keeps it from being made is a log line.
 		void FailOpenFile(const std::string& why)
 		{
-			if (g_unlockFiles)
-				ReportFailure(kTag, "The files in the game folder are not unlocked this session: " + why + ".");
-			else
-				WriteLog(kTag, "DIAGNOSTIC: OpenFile is not logged: " + why + ".");
+			WriteLog(kTag, "DIAGNOSTIC: OpenFile is not logged: " + why + ".");
 		}
 
 		// Under g_openFileLock: another interface next to the one TweaksV knows, said once a session.
@@ -996,12 +1291,8 @@ namespace TweaksV
 
 			if (!HookFunctions({ { target, reinterpret_cast<const void*>(&HookOpenFile), reinterpret_cast<void**>(&g_originalOpenFile), "OpenFile" } }, kTag))
 				FailOpenFile("OpenFile (" + DescribeCode(target) + ") could not be hooked (details in TweaksV.log)");
-			else if (g_unlockFiles)
-				WriteLog(kTag, "UNLOCK_FILES: from now on DirectStorage may open only the .rpf and .cache files in the game "
-					"folder (OpenFile at " + DescribeCode(target) + " hooked); files outside it are not touched.");
 			else
-				WriteLog(kTag, "DIAGNOSTIC: the game's OpenFile calls are logged (OpenFile at " + DescribeCode(target) +
-					" hooked); UNLOCK_FILES=0, so every file is opened.");
+				WriteLog(kTag, "DIAGNOSTIC: the game's OpenFile calls are logged (OpenFile at " + DescribeCode(target) + " hooked).");
 		}
 
 		// The game got a factory for riid. For the interface TweaksV knows, OpenFile is hooked once, before the
@@ -1023,26 +1314,19 @@ namespace TweaksV
 					return;
 				g_interfaceCheckStarted = true;
 				g_otherInterface = riid;
-				if (!StartModuleThread(InterfaceCheckThread, "DirectStorage interface check") && g_unlockFiles)
-					ReportFailure(kTag, "The check of the other DirectStorage interface the game asked for, " + GuidText(riid) +
-						", is not done this session: its thread could not be started (details in TweaksV.log).");
+				StartModuleThread(InterfaceCheckThread, "DirectStorage interface check");	// one that cannot start is logged
 				return;
 			}
 
-			// made before the attempt, so that reporting an exception in it needs no new text
-			const std::string unexpected = g_unlockFiles
-				? "The files in the game folder are not unlocked this session: OpenFile could not be hooked (unexpected exception)."
-				: "DIAGNOSTIC: OpenFile is not logged: OpenFile could not be hooked (unexpected exception).";
+			// made before the attempt, so that logging an exception in it needs no new text
+			const std::string unexpected = "DIAGNOSTIC: OpenFile is not logged: OpenFile could not be hooked (unexpected exception).";
 			try
 			{
 				HookOpenFileOf(ppv);
 			}
 			catch (...)
 			{
-				if (g_unlockFiles)
-					ReportFailure(kTag, unexpected);
-				else
-					WriteLog(kTag, unexpected);
+				WriteLog(kTag, unexpected);
 			}
 			g_openFileHookTried = true;
 		}
@@ -1065,7 +1349,7 @@ namespace TweaksV
 		ConfigurationFunction g_configurationFunctions[] = { { "DStorageSetConfiguration", 7, nullptr },
 			{ "DStorageSetConfiguration1", 8, nullptr } };
 
-		// DIAGNOSTIC_MODE: where the factory's first 8 functions are (IUnknown's 3, then its own)
+		// Where the factory's first 8 functions are (IUnknown's 3, then its own)
 		void LogFactoryFunctions(void** ppv)
 		{
 			void* factory = nullptr;
@@ -1090,15 +1374,13 @@ namespace TweaksV
 			const HRESULT result = g_originalGetFactory(riid, ppv);
 			AfterCall([&]
 			{
-				if (g_diagnostic)
-				{
-					WriteLog(kTag, "the game asked for the DirectStorage factory (call #" + std::to_string(++g_factoryCalls) +
-						", interface " + GuidText(riid) + ") -> " + HResultText(result) + ", from " + DescribeCallers(nullptr));
-					if (SUCCEEDED(result) && ppv)
-						LogFactoryFunctions(ppv);
-				}
+				WriteLog(kTag, "the game asked for the DirectStorage factory (call #" + std::to_string(++g_factoryCalls) +
+					", interface " + GuidText(riid) + ") -> " + HResultText(result) + ", from " + DescribeCallers(nullptr));
 				if (SUCCEEDED(result) && ppv)
+				{
+					LogFactoryFunctions(ppv);
 					HookFactoryOpenFile(riid, ppv);
+				}
 			});
 			return result;
 		}
@@ -1129,17 +1411,15 @@ namespace TweaksV
 			return result;
 		}
 
-		// UNLOCK_FILES: a factory the game has not asked for 30 seconds after TweaksV started may have been
-		// asked for before TweaksV was loaded. Nothing is unlocked then, so it is a problem - reported after
-		// the start-up summary, it gets a message box of its own.
+		// A factory the game has not asked for 30 seconds after TweaksV started may have been asked for before
+		// TweaksV was loaded: the calls are not logged then. A diagnostic line - nothing depends on the factory.
 		DWORD WINAPI FactoryCheckThread(LPVOID module)
 		{
 			Sleep(kFactoryCheckMs);
 			try
 			{
 				if (!g_factoryAsked.load())
-					ReportFailure(kTag, "The files in the game folder are not unlocked this session: the game has not asked for its "
-						"DirectStorage factory since TweaksV started - TweaksV may have been loaded too late.");
+					WriteLog(kTag, "DIAGNOSTIC: the game has not asked for its DirectStorage factory since TweaksV started.");
 			}
 			catch (...)
 			{
@@ -1183,6 +1463,29 @@ namespace TweaksV
 			if (longLength > 0 && longLength < std::size(longForm))
 				g_tempFolders[1].assign(longForm, longLength);
 		}
+
+		// The game folder's identity (FolderIdentity), read before the hook is made. False, with Windows'
+		// error, if it cannot be read: no open relative to a folder handle is then known to lie in the game
+		// folder.
+		bool ReadGameFolderIdentity(DWORD& error)
+		{
+			const HANDLE folder = CreateFileW(g_gameFolder.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE |
+				FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+			if (folder == INVALID_HANDLE_VALUE)
+			{
+				error = GetLastError();
+				return false;
+			}
+			for (const IdentityKind kind : { IdentityKind::FileId, IdentityKind::FileIndex })
+				if (IdentityOf(folder, kind, g_gameFolderIdentity))
+				{
+					g_identityKind = kind;
+					break;
+				}
+			error = GetLastError();
+			CloseHandle(folder);
+			return g_identityKind != IdentityKind::None;
+		}
 	}
 
 	void InitDirectStorage()
@@ -1209,7 +1512,8 @@ namespace TweaksV
 		if (IsDryRun())
 		{
 			if (unlock)
-				WriteLog(kTag, "DRY_RUN: would let DirectStorage open only .rpf and .cache files (UNLOCK_FILES).");
+				WriteLog(kTag, "DRY_RUN: would hook NtCreateFile so that the game folder's other files are opened with write and "
+					"delete sharing (UNLOCK_FILES).");
 			if (diagnostic)
 			{
 				WriteLog(kTag, "DRY_RUN: would hook dstorage.dll to log the game's DirectStorage calls.");
@@ -1225,43 +1529,50 @@ namespace TweaksV
 		g_kernelBase = RangeOf(GetModuleHandleW(L"KernelBase.dll"));
 		g_kernel32 = RangeOf(GetModuleHandleW(L"kernel32.dll"));
 
-		if (!loaded)
+		// DIAGNOSTIC_MODE: the calls into DirectStorage - the factory's OpenFile is hooked when the game creates the
+		// factory (HookFactoryOpenFile). Diagnostic aids: what cannot be hooked is logged.
+		if (diagnostic && !loaded)
+			WriteLog(kTag, "dstorage.dll is not loaded, so the game does not use DirectStorage here: there are no DirectStorage "
+				"calls to log.");
+		else if (diagnostic)
 		{
-			WriteLog(kTag, std::string("dstorage.dll is not loaded, so the game does not use DirectStorage here: there is ") +
-				"nothing to " + (unlock ? "unlock." : "log."));
-		}
-		else
-		{
-			// the factory's OpenFile is hooked when the game creates the factory (HookFactoryOpenFile)
 			const bool factory = InstallHook(L"dstorage.dll", "DStorageGetFactory", reinterpret_cast<LPVOID>(&HookGetFactory),
 				reinterpret_cast<LPVOID*>(&g_originalGetFactory));
-			if (diagnostic)
-			{
-				int hooked = factory ? 1 : 0;
-				hooked += InstallHook(L"dstorage.dll", g_configurationFunctions[0].name, reinterpret_cast<LPVOID>(&HookSetConfiguration<0>),
-					reinterpret_cast<LPVOID*>(&g_configurationFunctions[0].original)) ? 1 : 0;
-				hooked += InstallHook(L"dstorage.dll", g_configurationFunctions[1].name, reinterpret_cast<LPVOID>(&HookSetConfiguration<1>),
-					reinterpret_cast<LPVOID*>(&g_configurationFunctions[1].original)) ? 1 : 0;
-				WriteLog(kTag, "DIAGNOSTIC: the game's DirectStorage calls are logged (" + std::to_string(hooked) +
-					" of 3 functions hooked).");
-			}
-			if (unlock && factory)
-			{
-				WriteLog(kTag, "UNLOCK_FILES: when the game creates its DirectStorage factory, OpenFile is hooked so that "
-					"in the game folder only .rpf and .cache files can be opened.");
-				// a check whose thread cannot start is logged and reported: without it, a factory that never comes
-				// would go unreported
-				if (!StartModuleThread(FactoryCheckThread, "DirectStorage factory check"))
-					ReportFailure(kTag, "The check that the game asks for its DirectStorage factory is not done this session: its thread "
-						"could not be started (details in TweaksV.log).");
-			}
-			else if (unlock)
-				ReportFailure(kTag, "The files in the game folder are not unlocked this session: DStorageGetFactory could "
-					"not be hooked (details in TweaksV.log).");
+			int hooked = factory ? 1 : 0;
+			hooked += InstallHook(L"dstorage.dll", g_configurationFunctions[0].name, reinterpret_cast<LPVOID>(&HookSetConfiguration<0>),
+				reinterpret_cast<LPVOID*>(&g_configurationFunctions[0].original)) ? 1 : 0;
+			hooked += InstallHook(L"dstorage.dll", g_configurationFunctions[1].name, reinterpret_cast<LPVOID>(&HookSetConfiguration<1>),
+				reinterpret_cast<LPVOID*>(&g_configurationFunctions[1].original)) ? 1 : 0;
+			WriteLog(kTag, "DIAGNOSTIC: the game's DirectStorage calls are logged (" + std::to_string(hooked) + " of 3 functions hooked).");
+			if (factory)
+				StartModuleThread(FactoryCheckThread, "DirectStorage factory check");	// one that cannot start is logged
 		}
 
-		if (diagnostic && InstallHook(L"ntdll.dll", "NtCreateFile", reinterpret_cast<LPVOID>(&HookNtCreateFile),
+		// One NtCreateFile hook for both jobs, made whatever loaded DirectStorage: UNLOCK_FILES frees the files
+		// whoever opens them. First what the hook uses from its first call on: the game folder's identity and
+		// the event it sets at the first open it counts.
+		DWORD identityError = 0;
+		const bool identity = unlock && ReadGameFolderIdentity(identityError);
+		if (unlock)
+			g_firstCounted = CreateEventW(nullptr, TRUE, FALSE, nullptr);	// null: the summary's clock starts at once
+		if (!InstallHook(L"ntdll.dll", "NtCreateFile", reinterpret_cast<LPVOID>(&HookNtCreateFile),
 			reinterpret_cast<LPVOID*>(&g_originalNtCreateFile)))
+		{
+			if (unlock)
+				ReportFailure(kTag, "The files in the game folder are not unlocked this session: NtCreateFile could not be hooked "
+					"(details in TweaksV.log).");
+			return;
+		}
+		if (unlock)
+		{
+			WriteLog(kTag, "UNLOCK_FILES: NtCreateFile is hooked - a read-only open of a file in the game folder other than .rpf "
+				"and .cache that shares reading gets write and delete sharing too, so those files stay free for other programs.");
+			StartMeasurement<kUnlockMeasurement>();	// the summary; one that cannot start is logged
+			if (!identity)
+				ReportFailure(kTag, "Files in the game folder opened by a relative path are not unlocked this session: the game "
+					"folder's file ID could not be read (" + DescribeError(identityError) + ").");
+		}
+		if (diagnostic)
 		{
 			WriteLog(kTag, "DIAGNOSTIC: every open of a file or folder in " + ToUtf8(g_gameFolder) + " is logged, " +
 				std::to_string(kLinesPerWay) + " lines per file, caller and sharing; a summary follows every minute.");
