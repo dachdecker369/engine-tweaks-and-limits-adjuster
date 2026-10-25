@@ -30,11 +30,12 @@
 // The game's file system is not up in DllMain, so the part hooks GetSystemTimeAsFileTime and does its
 // work when the game first asks for the time; then it shows the start-up summary and switches that
 // hook off again - or, if the game has not asked 30 seconds in, a thread says so, shows the summary and
-// switches the hook off. A file function another mod has already hooked is hooked on top and chains
-// through - for the four found by a pattern inside them (GetFileTime and GetFileSize of both devices):
-// a hook on OpenBulk or GetAttributes changes the bytes their patterns match at the function's start,
-// so the pattern is not found and the mods folder is not used. A call another mod has redirected, and
-// a cache check another mod has skipped or hooked, are left alone.
+// switches the hook off; when that thread cannot start, DllMain shows the summary instead. A file
+// function another mod has already hooked is hooked on top and chains through - for the four found by a
+// pattern inside them (GetFileTime and GetFileSize of both devices): a hook on OpenBulk or GetAttributes
+// changes the bytes their patterns match at the function's start, so the pattern is not found and the
+// mods folder is not used. A call another mod has redirected, and a cache check another mod has skipped
+// or hooked, are left alone.
 // Written for TweaksV; the patterns, the archive facts and the idea come from RageOpenV by
 // Chiheb-Bacha, which builds on ClosedIV by martonp96 (CREDITS.md).
 
@@ -954,7 +955,16 @@ namespace TweaksV
 				"OPEN archives and the cache check skip are off this session.");
 			return false;
 		}
-		StartModuleThread(StartUpCheckThread, "RageOpenV start-up check");	// one that cannot start is logged
+		// Without the check, a game that never asks for the time would show no part's start-up summary: a check
+		// whose thread cannot start is logged and reported, and DllMain shows the summary itself. The hook stays
+		// on - the start-up still runs at the first time request, its problems come after the summary, and its
+		// own call to show the summary does nothing, since the summary is shown once.
+		if (!StartModuleThread(StartUpCheckThread, "RageOpenV start-up check"))
+		{
+			ReportFailure(kTag, "The check that RageOpenV's start-up runs is not done this session: its thread could not be started "
+				"(details in TweaksV.log).");
+			return false;
+		}
 		return true;
 	}
 }

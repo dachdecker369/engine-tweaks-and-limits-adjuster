@@ -8,7 +8,8 @@
 namespace TweaksV
 {
 	// Hooks GetSystemTimeAsFileTime so that the part's start-up runs at the game's first time request.
-	// True if that hook is on: the start-up shows the start-up summary - or a thread does, 30 seconds in,
-	// if the game never asks - so DllMain must not. Called once by DllMain.
+	// True if the start-up shows the start-up summary - or a thread does, 30 seconds in, if the game never
+	// asks - so DllMain must not; false if the hook could not be made or that thread could not be started:
+	// DllMain shows it then. Called once by DllMain.
 	bool InitRageOpenV();
 }
