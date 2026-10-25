@@ -40,13 +40,17 @@
 //   decalbadsize   the parser's check of the limit holds an implausible 131071
 //   decalfull      260 decal definitions are registered (the game's own array is full)
 //   decalmany      300 decal definitions are registered
-//   dstorage       loads the stand-in dstorage.dll (fake_dstorage.cpp) before TweaksV, calls it after
+//   dstorage       loads the stand-in dstorage.dll (fake_dstorage.cpp) before TweaksV, calls it after: the
+//                  configuration, the factory and its OpenFile for 19 paths, the files it holds closed again
 //   dsotherinterface  with dstorage: first asks for a DirectStorage interface TweaksV does not know, then for the known one
 //   dsotherlater   with dstorage: asks for an interface TweaksV does not know after the known one and its files
 //   dsotheronly    with dstorage: asks only for an interface TweaksV does not know - no factory TweaksV knows, no file;
-//                  stays 1.5 s longer after "wait", for the problem TweaksV reports 10 s after that request
+//                  stays 1.5 s longer after "wait", for the line TweaksV writes 10 s after that request
 //   dsnofactory    with dstorage: never asks for a factory
-//   dsflood        with dstorage: 20,001 more OpenFile calls of a file TweaksV refuses, after "wait" or "waitlong"
+//   dsflood        with dstorage: 20,001 more OpenFile calls, after "wait" or "waitlong"
+//   dsshare        with dstorage: other programs' opens of files the stand-in holds open (ShareThroughStandIn)
+//   ownshare       other programs' opens next to the fake's own opens in its folder (ShareOwnOpens)
+//   dstypes        read-only opens of 17 files of 17 types in its folder that are not there
 //   dsopenflood    opens 100,001 files in its folder that are not there, each by another name, after TweaksV has started
 //   fileopens      opens files in its folder (and one outside, in %TEMP%) after TweaksV has started
 //   nodyncode      no code may be changed or made once TweaksV loads (Windows' dynamic code policy)
@@ -58,6 +62,7 @@
 //   wait           stays 11 seconds longer before it reports
 //   waitlong       stays 31 seconds longer before it reports (TweaksV's DirectStorage factory check comes 30 s in)
 #include <windows.h>
+#include <winternl.h>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -776,20 +781,37 @@ static void CheckStub(const unsigned char* callTarget)
 		g_writableStubs++;
 }
 
-// DirectStorage (TweaksV's UNLOCK_FILES and DIAGNOSTIC_MODE): the calls the game makes into dstorage.dll,
-// and the factory's OpenFile for 19 paths: 4 archives in the game folder (one with a full path, one
-// .CACHE), 7 other files in it (one with '/', one with a \\?\ prefix, one named x.rpf.txt, one whose
-// extension is too long for TweaksV's table of types), 7 paths outside it (a save, temp files - one an
-// archive - a sibling folder whose name starts with the game folder's, a path that leaves the game folder
-// through "..", a network path in its \\?\UNC\ form, its prefix in upper and in lower case) and one too long
-// to check.
+// DirectStorage (TweaksV's UNLOCK_FILES and DIAGNOSTIC_MODE): the calls the game makes into the stand-in
+// dstorage.dll, which opens its files for real and holds them open, as DirectStorage does, and the factory's
+// OpenFile for 19 paths: 4 archives in the game folder (one with a full path, one .CACHE), 7 other files in
+// it (one with '/', one with a \\?\ prefix, one named x.rpf.txt, one whose extension is too long for
+// TweaksV's table of types), 7 paths outside it (a save, temp files - one an archive - a sibling folder whose
+// name starts with the game folder's, a path that leaves the game folder through "..", a network path in its
+// \\?\UNC\ form, its prefix in upper and in lower case) and one too long to check. The files in the game
+// folder are made first and deleted again afterwards; the others are not there.
 enum class OtherInterface { None, First, Later, Only };
 static const GUID g_factoryId = { 0x6924EA0C, 0xC3CD, 0x4826, { 0xB1, 0x0A, 0xF6, 0x4F, 0x4E, 0xD9, 0x27, 0xC1 } };
 static const GUID g_otherId = { 0x12345678, 0x1234, 0x5678, { 0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78 } };
 using OpenFileFn = HRESULT(STDMETHODCALLTYPE*)(void*, const wchar_t*, REFIID, void**);
-static void* g_factory = nullptr;			// for dsflood
+using FileHandleFn = HANDLE(WINAPI*)(void*);
+using CloseFileFn = void(WINAPI*)(void*);
+static void* g_factory = nullptr;			// for dsshare and dsflood
 static OpenFileFn g_openFile = nullptr;
+static FileHandleFn g_fileHandle = nullptr;	// the handle a file the stand-in opened holds
+static CloseFileFn g_closeFile = nullptr;	// lets go of a file the stand-in opened
 static wchar_t g_dstorageResult[1024];
+
+// A file of the fake's own with text in it (one write open).
+static void MakeFile(const wchar_t* path, const char* text = "test")
+{
+	const HANDLE file = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+		return;
+	DWORD written = 0;
+	WriteFile(file, text, static_cast<DWORD>(strlen(text)), &written, nullptr);
+	CloseHandle(file);
+}
+
 static void CallDStorage(HMODULE dstorage, OtherInterface other)
 {
 	using GetFactory = HRESULT(WINAPI*)(REFIID, void**);
@@ -799,8 +821,10 @@ static void CallDStorage(HMODULE dstorage, OtherInterface other)
 	const auto getFactory = reinterpret_cast<GetFactory>(GetProcAddress(dstorage, "DStorageGetFactory"));
 	using FakeOpenFileCalls = long(WINAPI*)();
 	const auto openFileCalls = reinterpret_cast<FakeOpenFileCalls>(GetProcAddress(dstorage, "FakeOpenFileCalls"));
+	g_fileHandle = reinterpret_cast<FileHandleFn>(GetProcAddress(dstorage, "FakeFileHandle"));
+	g_closeFile = reinterpret_cast<CloseFileFn>(GetProcAddress(dstorage, "FakeCloseFile"));
 	const size_t size = sizeof(g_dstorageResult) / sizeof(g_dstorageResult[0]);
-	if (!setConfiguration || !setConfiguration1 || !getFactory || !openFileCalls)
+	if (!setConfiguration || !setConfiguration1 || !getFactory || !openFileCalls || !g_fileHandle || !g_closeFile)
 	{
 		swprintf(g_dstorageResult, size, L"dstorage: exports missing | ");
 		return;
@@ -831,13 +855,13 @@ static void CallDStorage(HMODULE dstorage, OtherInterface other)
 	wchar_t folder[MAX_PATH + 1] = {};
 	GetCurrentDirectoryW(MAX_PATH, folder);
 	wchar_t absolute[MAX_PATH + 64] = {}, prefixed[MAX_PATH + 64] = {}, sibling[MAX_PATH + 64] = {}, dotdot[MAX_PATH + 64] = {};
-	swprintf(absolute, MAX_PATH + 64, L"%ls\\update\\update.RPF", folder);
+	swprintf(absolute, MAX_PATH + 64, L"%ls\\ds_update\\update.RPF", folder);
 	swprintf(prefixed, MAX_PATH + 64, L"\\\\?\\%ls\\prefixed.txt", folder);		// in the game folder after all
 	swprintf(sibling, MAX_PATH + 64, L"%ls2\\sibling.txt", folder);			// "...\TestRun2": not in the game folder
 	swprintf(dotdot, MAX_PATH + 64, L"%ls\\..\\outside.txt", folder);		// out of it again
 	// outside the game folder, like the game's saves (Documents\...\Profiles\...\SGTA50000) - here in the
 	// folder above it, outside %TEMP% too - its cloud files in %TEMP% and a network path in its
-	// \\?\UNC\ form: these must always reach DirectStorage
+	// \\?\UNC\ form: none of them is there
 	wchar_t save[MAX_PATH + 64] = {};
 	wcscpy_s(save, folder);
 	if (wchar_t* const slash = wcsrchr(save, L'\\'))
@@ -847,7 +871,7 @@ static void CallDStorage(HMODULE dstorage, OtherInterface other)
 	GetTempPathW(MAX_PATH, tempFolder);
 	swprintf(temp, MAX_PATH + 64, L"%lscloud_tweaksv.dat", tempFolder);
 	swprintf(tempArchive, MAX_PATH + 64, L"%lsoutside.rpf", tempFolder);
-	static wchar_t tooLong[3001];	// more than the 2047 characters TweaksV checks: passed on unchecked
+	static wchar_t tooLong[3001];	// more than the 2047 characters TweaksV checks
 	wmemset(tooLong, L'a', 3000);
 	tooLong[3000] = L'\0';
 	const struct { const wchar_t* name; const wchar_t* path; } files[] = { { L"rpf", L"x64a.rpf" }, { L"RPF", absolute },
@@ -856,36 +880,252 @@ static void CallDStorage(HMODULE dstorage, OtherInterface other)
 		{ L"slash", L"ds_dir/slash.txt" }, { L"prefixed", prefixed }, { L"sibling", sibling }, { L"dotdot", dotdot },
 		{ L"rpftxt", L"x.rpf.txt" }, { L"CACHE", L"y.CACHE" }, { L"outrpf", tempArchive },
 		{ L"unc2", L"\\\\?\\unc\\localhost\\tweaksv_share\\cloud2.dat" }, { L"long", tooLong }, { L"manifest", L"other.manifest" } };
+	// the files in the game folder (TweaksV.asi is there already)
+	const wchar_t* const made[] = { L"x64a.rpf", L"ds_update\\update.RPF", L"rpf.cache", L"locktest.txt", L"noextension",
+		L"ds_dir\\slash.txt", L"prefixed.txt", L"x.rpf.txt", L"y.CACHE", L"other.manifest" };
+	CreateDirectoryW(L"ds_update", nullptr);
+	CreateDirectoryW(L"ds_dir", nullptr);
+	for (const wchar_t* path : made)
+		MakeFile(path);
+	void* opened[sizeof(files) / sizeof(files[0])] = {};
 	length += swprintf(g_dstorageResult + length, size - length, L"open:");
-	for (const auto& file : files)
+	for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++)
 	{
-		void* opened = nullptr;
-		const HRESULT result = openFile(factory, file.path, g_factoryId, &opened);
-		length += swprintf(g_dstorageResult + length, size - length, L" %ls 0x%lX,", file.name, static_cast<unsigned long>(result));
+		const HRESULT result = openFile(factory, files[i].path, g_factoryId, &opened[i]);
+		length += swprintf(g_dstorageResult + length, size - length, L" %ls 0x%lX,", files[i].name, static_cast<unsigned long>(result));
 	}
 	swprintf(g_dstorageResult + length, size - length, L" reached %ld | ", openFileCalls());
+	for (void* file : opened)
+		g_closeFile(file);	// nullptr for a file not opened
+	for (const wchar_t* path : made)
+		DeleteFileW(path);
+	RemoveDirectoryW(L"ds_update");
+	RemoveDirectoryW(L"ds_dir");
 	if (other == OtherInterface::Later)	// dsotherlater: an interface TweaksV does not know, after the known one
 		getFactory(g_otherId, &otherFactory);
 }
 
-// dsflood: 20,001 more OpenFile calls of a file TweaksV refuses with UNLOCK_FILES.
+// dsflood: 20,001 more OpenFile calls - with DIAGNOSTIC_MODE, more than the 20,000 OpenFile lines TweaksV writes.
 static wchar_t g_floodResult[64];
 static void FloodOpenFile()
 {
 	if (!g_openFile)
 		return;
-	int refused = 0;
+	int calls = 0;
 	for (int i = 0; i < 20001; i++)
 	{
 		void* file = nullptr;
-		if (g_openFile(g_factory, L"locktest.txt", g_factoryId, &file) == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
-			refused++;
+		g_openFile(g_factory, L"locktest.txt", g_factoryId, &file);
+		g_closeFile(file);
+		calls++;
 	}
-	swprintf(g_floodResult, sizeof(g_floodResult) / sizeof(g_floodResult[0]), L"flood: %d refused | ", refused);
+	swprintf(g_floodResult, sizeof(g_floodResult) / sizeof(g_floodResult[0]), L"flood: %d calls | ", calls);
+}
+
+// Opens path as another program would and closes it again: 0 if it opened, else Windows' error.
+static DWORD TryOpen(const wchar_t* path, DWORD access, DWORD share)
+{
+	const HANDLE file = CreateFileW(path, access, share, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+		return GetLastError();
+	CloseHandle(file);
+	return 0;
+}
+
+// Renames from to to and back again, as another program would: 0 if it could be renamed, else Windows' error.
+static DWORD TryRename(const wchar_t* from, const wchar_t* to)
+{
+	if (!MoveFileExW(from, to, 0))
+		return GetLastError();
+	MoveFileExW(to, from, 0);
+	return 0;
+}
+
+// dsshare (with dstorage): while the stand-in holds a file open, as DirectStorage holds the game's, other
+// programs' opens of it. A text file in the game folder, opened by a relative path and by a full one: a write
+// open that shares reading and a rename succeed, a write open that shares nothing fails (the limit: the
+// stand-in reads it). An archive: a write open fails. A loose file in a subfolder, the way a mods loader
+// serves it (onigiri\common\data\gameconfig.xml): opened, its bytes read through the stand-in's handle,
+// shared; the same file by a \\?\ path, shared. A file in %TEMP% and one reached through "..", both outside
+// the game folder: a write open fails. Each open's result, then the error of the other program's open (0:
+// it succeeded).
+static wchar_t g_shareResult[512];
+static void ShareThroughStandIn()
+{
+	const size_t size = sizeof(g_shareResult) / sizeof(g_shareResult[0]);
+	if (!g_openFile)
+	{
+		swprintf(g_shareResult, size, L"share: no stand-in | ");
+		return;
+	}
+	wchar_t folder[MAX_PATH + 1] = {}, path[MAX_PATH * 2] = {};
+	GetCurrentDirectoryW(MAX_PATH, folder);
+	void* file = nullptr;
+
+	MakeFile(L"ds_lock.txt");
+	const HRESULT txt = g_openFile(g_factory, L"ds_lock.txt", g_factoryId, &file);
+	const DWORD txtWrite = TryOpen(L"ds_lock.txt", GENERIC_WRITE, FILE_SHARE_READ);
+	const DWORD txtRename = TryRename(L"ds_lock.txt", L"ds_lock_renamed.txt");
+	const DWORD txtExclusive = TryOpen(L"ds_lock.txt", GENERIC_WRITE, 0);
+	g_closeFile(file);
+	swprintf(path, MAX_PATH * 2, L"%ls\\ds_lock.txt", folder);
+	const HRESULT full = g_openFile(g_factory, path, g_factoryId, &file);
+	const DWORD fullWrite = TryOpen(L"ds_lock.txt", GENERIC_WRITE, FILE_SHARE_READ);
+	g_closeFile(file);
+	DeleteFileW(L"ds_lock.txt");
+
+	MakeFile(L"ds_lock.rpf");
+	const HRESULT rpf = g_openFile(g_factory, L"ds_lock.rpf", g_factoryId, &file);
+	const DWORD rpfWrite = TryOpen(L"ds_lock.rpf", GENERIC_WRITE, FILE_SHARE_READ);
+	g_closeFile(file);
+	DeleteFileW(L"ds_lock.rpf");
+
+	const wchar_t* const loosePath = L"onigiri\\common\\data\\gameconfig.xml";
+	CreateDirectoryW(L"onigiri", nullptr);
+	CreateDirectoryW(L"onigiri\\common", nullptr);
+	CreateDirectoryW(L"onigiri\\common\\data", nullptr);
+	MakeFile(loosePath, "<gameconfig/>");
+	const HRESULT loose = g_openFile(g_factory, loosePath, g_factoryId, &file);
+	char bytes[32] = {};
+	DWORD read = 0;
+	const bool looseBytes = SUCCEEDED(loose) && ReadFile(g_fileHandle(file), bytes, sizeof(bytes) - 1, &read, nullptr) &&
+		read == 13 && memcmp(bytes, "<gameconfig/>", 13) == 0;
+	const DWORD looseWrite = TryOpen(loosePath, GENERIC_WRITE, FILE_SHARE_READ);
+	g_closeFile(file);
+	swprintf(path, MAX_PATH * 2, L"\\\\?\\%ls\\%ls", folder, loosePath);
+	const HRESULT prefixed = g_openFile(g_factory, path, g_factoryId, &file);
+	const DWORD prefixedWrite = TryOpen(loosePath, GENERIC_WRITE, FILE_SHARE_READ);
+	g_closeFile(file);
+	DeleteFileW(loosePath);
+	RemoveDirectoryW(L"onigiri\\common\\data");
+	RemoveDirectoryW(L"onigiri\\common");
+	RemoveDirectoryW(L"onigiri");
+
+	wchar_t temp[MAX_PATH + 64] = {};
+	GetTempPathW(MAX_PATH, temp);
+	wcscat_s(temp, L"tweaksv_ds_temp.txt");
+	MakeFile(temp);
+	const HRESULT tempOpen = g_openFile(g_factory, temp, g_factoryId, &file);
+	const DWORD tempWrite = TryOpen(temp, GENERIC_WRITE, FILE_SHARE_READ);
+	g_closeFile(file);
+	DeleteFileW(temp);
+
+	// out of the game folder through "..", into the harness's %TEMP% next to it (object\TestTemp, common.sh)
+	const wchar_t* const upPath = L"..\\TestTemp\\tweaksv_ds_up.txt";
+	MakeFile(upPath);
+	const HRESULT up = g_openFile(g_factory, upPath, g_factoryId, &file);
+	const DWORD upWrite = TryOpen(upPath, GENERIC_WRITE, FILE_SHARE_READ);
+	g_closeFile(file);
+	DeleteFileW(upPath);
+
+	swprintf(g_shareResult, size, L"share: txt 0x%lX write %lu rename %lu write-exclusive %lu, full 0x%lX write %lu, rpf 0x%lX write %lu, "
+		L"loose 0x%lX bytes %ls write %lu, prefixed 0x%lX write %lu, temp 0x%lX write %lu, up 0x%lX write %lu | ",
+		static_cast<unsigned long>(txt), txtWrite, txtRename, txtExclusive, static_cast<unsigned long>(full), fullWrite,
+		static_cast<unsigned long>(rpf), rpfWrite, static_cast<unsigned long>(loose), looseBytes ? L"ok" : L"WRONG", looseWrite,
+		static_cast<unsigned long>(prefixed), prefixedWrite, static_cast<unsigned long>(tempOpen), tempWrite,
+		static_cast<unsigned long>(up), upWrite);
+}
+
+// NtCreateFile as a program that calls it directly: path relative to root or, without root, made full
+// ("\??\C:\..."). The handle, or nullptr.
+using NtCreateFileFn = LONG(NTAPI*)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PIO_STATUS_BLOCK, PLARGE_INTEGER,
+	ULONG, ULONG, ULONG, ULONG, PVOID, ULONG);
+static HANDLE OpenNt(const wchar_t* path, HANDLE root, ACCESS_MASK access, ULONG share, ULONG options)
+{
+	const auto create = reinterpret_cast<NtCreateFileFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtCreateFile"));
+	wchar_t name[MAX_PATH * 2] = {};
+	if (root)
+		wcscpy_s(name, path);
+	else
+	{
+		wchar_t full[MAX_PATH] = {};
+		GetFullPathNameW(path, MAX_PATH, full, nullptr);
+		swprintf(name, MAX_PATH * 2, L"\\??\\%ls", full);
+	}
+	UNICODE_STRING string{};
+	string.Length = string.MaximumLength = static_cast<USHORT>(wcslen(name) * sizeof(wchar_t));
+	string.Buffer = name;
+	OBJECT_ATTRIBUTES attributes{};
+	InitializeObjectAttributes(&attributes, &string, OBJ_CASE_INSENSITIVE, root, nullptr);
+	IO_STATUS_BLOCK io{};
+	HANDLE handle = nullptr;
+	if (!create || create(&handle, access | SYNCHRONIZE, &attributes, &io, nullptr, FILE_ATTRIBUTE_NORMAL, share, FILE_OPEN,
+		options | FILE_SYNCHRONOUS_IO_NONALERT, nullptr, 0) < 0)
+		return nullptr;
+	return handle;
+}
+
+// ownshare: the fake's own opens in its folder, also without the stand-in (dstorage.dll not loaded), and
+// other programs' opens next to them. A read-only open that shares reading is given write and delete sharing:
+// a write open that shares reading succeeds while it is held. An exclusive read-only open stays exclusive: a
+// second open fails. A folder opened as one (FILE_DIRECTORY_FILE) is left as it is: it cannot be renamed while
+// held. A name relative to another folder's handle is left as it is: a write open fails. A write open is left
+// as it is: a second write open fails, as its sharing leaves writing out. 9999: the fake's own open failed.
+static wchar_t g_ownResult[256];
+static void ShareOwnOpens()
+{
+	MakeFile(L"ds_own.txt");
+	HANDLE held = CreateFileW(L"ds_own.txt", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	const DWORD widened = held != INVALID_HANDLE_VALUE ? TryOpen(L"ds_own.txt", GENERIC_WRITE, FILE_SHARE_READ) : 9999;
+	if (held != INVALID_HANDLE_VALUE)
+		CloseHandle(held);
+	DeleteFileW(L"ds_own.txt");
+
+	MakeFile(L"ds_excl.txt");
+	held = CreateFileW(L"ds_excl.txt", GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	const DWORD exclusive = held != INVALID_HANDLE_VALUE ? TryOpen(L"ds_excl.txt", GENERIC_READ, FILE_SHARE_READ) : 9999;
+	if (held != INVALID_HANDLE_VALUE)
+		CloseHandle(held);
+	DeleteFileW(L"ds_excl.txt");
+
+	CreateDirectoryW(L"ds_own_dir", nullptr);
+	MakeFile(L"ds_own_dir\\inner.txt");
+	const HANDLE folder = OpenNt(L"ds_own_dir", nullptr, FILE_LIST_DIRECTORY, FILE_SHARE_READ, FILE_DIRECTORY_FILE);
+	const DWORD folderRename = folder ? TryRename(L"ds_own_dir", L"ds_own_dir2") : 9999;
+	if (folder)
+		CloseHandle(folder);
+	const HANDLE root = OpenNt(L"ds_own_dir", nullptr, FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		FILE_DIRECTORY_FILE);
+	const HANDLE rooted = root ? OpenNt(L"inner.txt", root, GENERIC_READ, FILE_SHARE_READ, FILE_NON_DIRECTORY_FILE) : nullptr;
+	const DWORD rootedWrite = rooted ? TryOpen(L"ds_own_dir\\inner.txt", GENERIC_WRITE, FILE_SHARE_READ) : 9999;
+	if (rooted)
+		CloseHandle(rooted);
+	if (root)
+		CloseHandle(root);
+	DeleteFileW(L"ds_own_dir\\inner.txt");
+	RemoveDirectoryW(L"ds_own_dir");
+
+	MakeFile(L"ds_w.txt");
+	held = CreateFileW(L"ds_w.txt", GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	const DWORD writeOpen = held != INVALID_HANDLE_VALUE ? TryOpen(L"ds_w.txt", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE) : 9999;
+	if (held != INVALID_HANDLE_VALUE)
+		CloseHandle(held);
+	DeleteFileW(L"ds_w.txt");
+
+	swprintf(g_ownResult, sizeof(g_ownResult) / sizeof(g_ownResult[0]),
+		L"own: widened write %lu, exclusive %lu, folder rename %lu, rooted write %lu, write-open %lu | ",
+		widened, exclusive, folderRename, rootedWrite, writeOpen);
+}
+
+// dstypes: read-only opens of 17 files in its folder that are not there, each of another type - 16 short ones
+// and one too long for TweaksV's table of types: more types than its summary lists.
+static void OpenTypes()
+{
+	for (int i = 1; i <= 17; i++)
+	{
+		wchar_t name[32];
+		if (i <= 16)
+			swprintf(name, 32, L"ds_type.e%02d", i);
+		else
+			wcscpy_s(name, L"ds_type.toolongx");
+		const HANDLE file = CreateFileW(name, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (file != INVALID_HANDLE_VALUE)
+			CloseHandle(file);
+	}
 }
 
 // dsopenflood: 100,001 opens in the game folder of files that are not there, each by another name - more than
-// the tables of TweaksV's open summary take.
+// the tables of TweaksV's open summary take, and more files than its UNLOCK_FILES summary tells apart.
 static void FloodOpens()
 {
 	for (int i = 0; i < 100001; i++)
@@ -1146,16 +1386,23 @@ int wmain(int argc, wchar_t** argv)
 		CallDStorage(dstorage, HasOption(argc, argv, L"dsotherinterface") ? OtherInterface::First
 			: HasOption(argc, argv, L"dsotherlater") ? OtherInterface::Later
 			: HasOption(argc, argv, L"dsotheronly") ? OtherInterface::Only : OtherInterface::None);
+	if (HasOption(argc, argv, L"dsshare"))
+		ShareThroughStandIn();
+	if (HasOption(argc, argv, L"ownshare"))
+		ShareOwnOpens();
+	if (HasOption(argc, argv, L"dstypes"))
+		OpenTypes();
 	if (HasOption(argc, argv, L"fileopens"))
 		OpenFiles();
 	if (HasOption(argc, argv, L"dsopenflood"))
 		FloodOpens();
 	if (HasOption(argc, argv, L"wait"))
-		Sleep(11000);	// TweaksV's DirectStorage summary comes 10 s after the first OpenFile, its interface check 10 s after the request
+		Sleep(11000);	// TweaksV's UNLOCK_FILES summary comes 10 s after the first open it counts, the OpenFile summary 10 s
+						// after the first OpenFile, the interface check 10 s after the request
 	if (HasOption(argc, argv, L"waitlong"))
 		Sleep(31000);	// TweaksV's DirectStorage factory check comes 30 s after it started
 	if (HasOption(argc, argv, L"dsotheronly"))
-		Sleep(1500);	// the problem after the start-up summary is shown (or logged) a second after it is reported
+		Sleep(1500);	// the interface check's line comes 10 s after the request, a little after "wait" began
 	if (HasOption(argc, argv, L"dsflood"))
 		FloodOpenFile();
 
@@ -1175,7 +1422,7 @@ int wmain(int argc, wchar_t** argv)
 	PrintBoxStreamer();
 	PrintDecals();
 	RovReport();
-	wprintf(L"%ls%ls%ls", g_dstorageResult, g_floodResult, g_fileOpensResult);
+	wprintf(L"%ls%ls%ls%ls%ls", g_dstorageResult, g_floodResult, g_shareResult, g_ownResult, g_fileOpensResult);
 	CheckStub(Rel32Target(g_packCallSite));
 	for (const Site& site : g_boxCalls)
 		CheckStub(Rel32Target(site));
