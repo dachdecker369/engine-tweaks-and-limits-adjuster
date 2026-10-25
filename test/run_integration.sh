@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-only
-# TweaksV as a whole, in the fake game: old plugins present, one pattern deliberately broken per
-# plugin with the TEST build, another game exe, no C runtime DLLs, a renamed .asi, no code changes
-# allowed, the user name kept out of the log, the log's limit, links, a read-only game folder, a held log, the code dump.
+# TweaksV as a whole, in the fake game: old plugins present, NaturalVision Enhanced's loader present, one
+# pattern deliberately broken per plugin with the TEST build, another game exe, no C runtime DLLs, a renamed
+# .asi, no code changes allowed, the user name kept out of the log, the log's limit, links, a read-only game
+# folder, a held log, the code dump.
 # Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
@@ -26,6 +27,9 @@ DECAL_OFF='decal refs: 0 new 31 game 0 other | decal limits: 259 260 0x5918, 23 
 ROV_ON='file hooks 8/8, redirect 8/8, pass 8/8, spellings ok, folder ok, outside ok | open calls 5/5, behaviour ok'
 ROV_OFF='rov api hook: no'
 summary_once() { [ "$(count 'Start-up summary not shown (ERROR_POPUP=0)')" -eq 1 ]; }
+# nve_item SUB PART SECTION: how many lines of TweaksV.log are, word for word, the start-up summary's item for
+# onigiri.asi, NaturalVision Enhanced's loader, in the game folder (SUB "") or in its subfolder SUB ("scripts.")
+nve_item() { tr -d '\r' < TweaksV.log | grep -c -- "PROBLEM: .*TestRun.$1onigiri.asi is installed and does this job too (NaturalVision Enhanced.s loader): TweaksV.s $2 part is switched off while it is there, so nothing is patched twice. To stop this message, set ENABLED=0 under \\[$3\\] in TweaksV.ini.\$"; }
 
 echo "== I1 each old plugin on its own: only its part is skipped"
 for old in HeapAdjuster.asi ZHeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi PackfileLimitAdjusterEnhanced.asi DecalPatch.asi RageOpenV.asi OpenRPF.asi OpenIV.asi StraightToStoryMode.asi DirectStorageFix.asi; do
@@ -42,6 +46,14 @@ for old in HeapAdjuster.asi ZHeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi Pa
 	check "$old: its part skipped, the rest applied, reported once in the summary" "$ok && log_has 'Old plugin found: .*$old' && summary_once"
 done
 
+echo "== I1b onigiri.asi, NaturalVision Enhanced's loader, alone in the game folder, scripts\\ and plugins\\: RageOpenV and StraightToStoryMode off while it is there"
+for dir in "" scripts plugins; do
+	fresh_ini; touch "${dir:-.}/onigiri.asi"; out=$(game full_game.exe); rm -f "${dir:-.}/onigiri.asi"
+	at=${dir:+$dir\\}; at=${at:-the game folder}; sub=${dir:+$dir.}
+	check "in $at: RageOpenV and StraightToStoryMode off, the other six parts applied, DirectStorage on" "has '$ROV_OFF' && has '$STORY_OFF' && has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && log_has '\[DirectStorage\]'"
+	check "in $at: one item per part, word for word, the only two problems of one summary" "[ \$(nve_item '$sub' RageOpenV RAGEOPENV) -eq 1 ] && [ \$(nve_item '$sub' StraightToStoryMode STRAIGHTTOSTORYMODE) -eq 1 ] && log_has 'Start-up summary not shown (ERROR_POPUP=0): 2 problem' && summary_once"
+done
+
 echo "== I2 all old plugins at once, in the game folder, scripts\\ and plugins\\: everything skipped"
 fresh_ini
 touch HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdjusterEnhanced.asi scripts/OpenRPF.asi StraightToStoryMode.asi scripts/DecalPatch.asi
@@ -49,6 +61,25 @@ out=$(game full_game.exe); echo "      $out"
 rm -f HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdjusterEnhanced.asi scripts/OpenRPF.asi StraightToStoryMode.asi scripts/DecalPatch.asi
 check "nothing applied: the six old plugins switch every part off" "has '$GAME_HEAP' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$ROV_OFF' && has '$STORY_OFF' && has '$BOX_OFF' && has '$DECAL_OFF'"
 check "all six reported (DecalPatch.asi for two parts), one summary with 7 problems, no crash" "[ \$(count 'PROBLEM: Old plugin found') -eq 7 ] && log_has 'Start-up summary not shown (ERROR_POPUP=0): 7 problem' && summary_once"
+
+echo "== I2b the same six and onigiri.asi in the game folder: everything skipped, every plugin said"
+fresh_ini
+touch HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdjusterEnhanced.asi scripts/OpenRPF.asi StraightToStoryMode.asi scripts/DecalPatch.asi onigiri.asi
+out=$(game full_game.exe)
+rm -f HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdjusterEnhanced.asi scripts/OpenRPF.asi StraightToStoryMode.asi scripts/DecalPatch.asi onigiri.asi
+check "nothing applied" "has '$GAME_HEAP' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$ROV_OFF' && has '$STORY_OFF' && has '$BOX_OFF' && has '$DECAL_OFF'"
+check "the 7 old-plugin items, and onigiri.asi's item word for word for each of its two parts, also switched off by OpenRPF.asi and StraightToStoryMode.asi: one summary with 9 problems" "[ \$(count 'PROBLEM: Old plugin found') -eq 7 ] && [ \$(nve_item '' RageOpenV RAGEOPENV) -eq 1 ] && [ \$(nve_item '' StraightToStoryMode STRAIGHTTOSTORYMODE) -eq 1 ] && log_has 'Start-up summary not shown (ERROR_POPUP=0): 9 problem' && summary_once"
+
+echo "== I2c onigiri.asi next to a part TweaksV.ini switches off: nothing said for that part, nothing at all with both off"
+fresh_ini; setkey ENABLED 0 RAGEOPENV; touch onigiri.asi; out=$(game full_game.exe); rm -f onigiri.asi
+check "[RAGEOPENV] ENABLED=0: StraightToStoryMode's item alone, the one problem; both parts off, the rest applied" "[ \$(nve_item '' StraightToStoryMode STRAIGHTTOSTORYMODE) -eq 1 ] && log_lacks 'RageOpenV part is switched off' && log_has 'Start-up summary not shown (ERROR_POPUP=0): 1 problem' && summary_once && has '$ROV_OFF' && has '$STORY_OFF' && has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON'"
+fresh_ini; setkey ENABLED 0 RAGEOPENV; setkey ENABLED 0 STRAIGHTTOSTORYMODE; touch onigiri.asi; out=$(game full_game.exe); rm -f onigiri.asi
+check "both sections ENABLED=0: no line names onigiri.asi, no problem, no summary; the other six parts applied, DirectStorage on" "log_lacks -F 'onigiri.asi' && log_lacks 'PROBLEM' && log_lacks 'Start-up summary' && has '$ROV_OFF' && has '$STORY_OFF' && has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && log_has '\[DirectStorage\]'"
+check "and no line that none was found either: onigiri.asi is there" "log_lacks 'Conflict check: none'"
+
+echo "== I2d neither kind of plugin installed: the conflict check says so in one line"
+fresh_ini; out=$(game full_game.exe)
+check "the one line, no problem" "[ \$(count 'Conflict check: none of the plugins that do the job of one of TweaksV.s parts were found.') -eq 1 ] && log_lacks 'PROBLEM'"
 
 echo "== I3 TEST build, one pattern broken per plugin: only that part is skipped, one summary"
 breaktest() {	# description, the pattern's label, expected-output check: the label broken and its part's reason, in any case
