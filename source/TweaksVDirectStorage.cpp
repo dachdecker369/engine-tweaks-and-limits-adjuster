@@ -1486,9 +1486,11 @@ namespace TweaksV
 		// folder.
 		bool ReadGameFolderIdentity(DWORD& error)
 		{
-			const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-			g_queryInformationFile = reinterpret_cast<NtQueryFileFn>(GetProcAddress(ntdll, "NtQueryInformationFile"));
-			g_queryVolumeInformationFile = reinterpret_cast<NtQueryFileFn>(GetProcAddress(ntdll, "NtQueryVolumeInformationFile"));
+			if (const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll"))
+			{
+				g_queryInformationFile = reinterpret_cast<NtQueryFileFn>(GetProcAddress(ntdll, "NtQueryInformationFile"));
+				g_queryVolumeInformationFile = reinterpret_cast<NtQueryFileFn>(GetProcAddress(ntdll, "NtQueryVolumeInformationFile"));
+			}
 			if (!g_queryInformationFile || !g_queryVolumeInformationFile)
 			{
 				error = ERROR_PROC_NOT_FOUND;
