@@ -30,20 +30,38 @@ summary_once() { [ "$(count 'Start-up summary not shown (ERROR_POPUP=0)')" -eq 1
 # nve_item SUB PART SECTION: how many lines of TweaksV.log are, word for word, the start-up summary's item for
 # onigiri.asi, NaturalVision Enhanced's loader, in the game folder (SUB "") or in its subfolder SUB ("scripts.")
 nve_item() { tr -d '\r' < TweaksV.log | grep -c -- "PROBLEM: .*TestRun.$1onigiri.asi is installed and does this job too (NaturalVision Enhanced.s loader): TweaksV.s $2 part is switched off while it is there, so nothing is patched twice. To stop this message, set ENABLED=0 under \\[$3\\] in TweaksV.ini.\$"; }
+# features_say [PART...]: the log header's Features: line says off for each PART and on for every other part
+features_say() {
+	local want="Features:" part sep=" "
+	for part in HeapAdjuster ModkitLimit PackfileLimit BoxStreamer Decals RageOpenV StraightToStoryMode DirectStorage; do
+		if [[ " $* " == *" $part "* ]]; then want+="$sep$part off"; else want+="$sep$part on"; fi
+		sep=", "
+	done
+	tr -d '\r' < TweaksV.log | grep -qx -- ".* \[TweaksV\] $want"
+}
+# after_header PATTERN: the first line of TweaksV.log that matches PATTERN stands after the header, whose last line
+# in a release build holds the values of [DIRECTSTORAGE]
+after_header() {
+	local header line
+	header=$(grep -n -m 1 -- '\[TweaksV\] DirectStorage: UNLOCK_FILES=' TweaksV.log | cut -d: -f1)
+	line=$(grep -n -m 1 -- "$1" TweaksV.log | cut -d: -f1)
+	[ -n "$header" ] && [ -n "$line" ] && [ "$line" -gt "$header" ]
+}
 
-echo "== I1 each old plugin on its own: only its part is skipped"
+echo "== I1 each old plugin on its own: only its part is skipped, and the log header says so"
 for old in HeapAdjuster.asi ZHeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi PackfileLimitAdjusterEnhanced.asi DecalPatch.asi RageOpenV.asi OpenRPF.asi OpenIV.asi StraightToStoryMode.asi DirectStorageFix.asi; do
 	fresh_ini; touch "$old"; out=$(game full_game.exe); rm -f "$old"
 	case "$old" in
-		*HeapAdjuster.asi) ok="has '$GAME_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && has '$ROV_ON' && has '$STORY_ON'" ;;
-		DecalPatch.asi) ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_OFF' && has '$DECAL_OFF' && has '$ROV_ON' && has '$STORY_ON' && [ \$(count 'Old plugin found: .*DecalPatch.asi') -eq 2 ]" ;;
-		Modkit*) ok="has '$ALL_ON_HEAP' && has '$MODKIT_OFF' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'" ;;
-		Packfile*) ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_OFF' && has '$ROV_ON' && has '$STORY_ON'" ;;
-		RageOpenV.asi|OpenRPF.asi|OpenIV.asi) ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_OFF' && has '$STORY_ON'" ;;
-		StraightToStoryMode.asi) ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_OFF'" ;;
-		DirectStorageFix.asi) ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON' && log_lacks '\[DirectStorage\]'" ;;
+		*HeapAdjuster.asi) off=HeapAdjuster; ok="has '$GAME_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && has '$ROV_ON' && has '$STORY_ON'" ;;
+		DecalPatch.asi) off="BoxStreamer Decals"; ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_OFF' && has '$DECAL_OFF' && has '$ROV_ON' && has '$STORY_ON' && [ \$(count 'Old plugin found: .*DecalPatch.asi') -eq 2 ]" ;;
+		Modkit*) off=ModkitLimit; ok="has '$ALL_ON_HEAP' && has '$MODKIT_OFF' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON'" ;;
+		Packfile*) off=PackfileLimit; ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_OFF' && has '$ROV_ON' && has '$STORY_ON'" ;;
+		RageOpenV.asi|OpenRPF.asi|OpenIV.asi) off=RageOpenV; ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_OFF' && has '$STORY_ON'" ;;
+		StraightToStoryMode.asi) off=StraightToStoryMode; ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_OFF'" ;;
+		DirectStorageFix.asi) off=DirectStorage; ok="has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$ROV_ON' && has '$STORY_ON' && log_lacks '\[DirectStorage\]'" ;;
 	esac
 	check "$old: its part skipped, the rest applied, reported once in the summary" "$ok && log_has 'Old plugin found: .*$old' && summary_once"
+	check "$old: the header's Features: line says off for ${off// /, } and on for the rest, the check's line stands after the header" "features_say $off && after_header 'Old plugin found'"
 done
 
 echo "== I1b onigiri.asi, NaturalVision Enhanced's loader, alone in the game folder, scripts\\ and plugins\\: RageOpenV and StraightToStoryMode off while it is there"
@@ -52,6 +70,7 @@ for dir in "" scripts plugins; do
 	at=${dir:+$dir\\}; at=${at:-the game folder}; sub=${dir:+$dir.}
 	check "in $at: RageOpenV and StraightToStoryMode off, the other six parts applied, DirectStorage on" "has '$ROV_OFF' && has '$STORY_OFF' && has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && log_has '\[DirectStorage\]'"
 	check "in $at: one item per part, word for word, the only two problems of one summary" "[ \$(nve_item '$sub' RageOpenV RAGEOPENV) -eq 1 ] && [ \$(nve_item '$sub' StraightToStoryMode STRAIGHTTOSTORYMODE) -eq 1 ] && log_has 'Start-up summary not shown (ERROR_POPUP=0): 2 problem' && summary_once"
+	check "in $at: the header's Features: line says off for RageOpenV and StraightToStoryMode and on for the rest, the check's lines stand after the header" "features_say RageOpenV StraightToStoryMode && after_header 'is installed and does this job too'"
 done
 
 echo "== I2 all old plugins at once, in the game folder, scripts\\ and plugins\\: everything skipped"

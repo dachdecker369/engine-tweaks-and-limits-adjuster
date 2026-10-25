@@ -41,12 +41,14 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 				reinterpret_cast<LPCWSTR>(&DllMain), &self))
 				TweaksV::ReportFailure("TweaksV", "TweaksV.asi could not be pinned in memory (" + TweaksV::DescribeError(GetLastError()) +
 					"): an ASI loader that unloads it later would crash the game.");
-			TweaksV::ClearLogFile();												// 5. once, for TweaksV.log
-			TweaksV::WriteLogHeader();
-			if (TweaksV::IsOn(TweaksV::kConsole))					// 6.
-				TweaksV::OpenConsole();
-			if (TweaksV::IsOn(TweaksV::kConflictCheck))			// 7.
+			// The conflict check runs before the log is started, so that the header's Features: line says
+			// off for every part it switches off; its lines are kept and written after the header.
+			if (TweaksV::IsOn(TweaksV::kConflictCheck))			// 5.
 				TweaksV::CheckForConflicts();
+			TweaksV::ClearLogFile();												// 6. once, for TweaksV.log
+			TweaksV::WriteLogHeader();
+			if (TweaksV::IsOn(TweaksV::kConsole))					// 7.
+				TweaksV::OpenConsole();
 #ifdef TWEAKSV_TEST_BUILD
 			TweaksV::StartCodeDump();								//    test builds: before anything is patched
 #endif
