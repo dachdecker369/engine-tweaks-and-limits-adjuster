@@ -1249,7 +1249,11 @@ namespace TweaksV
 			{
 				WriteLog(kTag, "UNLOCK_FILES: when the game creates its DirectStorage factory, OpenFile is hooked so that "
 					"in the game folder only .rpf and .cache files can be opened.");
-				StartModuleThread(FactoryCheckThread, "DirectStorage factory check");	// one that cannot start is logged
+				// a check whose thread cannot start is logged and reported: without it, a factory that never comes
+				// would go unreported
+				if (!StartModuleThread(FactoryCheckThread, "DirectStorage factory check"))
+					ReportFailure(kTag, "The check that the game asks for its DirectStorage factory is not done this session: its thread "
+						"could not be started (details in TweaksV.log).");
 			}
 			else if (unlock)
 				ReportFailure(kTag, "The files in the game folder are not unlocked this session: DStorageGetFactory could "
