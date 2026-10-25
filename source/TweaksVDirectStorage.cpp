@@ -457,8 +457,11 @@ namespace TweaksV
 		// The game folder's identity, for an open relative to a folder handle - a relative path given to
 		// CreateFileW reaches NtCreateFile as a name relative to the current directory's handle: the volume's
 		// serial number and the folder's file ID, FileIdInformation's 128 bits or, on a file system without
-		// them, GetFileInformationByHandle's 64. Read once before the hook is made; the hook compares the
-		// handle's with it, one query of Windows per open relative to a folder handle.
+		// them, FileInternalInformation's 64 with FileFsVolumeInformation's serial number. Read once before the
+		// hook is made; the hook compares the handle's with it, one query of Windows per open relative to a
+		// folder handle (two on a file system without file IDs). These queries need no access to the handle -
+		// the current directory's is opened for traversing only, which GetFileInformationByHandle refuses - and
+		// leave the thread's last error alone.
 		enum class IdentityKind : uint8_t { None, FileId, FileIndex };
 		struct FolderIdentity
 		{
@@ -469,16 +472,23 @@ namespace TweaksV
 		};
 		IdentityKind g_identityKind = IdentityKind::None;	// None: the game folder's could not be read
 		FolderIdentity g_gameFolderIdentity;
+		using NtQueryFileFn = NTSTATUS(NTAPI*)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, ULONG);
+		NtQueryFileFn g_queryInformationFile = nullptr;			// ntdll's, read before the hook
+		NtQueryFileFn g_queryVolumeInformationFile = nullptr;	// the same shape
+		constexpr ULONG kFileInternalInformation = 6;
+		constexpr ULONG kFileIdInformation = 59;
+		constexpr ULONG kFileFsVolumeInformation = 1;
+		constexpr NTSTATUS kBufferOverflow = static_cast<NTSTATUS>(0x80000005);	// a warning: the fixed part is there
 
 		// The identity of what handle refers to, read the way kind says; false if Windows cannot give it.
-		// Changes the thread's last error: the caller keeps it.
 		bool IdentityOf(HANDLE handle, IdentityKind kind, FolderIdentity& identity)
 		{
 			identity = {};
+			IO_STATUS_BLOCK io{};
 			if (kind == IdentityKind::FileId)
 			{
-				FILE_ID_INFO info{};
-				if (!GetFileInformationByHandleEx(handle, FileIdInfo, &info, sizeof(info)))
+				FILE_ID_INFO info{};	// FileIdInformation's layout
+				if (!NT_SUCCESS(g_queryInformationFile(handle, &io, &info, sizeof(info), kFileIdInformation)))
 					return false;
 				identity.volume = info.VolumeSerialNumber;
 				static_assert(sizeof(info.FileId.Identifier) == sizeof(identity.file));
@@ -487,12 +497,21 @@ namespace TweaksV
 			}
 			if (kind == IdentityKind::FileIndex)
 			{
-				BY_HANDLE_FILE_INFORMATION info{};
-				if (!GetFileInformationByHandle(handle, &info))
+				struct
+				{
+					LARGE_INTEGER created;
+					ULONG serialNumber;
+					ULONG labelLength;
+					BOOLEAN supportsObjects;
+					WCHAR label[34];	// a label has 32 characters at most
+				} volume{};				// FILE_FS_VOLUME_INFORMATION's layout
+				LARGE_INTEGER index{};	// FILE_INTERNAL_INFORMATION's
+				const NTSTATUS volumeStatus = g_queryVolumeInformationFile(handle, &io, &volume, sizeof(volume), kFileFsVolumeInformation);
+				if ((!NT_SUCCESS(volumeStatus) && volumeStatus != kBufferOverflow) ||
+					!NT_SUCCESS(g_queryInformationFile(handle, &io, &index, sizeof(index), kFileInternalInformation)))
 					return false;
-				identity.volume = info.dwVolumeSerialNumber;
-				const uint64_t index = (static_cast<uint64_t>(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
-				memcpy(identity.file, &index, sizeof(index));
+				identity.volume = volume.serialNumber;
+				memcpy(identity.file, &index.QuadPart, sizeof(index.QuadPart));
 				return true;
 			}
 			return false;
@@ -755,11 +774,9 @@ namespace TweaksV
 			}
 			if (root)
 			{
-				const DWORD lastError = GetLastError();	// the caller's, kept
 				FolderIdentity identity;
 				const bool gameFolder = g_identityKind != IdentityKind::None && IdentityOf(root, g_identityKind, identity) &&
 					identity == g_gameFolderIdentity;
-				SetLastError(lastError);
 				if (!gameFolder)
 				{
 					check.kind = kUnexamined;	// relative to another folder: where it lies cannot be told
@@ -1469,6 +1486,14 @@ namespace TweaksV
 		// folder.
 		bool ReadGameFolderIdentity(DWORD& error)
 		{
+			const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+			g_queryInformationFile = reinterpret_cast<NtQueryFileFn>(GetProcAddress(ntdll, "NtQueryInformationFile"));
+			g_queryVolumeInformationFile = reinterpret_cast<NtQueryFileFn>(GetProcAddress(ntdll, "NtQueryVolumeInformationFile"));
+			if (!g_queryInformationFile || !g_queryVolumeInformationFile)
+			{
+				error = ERROR_PROC_NOT_FOUND;
+				return false;
+			}
 			const HANDLE folder = CreateFileW(g_gameFolder.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE |
 				FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
 			if (folder == INVALID_HANDLE_VALUE)
@@ -1476,14 +1501,25 @@ namespace TweaksV
 				error = GetLastError();
 				return false;
 			}
+			IdentityKind first = IdentityKind::FileId;
+#ifdef TWEAKSV_TEST_BUILD
+			// test builds only: TWEAKSV_TEST_FILE_INDEX=1 in the environment reads it as on a file system without
+			// file IDs, so that the suite tests that way too
+			wchar_t fileIndex[4]{};
+			if (GetEnvironmentVariableW(L"TWEAKSV_TEST_FILE_INDEX", fileIndex, 4) == 1 && fileIndex[0] == L'1')
+			{
+				first = IdentityKind::FileIndex;
+				WriteLog(kTag, "TEST BUILD: the game folder's identity is read without FileIdInformation (TWEAKSV_TEST_FILE_INDEX=1).");
+			}
+#endif
 			for (const IdentityKind kind : { IdentityKind::FileId, IdentityKind::FileIndex })
-				if (IdentityOf(folder, kind, g_gameFolderIdentity))
+				if (kind >= first && IdentityOf(folder, kind, g_gameFolderIdentity))
 				{
 					g_identityKind = kind;
 					break;
 				}
-			error = GetLastError();
 			CloseHandle(folder);
+			error = ERROR_NOT_SUPPORTED;	// the file system gives neither
 			return g_identityKind != IdentityKind::None;
 		}
 	}

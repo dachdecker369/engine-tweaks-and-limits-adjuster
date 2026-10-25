@@ -10,6 +10,8 @@
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" .
+# the file system without file IDs is the test build's (TWEAKSV_TEST_FILE_INDEX), the only build that reads that switch
+cp "$R/object/Test/Release/TweaksV.asi" TweaksV_test.asi
 mkdir -p appdata
 rm -f DirectStorageFix.asi	# an old plugin another suite may have left
 
@@ -165,6 +167,11 @@ echo "== D17 DIAGNOSTIC_MODE=1 with 100,001 opens of files that are not there: t
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe dsopenflood)
 check "20000 open lines, then the cap line once; a table full at 100000 entries, said once" "[ \$(count 'DirectStorage\] open #') -eq 20000 ] && log_has 'open #[0-9]*: dsflood_000000.txt | 0xC0000034 not found' && [ \$(count 'DIAGNOSTIC: 20000 open lines written - from now on the opens are only counted (see the summaries).') -eq 1 ] && [ \$(count 'DIAGNOSTIC: a table of the open summary is full (100000 entries) - the opens it cannot take are only counted (see the summaries).') -eq 1 ]"
 check "the game runs on" "has 'protect: all restored' && log_lacks 'PROBLEM'"
+
+echo "== D18 a game folder on a file system without file IDs (the test build with TWEAKSV_TEST_FILE_INDEX=1): a relative open told by the file number and the volume's serial number"
+fresh_ini; out=$(TWEAKSV_TEST_FILE_INDEX=1 ASI=TweaksV_test.asi game full_game.exe dstorage dsshare ownshare)
+check "the identity read that way, said once" "[ \$(count 'TEST BUILD: the game folder.s identity is read without FileIdInformation (TWEAKSV_TEST_FILE_INDEX=1).') -eq 1 ]"
+check "the files the stand-in holds by a relative path freed as by a full one, the fake's own too; a relative open of another folder left as it is; no problem" "has '$SHARED' && has '$OWN_SHARED' && log_lacks 'PROBLEM'"
 
 echo
 echo "DIRECTSTORAGE SCENARIOS: $pass passed, $fail failed"
