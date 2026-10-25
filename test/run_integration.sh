@@ -30,6 +30,9 @@ summary_once() { [ "$(count 'Start-up summary not shown (ERROR_POPUP=0)')" -eq 1
 # nve_item SUB PART SECTION: how many lines of TweaksV.log are, word for word, the start-up summary's item for
 # onigiri.asi, NaturalVision Enhanced's loader, in the game folder (SUB "") or in its subfolder SUB ("scripts.")
 nve_item() { tr -d '\r' < TweaksV.log | grep -c -- "PROBLEM: .*TestRun.$1onigiri.asi is installed and does this job too (NaturalVision Enhanced.s loader): TweaksV.s $2 part is switched off while it is there, so nothing is patched twice. To stop this message, set ENABLED=0 under \\[$3\\] in TweaksV.ini.\$"; }
+# nve_line PART: how many lines of TweaksV.log are, word for word, the conflict check's line for onigiri.asi in the
+# game folder next to PART switched off in TweaksV.ini
+nve_line() { tr -d '\r' < TweaksV.log | grep -c -- "\\[TweaksV\\] Conflict check: .*TestRun.onigiri.asi is installed; TweaksV.s $1 part is off in TweaksV.ini already.\$"; }
 # features_say [PART...]: the log header's Features: line says off for each PART and on for every other part
 features_say() {
 	local want="Features:" part sep=" "
@@ -89,12 +92,12 @@ rm -f HeapAdjuster.asi ModkitLimitAdjusterEnhanced.asi plugins/PackfileLimitAdju
 check "nothing applied" "has '$GAME_HEAP' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$ROV_OFF' && has '$STORY_OFF' && has '$BOX_OFF' && has '$DECAL_OFF'"
 check "the 7 old-plugin items, and onigiri.asi's item word for word for each of its two parts, also switched off by OpenRPF.asi and StraightToStoryMode.asi: one summary with 9 problems" "[ \$(count 'PROBLEM: Old plugin found') -eq 7 ] && [ \$(nve_item '' RageOpenV RAGEOPENV) -eq 1 ] && [ \$(nve_item '' StraightToStoryMode STRAIGHTTOSTORYMODE) -eq 1 ] && log_has 'Start-up summary not shown (ERROR_POPUP=0): 9 problem' && summary_once"
 
-echo "== I2c onigiri.asi next to a part TweaksV.ini switches off: nothing said for that part, nothing at all with both off"
+echo "== I2c onigiri.asi next to a part TweaksV.ini switches off: no item for that part, a line in the log; with both off, a line each and no problem"
 fresh_ini; setkey ENABLED 0 RAGEOPENV; touch onigiri.asi; out=$(game full_game.exe); rm -f onigiri.asi
-check "[RAGEOPENV] ENABLED=0: StraightToStoryMode's item alone, the one problem; both parts off, the other six applied, DirectStorage on" "[ \$(nve_item '' StraightToStoryMode STRAIGHTTOSTORYMODE) -eq 1 ] && log_lacks 'RageOpenV part is switched off' && log_has 'Start-up summary not shown (ERROR_POPUP=0): 1 problem' && summary_once && has '$ROV_OFF' && has '$STORY_OFF' && has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && log_has '\[DirectStorage\]'"
+check "[RAGEOPENV] ENABLED=0: StraightToStoryMode's item alone, the one problem, and RageOpenV's line word for word; both parts off, the other six applied, DirectStorage on" "[ \$(nve_item '' StraightToStoryMode STRAIGHTTOSTORYMODE) -eq 1 ] && [ \$(nve_line RageOpenV) -eq 1 ] && [ \$(nve_line StraightToStoryMode) -eq 0 ] && log_lacks 'RageOpenV part is switched off' && log_has 'Start-up summary not shown (ERROR_POPUP=0): 1 problem' && summary_once && has '$ROV_OFF' && has '$STORY_OFF' && has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && log_has '\[DirectStorage\]'"
 fresh_ini; setkey ENABLED 0 RAGEOPENV; setkey ENABLED 0 STRAIGHTTOSTORYMODE; touch onigiri.asi; out=$(game full_game.exe); rm -f onigiri.asi
-check "both sections ENABLED=0: no line names onigiri.asi, no problem, no summary; the other six parts applied, DirectStorage on" "log_lacks -F 'onigiri.asi' && log_lacks 'PROBLEM' && log_lacks 'Start-up summary' && has '$ROV_OFF' && has '$STORY_OFF' && has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && log_has '\[DirectStorage\]'"
-check "and no line that none was found either: onigiri.asi is there" "log_lacks 'Conflict check: none'"
+check "both sections ENABLED=0: one line per part word for word, no problem, no summary; the other six parts applied, DirectStorage on" "[ \$(nve_line RageOpenV) -eq 1 ] && [ \$(nve_line StraightToStoryMode) -eq 1 ] && log_lacks 'PROBLEM' && log_lacks 'Start-up summary' && has '$ROV_OFF' && has '$STORY_OFF' && has '$ALL_ON_HEAP' && has '$MODKIT_ON' && has '$PACK_ON' && has '$BOX_ON' && has '$DECAL_ON' && log_has '\[DirectStorage\]'"
+check "and not the line that none was found: onigiri.asi is there" "log_lacks 'Conflict check: none'"
 
 echo "== I2d neither kind of plugin installed: the conflict check says so in one line"
 fresh_ini; out=$(game full_game.exe)

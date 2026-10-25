@@ -12,7 +12,7 @@ namespace TweaksV
 	// session, is logged and goes into the start-up summary, which tells the user to delete the old
 	// file. A plugin that does the job too and stays installed does the same while its feature is on in
 	// TweaksV.ini, and the summary names the switch that stops the message; a feature switched off
-	// there has nothing said about it.
+	// there gets a line in the log, not a problem.
 	void CheckForConflicts();
 
 	// True if p lies inside GTA5_Enhanced.exe's image. The relocation checks use it: an

@@ -49,11 +49,15 @@ namespace TweaksV
 						continue;
 
 					++found;
-					// nothing is said for a part TweaksV.ini switches off - the file's own switch, not
+					// a part TweaksV.ini switches off gets a line, not a problem - the file's own switch, not
 					// IsFeatureOn: an old plugin found before may have switched the part off already, and
 					// this one is still said, so the result does not depend on the order of the finds
 					if (!IsEnabledInIni(*feature.section))
+					{
+						WriteLog("TweaksV", "Conflict check: " + ToUtf8(path) + " is installed; TweaksV's " +
+							feature.section->feature + " part is off in TweaksV.ini already.");
 						continue;
+					}
 					DisableFeatureForSession(*feature.section);
 					ReportFailure("TweaksV", ToUtf8(path) + " is installed and does this job too (" + peer->description +
 						"): TweaksV's " + feature.section->feature + " part is switched off while it is there, so nothing "
