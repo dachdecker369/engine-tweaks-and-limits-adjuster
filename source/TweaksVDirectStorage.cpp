@@ -1130,15 +1130,16 @@ namespace TweaksV
 		}
 
 		// UNLOCK_FILES: a factory the game has not asked for 30 seconds after TweaksV started may have been
-		// asked for before TweaksV was loaded - a log line, not a problem.
+		// asked for before TweaksV was loaded. Nothing is unlocked then, so it is a problem - reported after
+		// the start-up summary, it gets a message box of its own.
 		DWORD WINAPI FactoryCheckThread(LPVOID module)
 		{
 			Sleep(kFactoryCheckMs);
 			try
 			{
 				if (!g_factoryAsked.load())
-					WriteLog(kTag, "The game has not asked for its DirectStorage factory since TweaksV started - nothing is unlocked; TweaksV "
-						"may have been loaded too late.");
+					ReportFailure(kTag, "The files in the game folder are not unlocked this session: the game has not asked for its "
+						"DirectStorage factory since TweaksV started - TweaksV may have been loaded too late.");
 			}
 			catch (...)
 			{
