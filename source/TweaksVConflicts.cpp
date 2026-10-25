@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - old stand-alone plugins still installed next to TweaksV.
+// TweaksV - stand-alone plugins installed next to TweaksV that do the job of one of its parts.
 
 #include "TweaksVConflicts.h"
 
@@ -39,11 +39,32 @@ namespace TweaksV
 						" part is switched off for this session so nothing is patched twice. "
 						"Delete the old file - TweaksV replaces it.");
 				}
+
+				for (const PeerPlugin* peer : feature.peerPlugins)
+				{
+					if (!peer)
+						continue;
+					const std::wstring path = GetGameFolder() + folder + L"\\" + peer->file;
+					if (!FileExists(path))
+						continue;
+
+					++found;
+					// a part TweaksV.ini switches off has nothing to say about it. The file's own switch, not
+					// IsFeatureOn: an old plugin found before may have switched the part off already, and
+					// this one is still said, so the result does not depend on the order of the finds
+					if (!IsEnabledInIni(*feature.section))
+						continue;
+					DisableFeatureForSession(*feature.section);
+					ReportFailure("TweaksV", ToUtf8(path) + " is installed and does this job too (" + peer->description +
+						"): TweaksV's " + feature.section->feature + " part is switched off while it is there, so nothing "
+						"is patched twice. To stop this message, set ENABLED=0 under [" + feature.section->name +
+						"] in TweaksV.ini.");
+				}
 			}
 		}
 
 		if (found == 0)
-			WriteLog("TweaksV", "Conflict check: none of the old plugins TweaksV replaces were found.");
+			WriteLog("TweaksV", "Conflict check: none of the plugins that do the job of one of TweaksV's parts were found.");
 	}
 
 	bool IsInsideGameImage(const void* p)

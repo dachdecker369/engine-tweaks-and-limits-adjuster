@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // TweaksV - its features, defined once in kFeatures (TweaksVFeatures.cpp): the section of TweaksV.ini
-// that switches each one on, the old stand-alone plugins that do its job and the function that starts
-// it. DllMain starts them in that order and the conflict check looks for their old plugins, so a new
-// feature is one entry there, plus its section and settings in TweaksVSettings.h.
+// that switches each one on, the stand-alone plugins that do its job - the old ones TweaksV replaces and
+// the ones that stay installed - and the function that starts it. DllMain starts them in that order and
+// the conflict check looks for their plugins, so a new feature is one entry there, plus its section and
+// settings in TweaksVSettings.h.
 #pragma once
 
 #include <span>
@@ -11,11 +12,20 @@
 
 namespace TweaksV
 {
+	// A stand-alone plugin that does a feature's job too and stays installed, because another mod needs
+	// it: the conflict check switches the feature off while it is there and says why (TweaksVConflicts.h).
+	struct PeerPlugin
+	{
+		const wchar_t* file;		// "onigiri.asi"
+		const char* description;	// what it is, for the start-up summary: "NaturalVision Enhanced's loader"
+	};
+
 	struct Feature
 	{
-		const SettingsSection* section;	// its ENABLED switch and its name
-		const wchar_t* oldPlugins[3];	// the stand-alone .asi files that do its job (unused places nullptr)
-		bool (*start)();				// true if the feature shows the start-up summary itself, later
+		const SettingsSection* section;		// its ENABLED switch and its name
+		const wchar_t* oldPlugins[3];		// the stand-alone .asi files TweaksV replaces (unused places nullptr)
+		const PeerPlugin* peerPlugins[1];	// the ones that do its job too and stay installed (unused places nullptr)
+		bool (*start)();					// true if the feature shows the start-up summary itself, later
 	};
 
 	std::span<const Feature> Features();

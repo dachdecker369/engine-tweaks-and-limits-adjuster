@@ -21,6 +21,12 @@ namespace TweaksV
 {
 	namespace
 	{
+		// NaturalVision Enhanced's mods loader does RageOpenV's job and skips the splash and legal screens
+		// by its own INI, as StraightToStoryMode does. It loads before TweaksV but patches those sites after
+		// it, at the game's first request for the time, uses what it finds there unchecked and faults when
+		// TweaksV has changed them. NVE needs it, so it stays, and those two parts are off while it is there.
+		constexpr PeerPlugin kNveLoader{ L"onigiri.asi", "NaturalVision Enhanced's loader" };
+
 		// The five original plugins in the order an ASI loader loaded their .asi files (alphabetical),
 		// TweaksV's own box streamer and decal definitions parts among the limit adjusters, and its
 		// DirectStorage part last. ZHeapAdjuster.asi is the rename the HeapAdjuster author recommends;
@@ -28,22 +34,22 @@ namespace TweaksV
 		// DirectStorage part, and the closed-source DecalPatch.asi that of both the box streamer and the
 		// decal definitions parts, so it switches both off.
 		constexpr Feature kFeatures[] = {
-			{ &kHeapSection, { L"HeapAdjuster.asi", L"ZHeapAdjuster.asi" },
+			{ &kHeapSection, { L"HeapAdjuster.asi", L"ZHeapAdjuster.asi" }, {},
 				[] { InitHeapAdjuster(); return false; } },
-			{ &kModkitSection, { L"ModkitLimitAdjusterEnhanced.asi" },
+			{ &kModkitSection, { L"ModkitLimitAdjusterEnhanced.asi" }, {},
 				[] { InitModkitLimit(); return false; } },
-			{ &kPackfileSection, { L"PackfileLimitAdjusterEnhanced.asi" },
+			{ &kPackfileSection, { L"PackfileLimitAdjusterEnhanced.asi" }, {},
 				[] { InitPackfileLimit(); return false; } },
-			{ &kBoxStreamerSection, { L"DecalPatch.asi" },
+			{ &kBoxStreamerSection, { L"DecalPatch.asi" }, {},
 				[] { InitBoxStreamer(); return false; } },
-			{ &kDecalsSection, { L"DecalPatch.asi" },
+			{ &kDecalsSection, { L"DecalPatch.asi" }, {},
 				[] { InitDecals(); return false; } },
 			// RageOpenV's start-up runs later, in its GetSystemTimeAsFileTime hook, which then shows the summary
-			{ &kRageOpenVSection, { L"RageOpenV.asi", L"OpenRPF.asi", L"OpenIV.asi" },
+			{ &kRageOpenVSection, { L"RageOpenV.asi", L"OpenRPF.asi", L"OpenIV.asi" }, { &kNveLoader },
 				[] { return InitRageOpenV(); } },
-			{ &kStoryModeSection, { L"StraightToStoryMode.asi" },
+			{ &kStoryModeSection, { L"StraightToStoryMode.asi" }, { &kNveLoader },
 				[] { InitStraightToStoryMode(); return false; } },
-			{ &kDirectStorageSection, { L"DirectStorageFix.asi" },
+			{ &kDirectStorageSection, { L"DirectStorageFix.asi" }, {},
 				[] { InitDirectStorage(); return false; } },
 		};
 

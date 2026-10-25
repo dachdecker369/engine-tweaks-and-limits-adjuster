@@ -167,8 +167,9 @@ namespace TweaksV
 	const std::string& GetText(const Setting& setting);	// a Text
 
 	// The section's ENABLED switch, unless the part was switched off for this session
-	// (DisableFeatureForSession, e.g. by CheckForConflicts).
+	// (DisableFeatureForSession, e.g. by CheckForConflicts); IsEnabledInIni is the switch alone.
 	bool IsFeatureOn(const SettingsSection& section);
+	bool IsEnabledInIni(const SettingsSection& section);
 	void DisableFeatureForSession(const SettingsSection& section);
 
 	inline bool IsDryRun() { return IsOn(kDryRun); }

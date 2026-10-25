@@ -154,6 +154,11 @@ namespace TweaksV
 		ReleaseSRWLockShared(&g_lock);
 		if (disabled)
 			return false;
+		return IsEnabledInIni(section);
+	}
+
+	bool IsEnabledInIni(const SettingsSection& section)
+	{
 		for (const Setting& setting : kSettings)
 			if (setting.section == &section && std::string_view(setting.key) == "ENABLED")
 				return IsOn(setting);
