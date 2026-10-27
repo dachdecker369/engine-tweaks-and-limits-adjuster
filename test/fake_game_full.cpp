@@ -61,8 +61,22 @@
 //                  functions
 //   wait           stays 11 seconds longer before it reports
 //   waitlong       stays 31 seconds longer before it reports (TweaksV's DirectStorage factory check comes 30 s in)
+//   script         places the script program blip_controller once, once TweaksV has started, as the game does: on
+//                  a thread of its own, through the call at the hook site - TweaksV's stub when the call is
+//                  redirected, the fake's own resolution function when it is not - and writes what it placed to
+//                  script_placed_<n>.bin, n counting blip_controller's placements, for the suite to compare with
+//   scripttwice    places it twice, the second time with a native the fake's resolution function does not know
+//   scriptother    places another program, other_script, before it
+//   scripthash     places a program with blip_controller's hash and another name, blip_imposter, twice instead
+//   scriptpage     the second page of its code cannot be read
+//   scriptmany     places it 17 times
+//   scripthuge     places it twice: its code length says 16 MB and a byte the first time, its native count 65537 the
+//                  second
+//   scripthooked   the call at the hook site already leads outside the game (another mod redirected it); nothing
+//                  is placed
 #include <windows.h>
 #include <winternl.h>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -305,6 +319,19 @@ static DecalLimit g_decalLimits[23] = {
 	{ SITE(g_decalAdd[0], 6), 'L' }, { SITE(g_decalAdd[1], 6), 'L' }, { SITE(g_decalAdd[2], 6), 'L' }, { SITE(g_decalAdd[3], 6), 'L' },
 	{ SITE(g_decalAdd[4], 6), 'L' }, { SITE(g_decalAdd[5], 6), 'L' }, { SITE(g_decalAdd[6], 6), 'L' },
 	{ SITE(g_decalAddR8d, 6), 'L' }, { SITE(g_decalAddEsi, 4), 'L' }, { SITE(g_decalAddRel8, 6), 'L' }, { SITE(g_decalAddEbx, 6), 'L' } };
+
+// The script programs: the call in a program's resource constructor that resolves its natives ("mov rcx, r12",
+// the call, then "mov r14d, 0x3FFF" and "mov eax, [r12+0x70]"), the constructor's loop over the native table,
+// which reads the code length at +0x1C and the native table at +0x40, and the script interpreter's prologue,
+// which reads the code page table at +0x10. The program itself and the fake's resolution function are below,
+// outside this section, as the game's are. Every site ends in CC.
+volatile unsigned char g_scriptHookSite[] = { 0x4C, 0x89, 0xE1, 0xE8, 0, 0, 0, 0, 0x41, 0xBE, 0xFF, 0x3F, 0x00, 0x00,
+	0x41, 0x8B, 0x44, 0x24, 0x70, 0xCC };																	// the call at +3
+volatile unsigned char g_scriptNativeLoop[] = { 0x41, 0x8B, 0x4C, 0x24, 0x1C, 0x01, 0xC1, 0x49, 0x8B, 0x54, 0x24, 0x40, 0x48, 0xD3,
+	0x04, 0xC2, 0xCC };
+volatile unsigned char g_scriptInterpreter[] = { 0x4D, 0x8B, 0x50, 0x10, 0x49, 0x63, 0x41, 0x1C, 0x4C, 0x8D, 0x7C, 0xC1, 0xF8, 0x49,
+	0x63, 0x41, 0x18, 0x4C, 0x8D, 0x0C, 0xC1, 0xCC };
+static Site g_scriptCallSite = SITE(g_scriptHookSite, 4);	// the rel32 of the E8 at +3
 #pragma data_seg()
 
 // The game's own modkit array (1024 entries of 2 bytes) and packfile array (4500 entries of 8 bytes). The
@@ -363,6 +390,71 @@ static __declspec(noinline) void OriginalSetStreamingInterface(char* si)
 {
 	g_origCalls++;
 	g_origSawCount = *reinterpret_cast<uint32_t*>(si + 24);
+}
+
+// A script program, laid out at the offsets of the game's (PATTERNS.md, "Script programs"); the fields the game
+// has there and TweaksV does not read hold recognisable values, so that the copy of the object shows them.
+struct FakeScriptProgram
+{
+	uint64_t vtable;				// +0x00
+	uint64_t unknown08;
+	unsigned char** codePages;		// +0x10: one pointer per page of 16 KB
+	uint32_t unknown18;
+	uint32_t codeLength;			// +0x1C
+	uint32_t unknown20[3];
+	uint32_t nativeCount;			// +0x2C
+	uint64_t unknown30[2];
+	uint64_t* natives;				// +0x40
+	uint64_t unknown48[2];
+	uint32_t nameHash;				// +0x58
+	uint32_t unknown5C;
+	const char* name;				// +0x60
+	unsigned char** stringPages;	// +0x68
+	uint32_t stringLength;			// +0x70
+	uint32_t unknown74[3];
+};
+static_assert(offsetof(FakeScriptProgram, codePages) == 0x10 && offsetof(FakeScriptProgram, codeLength) == 0x1C &&
+	offsetof(FakeScriptProgram, nativeCount) == 0x2C && offsetof(FakeScriptProgram, natives) == 0x40 &&
+	offsetof(FakeScriptProgram, nameHash) == 0x58 && offsetof(FakeScriptProgram, name) == 0x60 &&
+	offsetof(FakeScriptProgram, stringPages) == 0x68 && offsetof(FakeScriptProgram, stringLength) == 0x70 &&
+	sizeof(FakeScriptProgram) == 0x80, "the fake's script program must have the game's layout");
+
+// The natives the fake's programs call: their hashes, and the handler the fake's resolution function puts in
+// their place - a function of the fake's own, each a different one so that the linker cannot fold them; a hash
+// it does not know gets the "unknown" handler, as the game's does, and the function returns 0.
+static int g_nativeCalls = 0;
+static __declspec(noinline) void FakeNativeA() { g_nativeCalls += 1; }
+static __declspec(noinline) void FakeNativeB() { g_nativeCalls += 2; }
+static __declspec(noinline) void FakeNativeC() { g_nativeCalls += 3; }
+static __declspec(noinline) void FakeNativeUnknown() { g_nativeCalls += 4; }
+struct FakeNative { uint64_t hash; void (*handler)(); };
+static const FakeNative g_fakeNatives[] = { { 0x4A5B6C7D8E9F0011ull, &FakeNativeA }, { 0x1122334455667788ull, &FakeNativeB },
+	{ 0x99AABBCCDDEEFF00ull, &FakeNativeC } };
+constexpr size_t kFakeNatives = sizeof(g_fakeNatives) / sizeof(g_fakeNatives[0]);
+constexpr uint64_t kUnknownNativeHash = 0x0123456789ABCDEFull;
+constexpr DWORD kResolveLastError = 0x2A1B;	// the last error the fake's resolution function leaves
+
+// The game's own function behind the call at the hook site: the program's native table, hashes until now,
+// gets the handlers; 1 when every hash was known. It reads no more entries than the fake's tables have, whatever
+// the program's native count says.
+static int g_resolveCalls = 0;
+static __declspec(noinline) unsigned char FakeResolveNatives(unsigned char* program)
+{
+	g_resolveCalls++;
+	const auto p = reinterpret_cast<FakeScriptProgram*>(program);
+	unsigned char every = 1;
+	for (uint32_t i = 0; i < p->nativeCount && i < kFakeNatives; i++)
+	{
+		uint64_t handler = reinterpret_cast<uint64_t>(&FakeNativeUnknown);
+		for (const FakeNative& native : g_fakeNatives)
+			if (p->natives[i] == native.hash)
+				handler = reinterpret_cast<uint64_t>(native.handler);
+		if (handler == reinterpret_cast<uint64_t>(&FakeNativeUnknown))
+			every = 0;
+		p->natives[i] = handler;
+	}
+	SetLastError(kResolveLastError);
+	return every;
 }
 
 static void SetRel32(const Site& site, const void* target)
@@ -711,7 +803,8 @@ static void ForEachSite(void (*fn)(const Site&))
 		SITE(g_packR31a, 0), SITE(g_packR31b, 0), SITE(g_packR31aCopy, 0), SITE(g_packExtra, 0), SITE(g_boxRef9, 0),
 		SITE(g_decalFull, 0), SITE(g_decalParserLea, 0), SITE(g_decalFindById, 0), SITE(g_decalPickVariant, 0), SITE(g_decalOverrideOne, 0), SITE(g_decalOverrideLoop, 0), SITE(g_decalOverrideCmp1, 0),
 		SITE(g_decalOverrideCmpEbp, 0), SITE(g_decalOverrideCmp2, 0), SITE(g_decalLoopStart, 0), SITE(g_decalLoopEnd, 0),
-		SITE(g_decalAddR8d, 0), SITE(g_decalAddEsi, 0), SITE(g_decalAddRel8, 0), SITE(g_decalAddEbx, 0), SITE(g_decalLeaExtra, 0) };
+		SITE(g_decalAddR8d, 0), SITE(g_decalAddEsi, 0), SITE(g_decalAddRel8, 0), SITE(g_decalAddEbx, 0), SITE(g_decalLeaExtra, 0),
+		SITE(g_scriptHookSite, 0), SITE(g_scriptNativeLoop, 0), SITE(g_scriptInterpreter, 0) };
 	for (const Site& site : singles) fn(site);
 	for (auto& row : g_decalAdd) { Site site = { row, 0, sizeof(row) }; fn(site); }
 	for (auto& row : g_decalLeas) { Site site = { row, 0, sizeof(row) }; fn(site); }
@@ -1183,6 +1276,191 @@ static void OpenFiles()
 	swprintf(g_fileOpensResult, 160, L"file opens: missing file error %lu | ", static_cast<unsigned long>(missingError));
 }
 
+// The script programs (TweaksVScripts, TEST_DUMP_SCRIPT): blip_controller with its code over two pages of 16 KB,
+// the second holding 0x123 bytes, three natives and 0x1F0 bytes of strings in one page; other_script and
+// blip_imposter - blip_controller's hash under another name - with code and strings of their own. Every page is
+// a VirtualAlloc of its own, so that one can be made unreadable. The placements run on a thread of their own,
+// as the game's resource placement thread places programs, each through the call at the hook site.
+constexpr uint32_t kScriptPage = 0x4000;
+constexpr uint32_t kScriptCodeLength = kScriptPage + 0x123;
+constexpr uint32_t kScriptStringLength = 0x1F0;
+constexpr uint32_t kBlipControllerHash = 0x80CFE974;	// the game's hash of "blip_controller"
+struct ScriptStorage
+{
+	FakeScriptProgram program{};
+	unsigned char* codePages[2] = {};
+	unsigned char* stringPages[1] = {};
+	uint64_t natives[kFakeNatives] = {};
+};
+static ScriptStorage g_blipController, g_otherScript, g_blipImposter;
+struct ScriptPlacement { ScriptStorage* script; bool unknownNative; uint32_t codeLength; uint32_t nativeCount; };
+static ScriptPlacement g_scriptPlan[20];
+static int g_scriptPlanned = 0;
+static int g_scriptPlaced = 0, g_scriptResolved = 0, g_scriptErrorKept = 0;
+static DWORD g_scriptThread = 0;
+static bool g_scriptPageUnreadable = false;
+static wchar_t g_scriptResult[256];
+
+static void MakeScript(ScriptStorage& script, const char* name, uint32_t hash, unsigned char seed)
+{
+	FakeScriptProgram& p = script.program;
+	p.vtable = 0x1111111111111111ull;
+	p.unknown08 = 0x0808080808080808ull;
+	p.unknown18 = 0x18181818;
+	for (uint32_t& value : p.unknown20)
+		value = 0x20202020;
+	p.unknown30[0] = p.unknown30[1] = 0x3030303030303030ull;
+	p.unknown48[0] = p.unknown48[1] = 0x4848484848484848ull;
+	p.unknown5C = 0x5C5C5C5C;
+	for (uint32_t& value : p.unknown74)
+		value = 0x74747474;
+	for (unsigned char*& page : script.codePages)
+		page = static_cast<unsigned char*>(VirtualAlloc(nullptr, kScriptPage, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+	script.stringPages[0] = static_cast<unsigned char*>(VirtualAlloc(nullptr, kScriptPage, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+	for (uint32_t i = 0; i < kScriptPage; i++)
+	{
+		script.codePages[0][i] = static_cast<unsigned char>(i * 7 + seed);
+		script.codePages[1][i] = static_cast<unsigned char>(i * 13 + seed + 1);
+		script.stringPages[0][i] = static_cast<unsigned char>('a' + (i + seed) % 26);
+	}
+	p.codePages = script.codePages;
+	p.codeLength = kScriptCodeLength;
+	p.nativeCount = static_cast<uint32_t>(kFakeNatives);
+	p.natives = script.natives;
+	p.nameHash = hash;
+	p.name = name;
+	p.stringPages = script.stringPages;
+	p.stringLength = kScriptStringLength;
+}
+
+static void PlanScript(ScriptStorage& script, bool unknownNative = false, uint32_t codeLength = kScriptCodeLength,
+	uint32_t nativeCount = static_cast<uint32_t>(kFakeNatives))
+{
+	if (g_scriptPlanned < static_cast<int>(sizeof(g_scriptPlan) / sizeof(g_scriptPlan[0])))
+		g_scriptPlan[g_scriptPlanned++] = { &script, unknownNative, codeLength, nativeCount };
+}
+
+// What a copy of blip_controller's n-th placement must hold after its header: the program object, the code
+// (the unreadable page as zeros), the natives before and after the game's resolution, the strings.
+static void WriteExpected(int n, const ScriptStorage& script, const uint64_t (&before)[kFakeNatives])
+{
+	wchar_t name[48];
+	swprintf(name, 48, L"script_placed_%d.bin", n);
+	const HANDLE file = CreateFileW(name, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+		return;
+	static const unsigned char zeros[kScriptPage] = {};
+	DWORD written = 0;
+	WriteFile(file, &script.program, sizeof(script.program), &written, nullptr);
+	WriteFile(file, script.codePages[0], kScriptPage, &written, nullptr);
+	WriteFile(file, g_scriptPageUnreadable ? zeros : script.codePages[1], kScriptCodeLength - kScriptPage, &written, nullptr);
+	WriteFile(file, before, sizeof(before), &written, nullptr);
+	WriteFile(file, script.natives, sizeof(script.natives), &written, nullptr);
+	WriteFile(file, script.stringPages[0], kScriptStringLength, &written, nullptr);
+	CloseHandle(file);
+}
+
+static DWORD WINAPI PlaceScripts(void*)
+{
+	g_scriptThread = GetCurrentThreadId();
+	using Resolve = unsigned char (*)(unsigned char*);
+	const auto resolve = reinterpret_cast<Resolve>(const_cast<unsigned char*>(Rel32Target(g_scriptCallSite)));
+	int blipPlacements = 0;
+	for (int i = 0; i < g_scriptPlanned; i++)
+	{
+		ScriptStorage& script = *g_scriptPlan[i].script;
+		FakeScriptProgram& p = script.program;
+		// as the game's constructor leaves the program before the call: the natives' hashes in the table
+		uint64_t before[kFakeNatives] = {};
+		for (size_t k = 0; k < kFakeNatives; k++)
+			before[k] = script.natives[k] = g_fakeNatives[k].hash;
+		if (g_scriptPlan[i].unknownNative)
+			before[1] = script.natives[1] = kUnknownNativeHash;
+		p.codeLength = g_scriptPlan[i].codeLength;
+		p.nativeCount = g_scriptPlan[i].nativeCount;
+		SetLastError(0);
+		const unsigned char resolved = resolve(reinterpret_cast<unsigned char*>(&p));
+		if (GetLastError() == kResolveLastError)
+			g_scriptErrorKept++;
+		g_scriptPlaced++;
+		if (resolved == 1)
+			g_scriptResolved++;
+		if (&script == &g_blipController)
+		{
+			blipPlacements++;
+			if (p.codeLength == kScriptCodeLength && p.nativeCount == kFakeNatives)
+				WriteExpected(blipPlacements, script, before);
+		}
+	}
+	return 0;
+}
+
+// The placements the options ask for, once TweaksV has started; then a while for a problem reported on the
+// placing thread to reach its own message box (TweaksV shows such a box a second after the problem).
+// "script: 2 placed on thread 1234 through a TweaksV stub, resolved 1 of 2, last error kept 2 of 2,
+// image 140695... 1236992 1700000000 | " - through the game function (the fake's own resolution function), a
+// TweaksV stub (outside the game), or nothing placed with a call to another mod (option "scripthooked")
+static void PlaceScriptsAsAsked(int argc, wchar_t** argv)
+{
+	const size_t size = sizeof(g_scriptResult) / sizeof(g_scriptResult[0]);
+	const unsigned char* const otherMod = ImageEnd() + 0x60000;
+	const unsigned char* const target = Rel32Target(g_scriptCallSite);
+	const wchar_t* const through = target == reinterpret_cast<const unsigned char*>(&FakeResolveNatives) ? L"the game function"
+		: target == otherMod ? L"another mod" : InImage(target) ? L"elsewhere in the game" : L"a TweaksV stub";
+	if (HasOption(argc, argv, L"scripthash"))
+	{
+		PlanScript(g_blipImposter);
+		PlanScript(g_blipImposter);
+	}
+	else if (HasOption(argc, argv, L"scriptother"))
+	{
+		PlanScript(g_otherScript);
+		PlanScript(g_blipController);
+	}
+	else if (HasOption(argc, argv, L"scripttwice"))
+	{
+		PlanScript(g_blipController);
+		PlanScript(g_blipController, true);
+	}
+	else if (HasOption(argc, argv, L"scriptmany"))
+		for (int i = 0; i < 17; i++)
+			PlanScript(g_blipController);
+	else if (HasOption(argc, argv, L"scripthuge"))
+	{
+		PlanScript(g_blipController, false, (16u << 20) + 1);
+		PlanScript(g_blipController, false, kScriptCodeLength, 65537);
+	}
+	else if (HasOption(argc, argv, L"script") || HasOption(argc, argv, L"scriptpage") || HasOption(argc, argv, L"scripthooked"))
+		PlanScript(g_blipController);
+	if (g_scriptPlanned == 0)
+	{
+		swprintf(g_scriptResult, size, L"script: none placed, call to %ls | ", through);
+		return;
+	}
+	if (target == otherMod || (InImage(target) && target != reinterpret_cast<const unsigned char*>(&FakeResolveNatives)))
+	{
+		swprintf(g_scriptResult, size, L"script: none placed, call to %ls | ", through);	// nothing is there to call
+		return;
+	}
+	if (HasOption(argc, argv, L"scriptpage"))
+	{
+		DWORD old = 0;
+		g_scriptPageUnreadable = VirtualProtect(g_blipController.codePages[1], kScriptPage, PAGE_NOACCESS, &old) != FALSE;
+	}
+	const HANDLE thread = CreateThread(nullptr, 0, PlaceScripts, nullptr, 0, nullptr);
+	if (thread)
+	{
+		WaitForSingleObject(thread, 30000);
+		CloseHandle(thread);
+	}
+	Sleep(1500);
+	const auto nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(ImageBase() + reinterpret_cast<const IMAGE_DOS_HEADER*>(ImageBase())->e_lfanew);
+	swprintf(g_scriptResult, size, L"script: %d placed on thread %lu through %ls, resolved %d of %d, last error kept %d of %d, "
+		L"image %llu %lu %lu | ", g_scriptPlaced, static_cast<unsigned long>(g_scriptThread), through, g_scriptResolved, g_scriptPlaced,
+		g_scriptErrorKept, g_scriptPlaced, static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(ImageBase())),
+		static_cast<unsigned long>(nt->OptionalHeader.SizeOfImage), static_cast<unsigned long>(nt->FileHeader.TimeDateStamp));
+}
+
 int wmain(int argc, wchar_t** argv)
 {
 	const wchar_t* asi = argc > 1 ? argv[1] : L"TweaksV.asi";
@@ -1339,6 +1617,14 @@ int wmain(int argc, wchar_t** argv)
 	if (HasOption(argc, argv, L"decalmany"))		// more than the game's own array holds
 		g_oldDecalStore->count = 300;
 
+	// The call at the script programs' hook site leads to the fake's own resolution function...
+	MakeScript(g_blipController, "blip_controller", kBlipControllerHash, 1);
+	MakeScript(g_otherScript, "other_script", 0x0F74EC00, 50);		// the game's hash of "other_script"
+	MakeScript(g_blipImposter, "blip_imposter", kBlipControllerHash, 100);
+	SetRel32(g_scriptCallSite, reinterpret_cast<const void*>(&FakeResolveNatives));
+	if (HasOption(argc, argv, L"scripthooked"))	// ...unless another mod redirected it already
+		SetRel32(g_scriptCallSite, ImageEnd() + 0x60000);
+
 	RovSetup(argc, argv);
 	ForEachSite(TouchSite);
 	RovForEachDataSite(TouchData);
@@ -1380,6 +1666,7 @@ int wmain(int argc, wchar_t** argv)
 		wprintf(L"unload: %ls after %d x FreeLibrary | ", GetModuleHandleW(asi) ? L"still loaded" : L"unloaded", frees);
 	}
 	CallBoxSearches();	// the box streamer searches, as the game would call them
+	PlaceScriptsAsAsked(argc, argv);	// the script programs, as the game's resource placement thread places them
 	if (dstorage && HasOption(argc, argv, L"dsnofactory"))
 		swprintf(g_dstorageResult, sizeof(g_dstorageResult) / sizeof(g_dstorageResult[0]), L"dstorage: not called | ");
 	else if (dstorage)
@@ -1422,8 +1709,9 @@ int wmain(int argc, wchar_t** argv)
 	PrintBoxStreamer();
 	PrintDecals();
 	RovReport();
-	wprintf(L"%ls%ls%ls%ls%ls", g_dstorageResult, g_floodResult, g_shareResult, g_ownResult, g_fileOpensResult);
+	wprintf(L"%ls%ls%ls%ls%ls%ls", g_dstorageResult, g_floodResult, g_shareResult, g_ownResult, g_fileOpensResult, g_scriptResult);
 	CheckStub(Rel32Target(g_packCallSite));
+	CheckStub(Rel32Target(g_scriptCallSite));
 	for (const Site& site : g_boxCalls)
 		CheckStub(Rel32Target(site));
 	RovForEachCallTarget(CheckStub);

@@ -3,7 +3,7 @@
 # TweaksV as a whole, in the fake game: old plugins present, NaturalVision Enhanced's loader present, one
 # pattern deliberately broken per plugin with the TEST build, another game exe, no C runtime DLLs, a renamed
 # .asi, no code changes allowed, the user name kept out of the log, the log's limit, links, a read-only game
-# folder, a held log, the code dump.
+# folder, a held log, the code dump, the copy of a script program.
 # Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
@@ -288,6 +288,100 @@ rm -f victim.txt
 fresh_ini; addkey TEST_DUMP_CODE 1; rm -rf $d; out=$(game full_game.exe)
 check "the release build ignores TEST_DUMP_CODE: nothing saved, no problem" "[ ! -e $d/GameCode-start.bin ] && log_lacks 'TEST BUILD' && log_lacks 'PROBLEM' && has '$ALL_ON_HEAP'"
 rm -rf $d
+
+# Test builds only: a script program as the game places it in memory, for reading a script's code. The fake game
+# places blip_controller - and with some options other_script or blip_imposter - through the call at the hook
+# site, on a thread of its own, and writes what it placed to script_placed_<n>.bin, n counting blip_controller's
+# placements, which the copies must hold byte for byte after their header.
+echo "== I17 TEST_DUMP_SCRIPT in a test build: the script program saved in %LOCALAPPDATA%\\TweaksV each time the game places it"
+d=appdata/TweaksV
+BLIP_HASH=$((0x80CFE974))
+# u32 FILE OFFSET, u64 FILE OFFSET: a little-endian number in a file, in decimal
+u32() { od -An -tu4 -j"$2" -N4 "$1" | tr -d ' '; }
+u64() { od -An -tu8 -j"$2" -N8 "$1" | tr -d ' '; }
+# script_report: the fake game's script field into placed, thread, base, size and stamp - how many programs it placed,
+# on which thread, and the game's base, SizeOfImage and PE timestamp
+script_report() {
+	read -r placed thread base size stamp <<< "$(sed -nE 's/.*script: ([0-9]+) placed on thread ([0-9]+) through [^,]*, resolved [0-9]+ of [0-9]+, last error kept [0-9]+ of [0-9]+, image ([0-9]+) ([0-9]+) ([0-9]+) \|.*/\1 \2 \3 \4 \5/p' <<< "$out")"
+}
+# header_ok FILE N PLACED RESOLVED UNREADABLE: the header of a copy of blip_controller as the fake game places it
+# (TweaksVDump.h's ScriptDumpHeader, 176 bytes: code 16675 bytes, 3 natives, strings 496 bytes), its placement N, the
+# programs placed so far, what the resolution returned and the bytes unreadable, the blocks' offsets and the file's size
+header_ok() {
+	local f=$1 code=16675 natives=3 strings=496
+	[ "$(head -c 8 "$f")" = TWKVSCRP ] && [ "$(u32 "$f" 8)" = 1 ] && [ "$(u32 "$f" 12)" = 176 ] &&
+	[ "$(head -c 80 "$f" | tail -c 64 | tr -d '\0')" = blip_controller ] && [ "$(head -c 80 "$f" | tail -c 64 | tr -cd '\0' | wc -c)" = 49 ] &&
+	[ "$(u32 "$f" 80)" = "$BLIP_HASH" ] && [ "$(u32 "$f" 84)" = $code ] && [ "$(u32 "$f" 88)" = $natives ] && [ "$(u32 "$f" 92)" = $strings ] &&
+	[ "$(u32 "$f" 96)" = "$2" ] && [ "$(u32 "$f" 100)" = "$thread" ] && [ "$(u32 "$f" 104)" = "$3" ] &&
+	[ "$(od -An -tu1 -j108 -N4 "$f" | tr -s ' ')" = " $4 0 0 0" ] &&
+	[ "$(u64 "$f" 112)" = "$base" ] && [ "$(u32 "$f" 120)" = "$size" ] && [ "$(u32 "$f" 124)" = "$stamp" ] &&
+	[ "$(u32 "$f" 128)" = "$5" ] && [ "$(u32 "$f" 132)" = 0 ] &&
+	[ "$(u64 "$f" 136)" = 176 ] && [ "$(u64 "$f" 144)" = 304 ] && [ "$(u64 "$f" 152)" = $((304 + code)) ] &&
+	[ "$(u64 "$f" 160)" = $((304 + code + 8 * natives)) ] && [ "$(u64 "$f" 168)" = $((304 + code + 16 * natives)) ] &&
+	[ "$(stat -c %s "$f")" = $((304 + code + 16 * natives + strings)) ]
+}
+# blocks_ok FILE N: after its header, the copy holds byte for byte what the fake game placed the N-th time
+blocks_ok() { tail -c +177 "$1" | cmp -s - "script_placed_$2.bin"; }
+# scripts: how many copies of a script program there are; script_run [OPTION...]: the fake game with the test build
+scripts() { ls $d 2> /dev/null | grep -c '^Script-'; }
+script_run() { rm -rf $d; rm -f script_placed_*.bin; out=$(ASI=TweaksV_test.asi game full_game.exe "$@"); script_report; }
+saved_line() {	# saved_line N PLACED NATIVES UNREADABLE: the log's line for the N-th copy, word for word but the folder
+	log_line "\[TweaksV\] TEST BUILD: Script-blip_controller-$1.bin saved in .*TweaksV: blip_controller placed the $(ordinal $1) time, as the game's $(ordinal $2) script program, on thread $thread - code 16675 bytes in 2 pages, 3 natives, $3, strings 496 bytes; $4.\$"
+}
+ordinal() { case $1 in 1) echo 1st ;; 2) echo 2nd ;; 3) echo 3rd ;; *) echo "$1th" ;; esac; }
+
+fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; script_run script
+f=$d/Script-blip_controller-1.bin
+check "the copy saved in %LOCALAPPDATA%\\TweaksV, and nothing in the game folder; the log header lists the switch, which says what it waits for, and the call is redirected" "[ -f $f ] && [ \$(scripts) = 1 ] && [ ! -e Script-blip_controller-1.bin ] && log_line 'TEST BUILD - not for release. .* TEST_DUMP_SCRIPT=blip_controller\$' && log_line '\[TweaksV\] TEST BUILD: TEST_DUMP_SCRIPT=blip_controller: the script program blip_controller (hash 0x80CFE974) is saved each time the game places it, at most 16 times, as Script-blip_controller-<n>.bin in .*TweaksV.\$' && log_line '\[TweaksV\] The natives. resolution call at RVA 0x[0-9A-F]* is redirected: every script program the game places passes TweaksV, before and after the game resolves its natives.\$'"
+check "the header: TWKVSCRP, format 1, 176 bytes, the name zero-padded, the hash and the lengths, placement 1 on the placing thread, the 1st program placed, resolved, the game's base, size and timestamp, none unreadable, the reserved fields 0, the five offsets and the file's size" "[ \"$placed\" = 1 ] && header_ok $f 1 1 1 0"
+check "the blocks byte for byte: the program object, the code over its two pages, the native table before (the hashes) and after (the handlers), the strings" "blocks_ok $f 1"
+check "the log: the first program the game placed, the line that proves the hook runs, and the copy saved, word for word; no problem" "log_line '\[TweaksV\] TEST BUILD: TEST_DUMP_SCRIPT: the first script program the game placed is blip_controller (hash 0x80CFE974), on thread $thread - the hook runs.\$' && saved_line 1 1 'every one resolved' 'none unreadable' && log_lacks 'PROBLEM'"
+check "the placement went through TweaksV's stub, read+execute; the game's resolution ran and its last error came back to the constructor" "has 'script: 1 placed on thread $thread through a TweaksV stub, resolved 1 of 1, last error kept 1 of 1' && has 'stubs: 7, all RX' && has 'protect: all restored (RX)'"
+
+fresh_ini; setkey DIAGNOSTIC_MODE 1; addkey TEST_DUMP_SCRIPT BLIP_Controller; script_run scripttwice
+check "placed twice, the name asked for in capitals: two copies, the second with a native the game does not know - not every one resolved - each with its blocks and its line" "[ \$(scripts) = 2 ] && header_ok $d/Script-blip_controller-1.bin 1 1 1 0 && header_ok $d/Script-blip_controller-2.bin 2 2 0 0 && blocks_ok $d/Script-blip_controller-1.bin 1 && blocks_ok $d/Script-blip_controller-2.bin 2 && saved_line 1 1 'every one resolved' 'none unreadable' && saved_line 2 2 'not every one resolved' 'none unreadable' && has 'resolved 1 of 2, last error kept 2 of 2'"
+check "DIAGNOSTIC_MODE: the three sites under [TweaksV], with what each holds, and the call's write" "log_has '\[TweaksV\] DIAGNOSTIC: natives. resolution call at RVA 0x[0-9A-F]* -> RVA 0x[0-9A-F]* (Y-E-H1)' && log_has '\[TweaksV\] DIAGNOSTIC: code length offset at RVA 0x[0-9A-F]* holds 0x1C, native table offset at RVA 0x[0-9A-F]* holds 0x40 (Y-E-N1)' && log_has '\[TweaksV\] DIAGNOSTIC: code page table offset at RVA 0x[0-9A-F]* holds 0x10 (Y-E-I1)' && log_has '\[TweaksV\] DIAGNOSTIC: natives. resolution call at RVA 0x[0-9A-F]*: E8 .* -> E8 '"
+
+fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; script_run scriptother
+check "another program placed first: other_script is the first program in the log and is not saved; blip_controller is saved as the game's 2nd program" "log_line '\[TweaksV\] TEST BUILD: TEST_DUMP_SCRIPT: the first script program the game placed is other_script (hash 0x0F74EC00), on thread $thread - the hook runs.\$' && [ \$(scripts) = 1 ] && header_ok $d/Script-blip_controller-1.bin 1 2 1 0 && blocks_ok $d/Script-blip_controller-1.bin 1 && saved_line 1 2 'every one resolved' 'none unreadable'"
+
+fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; script_run scripthash
+check "a program with blip_controller's hash and another name, placed twice: logged once, word for word, nothing saved, no problem" "[ \$(count 'TEST BUILD: TEST_DUMP_SCRIPT: a script program has the hash of blip_controller, 0x80CFE974, but is named blip_imposter - it is not saved (logged once).') -eq 1 ] && [ \$(scripts) = 0 ] && log_lacks 'PROBLEM' && has 'script: 2 placed'"
+
+fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; script_run scriptpage
+check "a page of its code that cannot be read: the copy saved all the same, the page's 291 bytes as zeros, counted in the header and the line, the rest byte for byte" "header_ok $f 1 1 1 291 && blocks_ok $f 1 && saved_line 1 1 'every one resolved' '291 bytes unreadable, saved as zeros' && log_lacks 'PROBLEM'"
+
+fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; script_run scriptmany
+check "placed 17 times: 16 copies, the 16th as the game's 16th program, no 17th, and the cap said once" "[ \$(scripts) = 16 ] && header_ok $d/Script-blip_controller-16.bin 16 16 1 0 && blocks_ok $d/Script-blip_controller-16.bin 16 && [ ! -e $d/Script-blip_controller-17.bin ] && [ \$(count 'TEST BUILD: 16 copies of blip_controller saved - from now on its placements are only counted.') -eq 1 ] && has 'script: 17 placed'"
+
+fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; script_run scripthuge
+check "beyond the bounds - a code length of 16 MB and a byte, a native count of 65537: each a problem, word for word, shown after the start-up summary; nothing saved" "log_has 'PROBLEM: TEST_DUMP_SCRIPT: Script-blip_controller-1.bin was not saved: its code length, 16777217 bytes, is beyond 16 MB.' && log_has 'PROBLEM: TEST_DUMP_SCRIPT: Script-blip_controller-2.bin was not saved: its native count, 65537, is beyond 65536.' && log_has 'Problem after the start-up summary not shown (ERROR_POPUP=0): 2 problem(s), see above.' && [ \$(scripts) = 0 ]"
+
+for value in ../x aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; do
+	fresh_ini; addkey TEST_DUMP_SCRIPT "$value"; script_run script
+	check "TEST_DUMP_SCRIPT=$value (${#value} characters) is no script's name: a problem, word for word; nothing hooked, nothing saved" "log_has 'PROBLEM: TweaksV.ini: \[TWEAKSV\] TEST_DUMP_SCRIPT=$value is not a script.s name of 1 to 63 letters, digits and _ - no script program is saved.' && has 'through the game function' && [ \$(scripts) = 0 ] && summary_once"
+done
+
+for label in Y-E-H1 Y-E-N1 Y-E-I1; do
+	fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; addkey TEST_BREAK_PATTERN $label; script_run script
+	check "TEST_BREAK_PATTERN=$label: the switch's problem names the pattern; nothing hooked, nothing saved, one summary" "grep -q -- 'TEST BUILD: pattern $label is treated as not found' TweaksV.log && log_has 'PROBLEM: TEST_DUMP_SCRIPT: the script program blip_controller is not saved this session: $label was not found.' && has 'through the game function' && [ \$(scripts) = 0 ] && summary_once"
+done
+
+fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; script_run scripthooked
+check "the call another mod redirected already: left alone and a problem, word for word; nothing saved" "log_has 'PROBLEM: TEST_DUMP_SCRIPT: the script program blip_controller is not saved this session: the natives. resolution call at RVA 0x[0-9A-F]* is not a call into the game (another mod may have hooked it already).' && has 'script: none placed, call to another mod' && [ \$(scripts) = 0 ]"
+
+fresh_ini; setkey DRY_RUN 1; addkey TEST_DUMP_SCRIPT blip_controller; script_run script
+check "DRY_RUN: the call found and checked, its would line, nothing redirected or saved, no problem" "log_has 'DRY_RUN: would redirect the natives. resolution call at RVA 0x[0-9A-F]*.' && log_has 'TEST BUILD: TEST_DUMP_SCRIPT=blip_controller: DRY_RUN - the call is not redirected, so no script program is saved.' && has 'through the game function' && [ \$(scripts) = 0 ] && log_lacks 'PROBLEM'"
+
+mkdir -p $d; echo "not a copy" > victim.txt
+fresh_ini; setkey ERROR_POPUP 1; addkey TEST_DUMP_SCRIPT blip_controller; rm -f script_placed_*.bin; ln victim.txt $f
+out=$(ASI=TweaksV_test.asi game full_game.exe script)
+check "Script-blip_controller-1.bin a hard link to another file: that file left alone; a problem, shown in a box of its own after the start-up summary" "[ \"\$(cat victim.txt)\" = 'not a copy' ] && log_has 'PROBLEM: TEST_DUMP_SCRIPT: Script-blip_controller-1.bin was not saved: it is a hard link' && log_has 'TEST BUILD: message box not shown (TWEAKSV_TEST_NO_BOXES=1): TweaksV: a part stopped working after the start-up:'"
+rm -f victim.txt
+
+fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; rm -rf $d; rm -f script_placed_*.bin; out=$(game full_game.exe script)
+check "the release build ignores TEST_DUMP_SCRIPT: nothing hooked or saved, no TEST BUILD line, no problem" "has 'script: 1 placed on thread' && has 'through the game function' && [ \$(scripts) = 0 ] && log_lacks 'TEST BUILD' && log_lacks 'PROBLEM'"
+rm -rf $d; rm -f script_placed_*.bin
 
 echo
 echo "INTEGRATION SCENARIOS: $pass passed, $fail failed"
