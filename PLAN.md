@@ -1,10 +1,6 @@
 # Plan
 
-The order of work for a change to TweaksV, phase by phase, each phase ending with the test suites green, the four builds (Release, Debug, the test build, the analysis build) clean, a local commit and my boot. It carried the decals part of 1.6.0, the whole rewrite of 2.0.0, the fixes of the 2.0.0 audit, the 2.1.1 patch for T-UNLOCK, and the two versions from the NaturalVision Enhanced report, 2.2.0 and 2.2.1, built in parallel tracks - one coding session in a worktree of its own per track, each owning its files, rebased onto main in order and released one after the other (all in the git history). Under way since 2026-10-27: 2.2.2, a comment after each key's value in the default `TweaksV.ini`, and the Blips part, the first of the five new parts on the roadmap ([ROADMAP.md](ROADMAP.md)), its research pass first; 2.3.0 stays on the roadmap, not urgent, and so do the other four parts.
-
-## 2.2.2 - a comment after each key's value in the default TweaksV.ini
-
-Made on 2026-10-27 from my own commented file, in the overview session itself, as one small change: the settings table carries each key's comment, the default file writes it at column 28, and TweaksV reads a value up to a comment after it, `//` or `;` - Windows' INI functions take everything after the `=` for the value, so until 2.2.1 a commented file was reported key by key and its defaults used. An existing file is kept as it is, and a key added back carries no comment, as I decided; the layout stays 2, since no key is new. The `ini_default` suite pins it with 4 checks more, 525. Not published by itself - the next release carries it: I boot it for my own use, and its tag follows that boot.
+The order of work for a change to TweaksV, phase by phase, each phase ending with the test suites green, the four builds (Release, Debug, the test build, the analysis build) clean, a local commit and my boot. It carried the decals part of 1.6.0, the whole rewrite of 2.0.0, the fixes of the 2.0.0 audit, the 2.1.1 patch for T-UNLOCK, and the two versions from the NaturalVision Enhanced report, 2.2.0 and 2.2.1, built in parallel tracks - one coding session in a worktree of its own per track, each owning its files, rebased onto main in order and released one after the other - and 2.2.2, a comment after each key's value in the default `TweaksV.ini`, made in one go on 2026-10-27 and not published by itself (all in the git history). Under way since 2026-10-27: the Blips part, the first of the five new parts on the roadmap ([ROADMAP.md](ROADMAP.md)), its research pass first; 2.3.0 stays on the roadmap, not urgent, and so do the other four parts.
 
 ## How the work runs
 
@@ -37,10 +33,10 @@ The phases:
 
 ## State
 
-**State:** 2.2.2 is committed, its version commit on main above bf3ed20, not pushed yet; the full check from a clean rebuild comes next, then my boot, then its tag and the push - it is not published by itself. The Blips part (2.4.0 on the roadmap) is under way, its research pass first, by the research session, for which I lifted my limit on analysing the game on 2026-10-27; the brief and the session's prompt are written, the session not started - it starts once 2.2.2 is booted, since its test build is built from main; D1 to D7 are decided. 2.2.1 is released, the tag on f965d5f, the commit I booted; the suites stand at 525 checks; the open issues are T-HARDEN, T-LAYOUT, T-CODEPAGE, T-DIAG, T-SUMMARY, T-FREEZE and T-REPLACE - T-LAYOUT goes with the Blips part, T-REPLACE with 2.3.0, not urgent.
+**State:** 2.2.2 is tagged on 2ba8c8c, the commit I booted on 2026-10-27 (line 1 of its log without -dirty, no PROBLEM line, every part applied, the commented default file written and read back as it is), and pushed with main; it is not published by itself - the next release carries it, and 2.2.1 stays the last one published. The Blips part (2.4.0 on the roadmap) is under way, its research pass first, by the research session, for which I lifted my limit on analysing the game on 2026-10-27; the brief and the session's prompt are written, the session not started; its test build is built from main, 2.2.2 now; D1 to D7 are decided. The suites stand at 525 checks; the open issues are T-HARDEN, T-LAYOUT, T-CODEPAGE, T-DIAG, T-SUMMARY, T-FREEZE and T-REPLACE - T-LAYOUT goes with the Blips part, T-REPLACE with 2.3.0, not urgent.
 
 **The research session:** not started; its prompt is `.claude\prompts\blips-research-session.md`.
 
 **Decisions waiting on me:** none.
 
-**Boots:** 2.2.2 for my own use; then my dump boot for the research pass, then the Blips part's boots.
+**Boots:** my dump boot for the research pass, then the Blips part's boots.
