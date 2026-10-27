@@ -46,6 +46,7 @@ What each part does and the checks it makes, the measurements, the open issues a
   - The tests check that `PATTERNS.md` lists exactly the table's patterns, and that the code uses each one once;
   - `TweaksV.log` names each pattern by its label, and `TEST_BREAK_PATTERN` (test builds only) takes a label.
   - `GTA5_Enhanced.exe` is encrypted on disk, so patterns are looked for in the running game: test builds save a copy of its code with `TEST_DUMP_CODE` - its code, constants and function table, never its data.
+  - The game's archives store its scripts encrypted, so a script's code is read in the running game too: test builds save a script program as the game places it in memory with `TEST_DUMP_SCRIPT`, through the hook that the shared module `TweaksVScripts` keeps for every part that works on a script program - its three patterns, `Y-E-H1`, `Y-E-N1` and `Y-E-I1`, are looked for only then, until the Blips part looks for them on every boot.
 
 - **One feature table:** `TweaksVFeatures.cpp` lists each feature once: its section of `TweaksV.ini`, the stand-alone plugins that do its job - the old ones TweaksV replaces and the ones that stay installed - and the function that starts it. DllMain starts the features from it and the conflict check takes their plugins from it, so a new feature is one entry there, plus its settings, and a new plugin one name in the entry of each part it does the job of.
 
@@ -114,7 +115,7 @@ What each part does and the checks it makes, the measurements, the open issues a
 
 - **Releasing:** a release zip carries exactly five files, now and for every version to come: `TweaksV.asi`, `LICENSE`, `THIRD_PARTY_NOTICES.md`, `CREDITS.md` and `README.md` - the binary, its license, the notices it must travel with, the credits and the player's guide; nothing else, not the `.pdb`. The release notes name the tag the build came from and link the repository, which `THIRD_PARTY_NOTICES.md` and `README.md` in the zip name too, so the source is one step from the binary wherever the zip goes (GPL-3.0, section 6d); the mod page carries the credits, links the repository and adds no restrictions of its own. Check the zip on VirusTotal before uploading: a plain build with its version resource and no packer stays clean.
 
-- **Tests:** `test\` holds fake-game test suites (561 checks): small programs that pretend to be the game, with copies of the code TweaksV patches, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
+- **Tests:** `test\` holds fake-game test suites (561 checks): small programs that pretend to be the game, with copies of the code TweaksV patches and a script program they place as the game does, load the real `TweaksV.asi` and report what it changed. One more suite checks the pattern table against `PATTERNS.md`. `bash test/run_all.sh` builds and runs them (see README).
 
 ## Versions
 
