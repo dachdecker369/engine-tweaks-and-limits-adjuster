@@ -85,6 +85,7 @@ namespace TweaksV
 		TestText(kTweaksVSection, "TEST_BREAK_PATTERN"),
 		TestText(kTweaksVSection, "TEST_LOG_LIMIT_KB"),
 		TestText(kTweaksVSection, "TEST_DUMP_CODE"),
+		TestText(kTweaksVSection, "TEST_DUMP_SCRIPT"),
 
 		Switch(kHeapSection, "ENABLED", true),
 		Number(kHeapSection, "HEAP_SIZE", 2000, 1, 2047, "Heap size in MB - Maximum 2047"),
@@ -172,6 +173,7 @@ namespace TweaksV
 	inline constexpr const Setting& kTestBreakPattern = FindSetting(kTweaksVSection, "TEST_BREAK_PATTERN");
 	inline constexpr const Setting& kTestLogLimitKb = FindSetting(kTweaksVSection, "TEST_LOG_LIMIT_KB");
 	inline constexpr const Setting& kTestDumpCode = FindSetting(kTweaksVSection, "TEST_DUMP_CODE");
+	inline constexpr const Setting& kTestDumpScript = FindSetting(kTweaksVSection, "TEST_DUMP_SCRIPT");
 	inline constexpr const Setting& kHeapSize = FindSetting(kHeapSection, "HEAP_SIZE");
 	inline constexpr const Setting& kModkitArraySize = FindSetting(kModkitSection, "MODKITARRAY_SIZE");
 	inline constexpr const Setting& kPackfileArraySize = FindSetting(kPackfileSection, "PACKFILEARRAY_SIZE");

@@ -179,3 +179,13 @@ The RPF7 facts the OPEN archives rely on, which no pattern holds: the encryption
 | S-E1 | `0F 85 A9 00 00 00 48 8D 54` | splash screen: `jz` at match - 0x0D becomes `jmp` | found | 0x52DC67 |
 | S-E2 | `00 E9 ? 05 00 00 E8 ? 07` | legal screen: the 6-byte `jz` (`0F 84`) at match - 0x0F is NOPed | found | 0x52F040 |
 | S-E3 | `E8 ? ? ? ? 8B 0D ? ? ? ? 83 C1 ? 84 C0` | landing page: its callee returns 0 | found | 0x1166F |
+
+## Script programs
+
+The game's compiled scripts as it holds them in memory, which the shared module `TweaksVScripts` hooks and reads for every part that works on one (SPECIFICATIONS.md, section 13.3).
+
+| Label | Pattern | Use | 1.0.1158.16 | RVA |
+|---|---|---|---|---|
+| Y-E-H1 | `4C 89 E1 E8 ? ? ? ? 41 BE FF 3F 00 00 41 8B 44 24 70` | +3: the call to the function that resolves a script program's natives (RVA 0x91BF20), in the program's resource constructor (RVA 0x91B9F0), rcx = the program (`mov rcx, r12` at +0) - the call `TweaksVScripts` redirects | found in the dump | 0x91BBA8 |
+| Y-E-N1 | `41 8B 4C 24 1C 01 C1 49 8B 54 24 40 48 D3 04 C2` | +4: 0x1C, the offset of a program's code length (`mov ecx, [r12+0x1C]`); +11: 0x40, the offset of its native table (`mov rdx, [r12+0x40]`) - the constructor's loop that rotates the natives' hashes back | found in the dump | 0x91BAA0 |
+| Y-E-I1 | `4D 8B 50 10 49 63 41 1C 4C 8D 7C C1 F8 49 63 41 18 4C 8D 0C C1` | +3: 0x10, the offset of a program's code page table (`mov r10, [r8+0x10]`) - the script interpreter's prologue | found in the dump | 0x91DD50 |

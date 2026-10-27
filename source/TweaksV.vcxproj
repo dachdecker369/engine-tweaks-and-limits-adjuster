@@ -141,6 +141,7 @@
     <ClCompile Include="TweaksVRageOpenV.cpp" />
     <ClCompile Include="TweaksVRelocation.cpp" />
     <ClCompile Include="TweaksVScanner.cpp" />
+    <ClCompile Include="TweaksVScripts.cpp" />
     <ClCompile Include="TweaksVSettings.cpp" />
     <ClCompile Include="TweaksVStraightToStoryMode.cpp" />
     <ClCompile Include="TweaksVSummary.cpp" />
@@ -181,6 +182,7 @@
     <ClInclude Include="TweaksVRageOpenV.h" />
     <ClInclude Include="TweaksVRelocation.h" />
     <ClInclude Include="TweaksVScanner.h" />
+    <ClInclude Include="TweaksVScripts.h" />
     <ClInclude Include="TweaksVSettings.h" />
     <ClInclude Include="TweaksVStraightToStoryMode.h" />
     <ClInclude Include="TweaksVSummary.h" />

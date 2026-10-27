@@ -11,7 +11,7 @@ namespace TweaksV
 {
 	struct GamePattern
 	{
-		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, D- Decals, R- RageOpenV, S- StraightToStoryMode
+		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, D- Decals, R- RageOpenV, S- StraightToStoryMode, Y- the script programs
 		const char* text;	// the bytes in hex, one space apart; ? matches any byte
 	};
 
@@ -132,6 +132,14 @@ namespace TweaksV
 		{ "S-E1", "0F 85 A9 00 00 00 48 8D 54" },
 		{ "S-E2", "00 E9 ? 05 00 00 E8 ? 07" },
 		{ "S-E3", "E8 ? ? ? ? 8B 0D ? ? ? ? 83 C1 ? 84 C0" },
+
+		// The script programs (TweaksVScripts.cpp): the call in a program's resource constructor that resolves
+		// its natives, where the module's hook is (H1); the constructor's loop over the native table, which
+		// reads the code length's and the native table's offsets (N1); the script interpreter's prologue,
+		// which reads the code page table's (I1)
+		{ "Y-E-H1", "4C 89 E1 E8 ? ? ? ? 41 BE FF 3F 00 00 41 8B 44 24 70" },
+		{ "Y-E-N1", "41 8B 4C 24 1C 01 C1 49 8B 54 24 40 48 D3 04 C2" },
+		{ "Y-E-I1", "4D 8B 50 10 49 63 41 1C 4C 8D 7C C1 F8 49 63 41 18 4C 8D 0C C1" },
 	};
 
 	// A text the scanner can use: bytes as two hex digits or ?, one space apart, at least one of them
@@ -181,5 +189,19 @@ namespace TweaksV
 			if (label == pattern.label)
 				return pattern;
 		throw "TweaksV: this pattern is not in kPatterns";
+	}
+
+	// The byte a pattern holds at index, or -1 for a wildcard and an index past its end - for the checks,
+	// when TweaksV is compiled, that a constant is the byte the pattern pins it with.
+	consteval int PatternByte(const GamePattern& pattern, size_t index)
+	{
+		const auto hex = [](char c) { return c <= '9' ? c - '0' : (c | 0x20) - 'a' + 10; };
+		const std::string_view text = pattern.text;
+		size_t i = 0;
+		for (size_t token = 0; i < text.size() && token < index; token++)
+			i += text[i] == '?' ? 2 : 3;	// a token and the space after it
+		if (i >= text.size() || text[i] == '?')
+			return -1;
+		return hex(text[i]) * 16 + hex(text[i + 1]);
 	}
 }

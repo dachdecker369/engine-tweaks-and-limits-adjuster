@@ -239,9 +239,11 @@ namespace TweaksV
 		const std::string& broken = GetText(kTestBreakPattern);
 		const std::string& logLimit = GetText(kTestLogLimitKb);
 		const std::string& dumpCode = GetText(kTestDumpCode);
+		const std::string& dumpScript = GetText(kTestDumpScript);
 		lines.push_back("TEST BUILD - not for release. TEST_BREAK_PATTERN=" + (broken.empty() ? std::string("(none)") : broken) +
 			" TEST_LOG_LIMIT_KB=" + (logLimit.empty() ? std::string("(none)") : logLimit) +
-			" TEST_DUMP_CODE=" + (dumpCode.empty() ? std::string("(none)") : dumpCode));
+			" TEST_DUMP_CODE=" + (dumpCode.empty() ? std::string("(none)") : dumpCode) +
+			" TEST_DUMP_SCRIPT=" + (dumpScript.empty() ? std::string("(none)") : dumpScript));
 #endif
 		return lines;
 	}

@@ -67,6 +67,9 @@
     <ClCompile Include="TweaksVScanner.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVScripts.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVSettings.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -148,6 +151,9 @@
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVScanner.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
+    <ClInclude Include="TweaksVScripts.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVSettings.h">

@@ -10,7 +10,7 @@
 #include <windows.h>
 
 #include "TweaksVConflicts.h"
-#include "TweaksVDump.h"		// test builds: TEST_DUMP_CODE
+#include "TweaksVDump.h"		// test builds: TEST_DUMP_CODE, TEST_DUMP_SCRIPT
 #include "TweaksVFeatures.h"
 #include "TweaksVGame.h"
 #include "TweaksVIni.h"
@@ -50,7 +50,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 			if (TweaksV::IsOn(TweaksV::kConsole))					// 7.
 				TweaksV::OpenConsole();
 #ifdef TWEAKSV_TEST_BUILD
-			TweaksV::StartCodeDump();								//    test builds: before anything is patched
+			TweaksV::StartCodeDump();								//    test builds: before anything is patched,
+			TweaksV::StartScriptDump();								//    then the script programs' hook
 #endif
 
 			const bool summaryLater = TweaksV::StartFeatures();		// 8. every feature that is on
