@@ -7,14 +7,16 @@
 //                         GetAttributes of its two file devices (R-E-F1..F8) - are hooked, so that a
 //                         path that exists under mods\ (in the game's current directory, normally the
 //                         game folder) is served from there. The folder is read once at start-up into a
-//                         list, and every call looks its path up in that list and does nothing else: no
-//                         file system call, no memory allocation, no lock. Both spellings of a path
-//                         (slashes, case) match, a path with ".." or one that is not relative is never
-//                         redirected, and a file the folder does not have reaches the game's own
-//                         function untouched. A mods file that cannot be opened is never replaced by
-//                         the game's own: OpenBulk gives the game that failure, as the game's function
-//                         would for any file it cannot open, logged and reported once. Without a mods
-//                         folder, or an empty one, nothing is hooked.
+//                         list, in UTF-8 as the game spells its paths on every Windows, and every call
+//                         looks its path up in that list and does nothing else: no file system call, no
+//                         memory allocation, no lock. Both spellings of a path (slashes, case, by
+//                         Windows' file-system upper case) match; a path with "..", one that is not
+//                         relative and one that is not UTF-8 is never redirected, and a file the folder
+//                         does not have reaches the game's own function untouched. A mods file that
+//                         cannot be opened is never replaced by the game's own: OpenBulk gives the game
+//                         that failure, as the game's function would for any file it cannot open,
+//                         logged and reported once. Without a mods folder, or an empty one, nothing is
+//                         hooked.
 //   OPEN_RPF              five calls of the archive code (R-E-E1..E5: FindEncryption, DecryptHeader,
 //                         DecryptHeader2 twice, ParseHeader) are redirected through call stubs, so that
 //                         an archive whose header says OPEN is read without decryption. The encryption
