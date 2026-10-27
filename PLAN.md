@@ -54,7 +54,7 @@ The phases:
 
 **The switch's track:** under way since 2026-10-27, in its worktree on the branch `claude/blips-script-save-switch-0d98c7`, from f777c78.
 
-**The 2.2.3 track:** not started; it branches from main with this plan.
+**The 2.2.3 track:** under way since 2026-10-27, in its worktree on the branch `claude/rageopen-utf8-codepage-36e096`, from 906f333.
 
 **The research session:** section 2 done; on 2026-10-27 it recorded the verification's corrections in the findings, wrote its reader for the saved program, `ScriptRead.java`, tested on files of its own, listed its tools in README.txt, and settled T-CODEPAGE's open fact, which I had added to its pass: all eight file functions RageOpenV hooks turn their paths into UTF-16 with code page 65001, UTF-8, before any Win32 call (the findings' last section; the overview session checked the eight call sites in the dump). It waits for my boot with the switch.
 
