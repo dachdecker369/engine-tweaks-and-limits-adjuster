@@ -72,16 +72,11 @@ fresh_ini; deep=mods/zdeep; for i in $(seq 1 33); do deep="$deep/d"; done; mkdir
 out=$(game full_game.exe)
 check "too deep: that folder skipped and reported, the rest of the folder still read and used" "log_has 'PROBLEM: Only part of the mods folder is used this session: 1 folder deeper than 32 levels was skipped.' && has '$FILES_OK'"
 rm -rf mods/zdeep
-# An emoji is a character outside the Basic Multilingual Plane, which no ANSI code page holds but UTF-8
-# (65001): the name is listed there and left out, counted in the log, on every other code page - single- or
-# double-byte; the lookup works either way.
-acp=$(MSYS_NO_PATHCONV=1 reg query 'HKLM\SYSTEM\CurrentControlSet\Control\Nls\CodePage' /v ACP 2>/dev/null | tr -d '\r' | sed -nE 's/.*ACP\s+REG_SZ\s+([0-9]+).*/\1/p')
-fresh_ini; touch "mods/test/😀.txt"; out=$(game full_game.exe)
-if [ "$acp" = 65001 ]; then
-	check "a name outside the Basic Multilingual Plane on the UTF-8 code page: listed, nothing left out" "log_has 'The mods folder has 3 files and folders.' && log_lacks 'left out of the list'"
-else
-	check "a name outside the Basic Multilingual Plane on code page ${acp:-?}: left out and counted, the rest listed" "log_has 'The mods folder has 2 files and folders.' && log_has 'Names in the mods folder left out of the list: 1 that the ANSI code page (${acp:-[0-9]*}) cannot hold - the game asks with paths in that code page.'"
-fi
+# An emoji is a character outside the Basic Multilingual Plane, which no ANSI code page holds but UTF-8: the
+# game asks for its files in UTF-8 on every Windows, so the name is listed and served whatever the code page.
+fresh_ini; touch "mods/test/😀.txt"; out=$(game full_game.exe rovask 'test/😀.txt')
+check "a name outside the Basic Multilingual Plane: listed in UTF-8, nothing left out" "log_has 'The mods folder has 3 files and folders.' && log_lacks 'left out of the list'"
+check "its file served by its UTF-8 path from every file function" "has 'ask 1 served 8/8 passed 0/8'"
 check "the lookup still works with the name there" "has 'spellings ok, folder ok, outside ok' && has '$FILES_OK'"
 rm -f "mods/test/😀.txt"
 
@@ -91,6 +86,44 @@ check "the folder logged and reported with its Windows error, the rest of the fo
 rm -rf mods/locked
 fresh_ini; deny_listing mods; out=$(game full_game.exe); allow_writes mods
 check "the mods folder cannot be listed: reported as such, not as empty; nothing hooked, the rest on" "log_has 'PROBLEM: Files in the mods folder are not used this session: the mods folder could not be read (Windows error 5, access denied).' && log_lacks 'is empty' && has 'file hooks 0/8 |' && has '$OPEN_OK'"
+
+echo "== R4e names with letters outside ASCII: a file and folders served by their UTF-8 path, also with those letters in the other case; a request whose bytes are not UTF-8 passed on untouched"
+# The game asks in UTF-8 on every Windows; asked in code page 1252, the name's bytes are not UTF-8 - the
+# spelling TweaksV's list had on a Windows whose ANSI code page is 1252, before it was read in UTF-8.
+fresh_ini; touch "mods/test/über.txt"; mkdir -p "mods/Ελληνικά/Модели"; touch "mods/Ελληνικά/Модели/фара.txt"
+out=$(game full_game.exe rovask 'test/über.txt' rovask 'TEST/ÜBER.TXT' rovask 'Ελληνικά/Модели' rovask 'ελληνικά\МОДЕЛИ\ФАРА.txt' rov1252 'test/über.txt')
+check "listed in UTF-8: 6 files and folders, nothing left out" "log_has 'The mods folder has 6 files and folders.' && log_lacks 'left out of the list'"
+check "the file served by its UTF-8 path from every file function, also with its letter in the other case" "has 'ask 1 served 8/8 passed 0/8' && has 'ask 2 served 8/8 passed 0/8'"
+check "the folders and the file in them served by their UTF-8 path, also with their letters in the other case and backslashes" "has 'ask 3 served 8/8 passed 0/8' && has 'ask 4 served 8/8 passed 0/8'"
+check "the file's name in code page 1252, bytes that are not UTF-8: never redirected, passed on untouched" "has 'ask 5 served 0/8 passed 8/8'"
+check "the other spellings, the folder and the paths never redirected as before" "has 'spellings ok, folder ok, outside ok' && has '$FILES_OK'"
+rm -rf "mods/test/über.txt" "mods/Ελληνικά"
+
+echo "== R4f letters compared as Windows' file systems compare them, by their upper case: the Kelvin sign and k told apart, a letter outside the Basic Multilingual Plane keeping its case, a name whose upper case is longer in UTF-8"
+kelvin=$(printf '\xe2\x84\xaa')			# the Kelvin sign, U+212A: its lower case is k, its upper case itself
+deseret=$(printf '\xf0\x90\x90\xa8')		# DESERET SMALL LETTER LONG I, U+10428
+deseretCap=$(printf '\xf0\x90\x90\x80')	# its capital, U+10400
+long=$(printf 'ɐ%.0s' $(seq 1 124))		# 124 letters of 2 bytes, their capitals of 3: test/ and these are 253 bytes, upcased 377
+fresh_ini; touch "mods/test/$kelvin.txt" "mods/test/$deseret.txt" "mods/test/$long"
+out=$(game full_game.exe rovask "test/$kelvin.txt" rovask 'test/k.txt' rovask "test/$deseret.txt" rovask "test/$deseretCap.txt" rovask "TEST/$long")
+check "the Kelvin sign's file served; k, which shares its lower case but not its upper case, passed on, as NTFS tells the two apart" "has 'ask 1 served 8/8 passed 0/8' && has 'ask 2 served 0/8 passed 8/8'"
+check "a Deseret letter's file served; its capital passed on, as NTFS keeps the case of a letter outside the Basic Multilingual Plane" "has 'ask 3 served 8/8 passed 0/8' && has 'ask 4 served 0/8 passed 8/8'"
+check "a name of 253 bytes whose upper case is 377 listed and served" "log_has 'The mods folder has 5 files and folders.' && has 'ask 5 served 8/8 passed 0/8'"
+rm -f "mods/test/$kelvin.txt" "mods/test/$deseret.txt" "mods/test/$long"
+
+echo "== R4g a name that is not valid UTF-16 (an unpaired surrogate, made by the fake before TweaksV starts): left out and counted, the rest used"
+fresh_ini; out=$(game full_game.exe rovbadname)
+if has 'bad name NOT made'; then
+	skip "this file system refuses a name with an unpaired surrogate, so none can be left out"
+else
+	check "left out and counted with its reason, the rest listed and used; the name gone again with the fake" "has 'bad name made |' && log_has 'The mods folder has 2 files and folders.' && log_has 'Names in the mods folder left out of the list: 1 whose name is not valid Unicode (an unpaired surrogate) - the game cannot ask for such a name.' && has '$FILES_OK' && [ \"\$(ls -A mods/test 2>/dev/null)\" = file.txt ]"
+fi
+
+echo "== R4h DIAGNOSTIC_MODE=1 and paths outside ASCII: the lines name them in UTF-8, a request that is not UTF-8 with the replacement character the game reads"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; touch "mods/test/über.txt"; out=$(game full_game.exe rovask 'test/über.txt' rov1252 'test/über.txt')
+check "the request and the file served named in UTF-8" "log_has 'DIAGNOSTIC: OpenBulk 1 asked for test/über.txt' && log_has 'DIAGNOSTIC: OpenBulk 1 served mods/test/über.txt' && has 'ask 1 served 8/8 passed 0/8'"
+check "the request in code page 1252 named with a replacement character, as the game reads it, and passed on" "log_has 'DIAGNOSTIC: OpenBulk 1 asked for test/�ber.txt' && has 'ask 2 served 0/8 passed 8/8'"
+rm -f "mods/test/über.txt"
 
 echo "== R5 DRY_RUN=1: the time hook is installed so the checks run at their moment; nothing else written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
@@ -202,11 +235,7 @@ fi
 
 echo "== R21 DIAGNOSTIC_MODE=1 and a request under a profile folder whose name is not ASCII: written as %USERPROFILE%"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(USERPROFILE='C:\Users\Jürgen' game full_game.exe rovprofile)
-if has 'profile path not in the ANSI code page'; then
-	skip "the profile folder's name is not in this machine's ANSI code page (${acp:-?}), so no request can name it"
-else
-	check "the request, from the ANSI code page, logged under %USERPROFILE% and not redirected; the name nowhere in the log" "has 'profile path asked' && log_has 'OpenBulk 1 asked for %USERPROFILE%.Documents.tweaksv.txt' && log_lacks 'rgen'"
-fi
+check "the request, in UTF-8 as the game asks, logged under %USERPROFILE% and not redirected; the name nowhere in the log" "has 'profile path asked' && log_has 'OpenBulk 1 asked for %USERPROFILE%.Documents.tweaksv.txt' && log_lacks 'rgen'"
 
 echo
 echo "RAGEOPENV SCENARIOS: $pass passed, $fail failed"

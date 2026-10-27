@@ -20,7 +20,12 @@
 //                      problem after the start-up summary
 //   rovbadarchive      parses an OPEN archive whose entry count is implausible, twice; waits 1.5 s the same way
 //   rovbadtable        parses an OPEN archive whose entry table points at memory that cannot be read, twice; the same wait
-//   rovprofile         asks OpenBulk 1 for a file under %USERPROFILE%, in the ANSI code page
+//   rovprofile         asks OpenBulk 1 for a file under %USERPROFILE%, in UTF-8 as the game asks
+//   rovask PATH        asks the eight file functions for PATH in UTF-8, as the game does, and reports how many served it from
+//                      mods/ and how many passed it on untouched; repeatable, reported as "ask 1", "ask 2", ... in the order given
+//   rov1252 PATH       the same, with PATH in code page 1252: a request whose bytes are not UTF-8 (numbered with rovask's)
+//   rovbadname         makes mods\test\bad<U+D800>.txt before TweaksV starts, a name that is not valid UTF-16 (an unpaired
+//                      surrogate), and keeps it open with delete on close, so it goes when the fake ends - however it ends
 //   rovnotime          never asks for the time (a game TweaksV's time hook does not reach): waits 35 s instead
 //   rovcwd DIR         runs in DIR, not in its own folder (a shortcut that sets another working folder): it changes
 //                      its current directory before it loads TweaksV.asi
@@ -218,12 +223,29 @@ static bool Has(int argc, wchar_t** argv, const wchar_t* option)
 static unsigned char g_apiBefore[5];
 static bool g_flood = false, g_badArchive = false, g_badTable = false, g_profile = false, g_noTime = false;
 static const wchar_t* g_cwdResult = nullptr;	// with rovcwd: whether the current directory could be changed
+static std::vector<std::string> g_asks;			// rovask and rov1252: the paths, in the bytes the file functions are asked with
+static const wchar_t* g_badNameResult = nullptr;	// with rovbadname: whether the name could be made
+
+// A path from the command line in the bytes of a code page; "?" if it cannot be converted.
+static std::string InCodePage(const wchar_t* path, UINT codePage)
+{
+	char bytes[MAX_PATH * 3] = {};
+	return WideCharToMultiByte(codePage, 0, path, -1, bytes, sizeof(bytes), nullptr, nullptr) > 0 ? std::string(bytes) : std::string("?");
+}
 
 void RovSetup(int argc, wchar_t** argv)
 {
 	for (int i = 2; i + 1 < argc; i++)
 		if (wcscmp(argv[i], L"rovcwd") == 0)
 			g_cwdResult = SetCurrentDirectoryW(argv[i + 1]) ? L"set" : L"NOT set";
+		else if (wcscmp(argv[i], L"rovask") == 0 || wcscmp(argv[i], L"rov1252") == 0)
+			g_asks.push_back(InCodePage(argv[i + 1], wcscmp(argv[i], L"rovask") == 0 ? CP_UTF8 : 1252));
+	if (Has(argc, argv, L"rovbadname"))	// held open until the fake ends, then gone: no shell has to delete a name it cannot spell
+	{
+		const HANDLE bad = CreateFileW(L"mods\\test\\bad\xD800" L".txt", GENERIC_READ | GENERIC_WRITE | DELETE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
+		g_badNameResult = bad != INVALID_HANDLE_VALUE ? L"made" : L"NOT made";
+	}
 	BuildFakeCode(Has(argc, argv, L"rovnotstart"), Has(argc, argv, L"rovmissing"), Has(argc, argv, L"rovjump"));
 	g_flood = Has(argc, argv, L"rovflood");
 	g_openFail = Has(argc, argv, L"rovopenfail");
@@ -291,6 +313,8 @@ void RovReport()
 {
 	if (g_cwdResult)
 		wprintf(L"cwd %ls | ", g_cwdResult);
+	if (g_badNameResult)
+		wprintf(L"bad name %ls | ", g_badNameResult);
 	wprintf(L"rov api hook: %ls | ", g_apiHookedAtFirstRequest ? L"yes" : L"no");
 	wprintf(L"rov api hook afterwards: %ls | ", memcmp(TimeApi(), g_apiBefore, 5) != 0 ? L"still there" : L"removed");
 	wprintf(L"console: %02X %02X %02X %02X %02X %02X | ", g_rovConsole[16], g_rovConsole[17], g_rovConsole[18], g_rovConsole[19],
@@ -356,23 +380,34 @@ void RovReport()
 			call("\\\\server\\share\\test\\file.txt") == "\\\\server\\share\\test\\file.txt" && call("C:test\\file.txt") == "C:test\\file.txt" &&
 			call("C:\\test\\file.txt") == "C:\\test\\file.txt" && call(longPath.c_str()) == longPath;
 		wprintf(L", spellings %ls, folder %ls, outside %ls", spellings ? L"ok" : L"no", folder ? L"ok" : L"no", outside ? L"ok" : L"no");
-		if (g_profile)	// a file under the profile folder, in the ANSI code page the game asks with (as UTF-8 on 65001)
+		if (g_profile)	// a file under the profile folder, in UTF-8 as the game asks
 		{
 			wchar_t profile[MAX_PATH] = {};
 			const DWORD length = GetEnvironmentVariableW(L"USERPROFILE", profile, MAX_PATH);
 			const std::wstring wide = std::wstring(profile, length < MAX_PATH ? length : 0) + L"\\Documents\\tweaksv.txt";
-			char path[MAX_PATH * 3] = {};
-			BOOL lossy = FALSE;
-			const int size = GetACP() == CP_UTF8
-				? WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, path, sizeof(path), nullptr, nullptr)
-				: WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wide.c_str(), -1, path, sizeof(path), nullptr, &lossy);
-			if (length > 0 && length < MAX_PATH && size > 0 && !lossy)
+			const std::string path = InCodePage(wide.c_str(), CP_UTF8);
+			if (length > 0 && length < MAX_PATH && path != "?")
 			{
-				const bool untouched = call(path) == path;
+				const bool untouched = call(path.c_str()) == path;
 				wprintf(L", profile path %ls", untouched ? L"asked" : L"REDIRECTED");
 			}
 			else
-				wprintf(L", profile path not in the ANSI code page");
+				wprintf(L", profile path not converted");
+		}
+		// The paths of rovask and rov1252, each asked of the eight functions: served from mods/, or passed on untouched.
+		for (size_t n = 0; n < g_asks.size(); n++)
+		{
+			int served = 0, untouched = 0;
+			for (size_t i = F_OPENBULK1; i <= F_GETATTRIBS2; i++)
+			{
+				g_fileCalls.clear();
+				reinterpret_cast<uint64_t (*)(void*, const char*, int64_t*)>(FnStart(i))(nullptr, g_asks[n].c_str(), nullptr);
+				if (g_fileCalls.size() == 1 && g_fileCalls[0] == "mods/" + g_asks[n])
+					served++;
+				else if (g_fileCalls.size() == 1 && g_fileCalls[0] == g_asks[n])
+					untouched++;
+			}
+			wprintf(L", ask %zu served %d/8 passed %d/8", n + 1, served, untouched);
 		}
 	}
 	wprintf(L" | ");
