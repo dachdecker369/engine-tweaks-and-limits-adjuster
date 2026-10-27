@@ -184,10 +184,12 @@ namespace TweaksV
 
 		constexpr size_t kMaxModsEntries = 200000;	// files and folders the list holds at most
 		constexpr size_t kMaxModsDepth = 32;		// folders deep
-		constexpr size_t kMaxModsPath = kMaxPathText;
-		constexpr size_t kMaxFolded = 3 * kMaxModsPath;	// what the fold can make of kMaxModsPath bytes: 3 bytes of UTF-8 per UTF-16 unit
 		constexpr char kModsPrefix[] = "mods/";
 		constexpr size_t kModsPrefixSize = sizeof(kModsPrefix) - 1;
+		// A path of the list, and a request redirected, at most: a hook hands the game "mods/" and the
+		// path, and its functions read kMaxPathText bytes of that - a longer path would be cut short.
+		constexpr size_t kMaxModsPath = kMaxPathText - kModsPrefixSize;
+		constexpr size_t kMaxFolded = 3 * kMaxModsPath;	// what the fold can make of kMaxModsPath bytes: 3 bytes of UTF-8 per UTF-16 unit
 		constexpr size_t kDevices = 2;				// the game's two file devices, each with the four functions
 		constexpr size_t kFunctionsPerDevice = 4;
 
@@ -262,9 +264,11 @@ namespace TweaksV
 		// doubled '/' inside collapsed, the letters in Windows' file-system upper case - on the bytes for a
 		// path of ASCII alone, through UTF-16 for any other (FoldOutsideAscii). Upper case, not lower: the
 		// file systems compare upcased names, and the two differ - the Kelvin sign and k share a lower case,
-		// not an upper case. False for an empty path; one longer than kMaxModsPath bytes, more than the game's
-		// function reads; one that is not valid UTF-8; and one that is not relative - it starts with a
-		// separator or a drive ("C:"): only a relative path names a file of the game folder.
+		// not an upper case. False for an empty path; one longer than kMaxModsPath bytes, which the game's
+		// function would read cut short behind "mods/" - checked before the fold, since an upper case can take
+		// more bytes than its letter, so a longer request can fold to a listed name; one that is not valid
+		// UTF-8; and one that is not relative - it starts with a separator or a drive ("C:"): only a relative
+		// path names a file of the game folder.
 		bool ListSpelling(const char* path, char (&out)[kMaxFolded + 1], size_t& length)
 		{
 			length = 0;

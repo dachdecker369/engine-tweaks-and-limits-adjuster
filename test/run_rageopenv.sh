@@ -125,6 +125,20 @@ check "the request and the file served named in UTF-8" "log_has 'DIAGNOSTIC: Ope
 check "the request in code page 1252 named with a replacement character, as the game reads it, and passed on" "log_has 'DIAGNOSTIC: OpenBulk 1 asked for test/�ber.txt' && has 'ask 2 served 0/8 passed 8/8'"
 rm -f "mods/test/über.txt"
 
+echo "== R4i the paths' limit, 254 bytes: a hook hands the game mods/ and the path, of which its file functions read 259 bytes"
+# A path of 254 bytes is listed and served; paths of 255 are left out and counted - a folder's name and its file's
+# joined, and a name of 255 alone. A request is measured before its fold, because an upper case can take more bytes
+# than its letter (Ɐ three, ɐ two): requests of 255 and 259 bytes fold to the spelling of the listed name of 253 bytes
+# and still pass on untouched.
+a254=$(printf 'a%.0s' $(seq 1 249)); b255=$(printf 'b%.0s' $(seq 1 250)); c255=$(printf 'c%.0s' $(seq 1 255))
+long=$(printf 'ɐ%.0s' $(seq 1 124))		# test/ and these are 253 bytes
+fresh_ini; touch "mods/test/$a254" "mods/test/$b255" "mods/$c255" "mods/test/$long"
+out=$(game full_game.exe rovask "test/$a254" rovask "TEST/Ɐ$(printf 'ɐ%.0s' $(seq 1 123))" rovask "test/ⱯⱯ$(printf 'ɐ%.0s' $(seq 1 122))" rovask "test/ⱯⱯⱯⱯⱯⱯ$(printf 'ɐ%.0s' $(seq 1 118))")
+check "a path of 254 bytes listed and served by every file function" "log_has 'The mods folder has 4 files and folders.' && has 'ask 1 served 8/8 passed 0/8'"
+check "paths of 255 bytes left out and counted with their reason, a folder's name and its file's joined, and a name alone" "log_has 'Names in the mods folder left out of the list: 2 whose path is longer than 254 bytes.'"
+check "a request of 254 bytes folding to the listed name of 253 served; requests of 255 and 259 bytes with the same fold passed on untouched" "has 'ask 2 served 8/8 passed 0/8' && has 'ask 3 served 0/8 passed 8/8' && has 'ask 4 served 0/8 passed 8/8'"
+rm -f "mods/test/$a254" "mods/test/$b255" "mods/$c255" "mods/test/$long"
+
 echo "== R5 DRY_RUN=1: the time hook is installed so the checks run at their moment; nothing else written"
 fresh_ini; setkey DRY_RUN 1; out=$(game full_game.exe); echo "      $out"
 check "time hook yes; nothing written" "has 'rov api hook: yes' && has 'rpf: 48 89 5C |' && has '$NOTHING' && has 'stubs: 0,'"
