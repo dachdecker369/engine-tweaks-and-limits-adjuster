@@ -33,7 +33,7 @@
     <!-- TweaksV's version: in BuildInfo.h (the log header) and version.rc (the file's version info) -->
     <TweaksVVersionMajor>2</TweaksVVersionMajor>
     <TweaksVVersionMinor>2</TweaksVVersionMinor>
-    <TweaksVVersionPatch>1</TweaksVVersionPatch>
+    <TweaksVVersionPatch>2</TweaksVVersionPatch>
     <TweaksVRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..'))</TweaksVRoot>
     <TargetName>TweaksV</TargetName>
     <TargetExt>.asi</TargetExt>
