@@ -114,6 +114,16 @@ namespace TweaksV
 		{
 			return setting.kind == SettingKind::Text ? GetText(setting) : std::to_string(ValueOf(setting).number);
 		}
+
+		// A key's line in the default file: KEY=default, then its comment at the comment column, which
+		// every KEY=default ends short of (CommentsFitTheColumn).
+		std::string DefaultLine(const Setting& setting)
+		{
+			std::string line = std::string(setting.key) + "=" + DefaultValueText(setting);
+			if (*setting.comment != '\0')
+				line += std::string(kIniCommentColumn - line.size(), ' ') + "//" + setting.comment;
+			return line;
+		}
 	}
 
 	void LoadSettings()
@@ -183,7 +193,7 @@ namespace TweaksV
 
 	std::string DefaultIniText()
 	{
-		// the header is the one comment in the file: README.md explains the keys
+		// the header, and a short comment after each key's value: README.md explains the keys in full
 		std::string text =
 			"; ===========================================================================\r\n"
 			"; TweaksV.asi Configuration File (GTA V Enhanced)\r\n"
@@ -198,7 +208,7 @@ namespace TweaksV
 			text += "\r\n[" + std::string(section->name) + "]\r\n";
 			for (const Setting& setting : kSettings)
 				if (setting.section == section && !setting.testBuildOnly)
-					text += std::string(setting.key) + "=" + DefaultValueText(setting) + "\r\n";
+					text += DefaultLine(setting) + "\r\n";
 		}
 		return text;
 	}

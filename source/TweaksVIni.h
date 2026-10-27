@@ -36,8 +36,8 @@ namespace TweaksV
 	// The TweaksV.ini line of the log header: the path, and where it came from.
 	std::string DescribeIniLocation();
 
-	// A key's value as written in TweaksV.ini, without the spaces around it; empty if the key is
-	// missing. At most 255 characters are read. Only LoadSettings() reads TweaksV.ini this way -
-	// everything else asks TweaksVSettings.h.
+	// A key's value as written in TweaksV.ini, up to a comment after it ("//" or ";") and without the
+	// spaces around it; empty if the key is missing. At most 255 characters are read. Only
+	// LoadSettings() reads TweaksV.ini this way - everything else asks TweaksVSettings.h.
 	std::wstring ReadIniValue(const char* section, const char* key);
 }

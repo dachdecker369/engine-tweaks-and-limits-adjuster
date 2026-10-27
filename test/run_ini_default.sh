@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-only
 # The default TweaksV.ini: a first start without a TweaksV.ini creates exactly the default text
-# (expected_default.ini) and uses its defaults; a deleted key comes back with its default; crafted
-# values are reported and clamped. A file without VERSION under [TWEAKSV] has the layout of TweaksV 1.x
+# (expected_default.ini, a comment after each key's value) and uses its defaults; a deleted key comes
+# back with its default and no comment; crafted values are reported and clamped; a comment after a
+# value, // or ;, is not part of it. A file without VERSION under [TWEAKSV] has the layout of TweaksV 1.x
 # (layout1.ini is the 1.6.0 default): it is renamed to TweaksV.old.ini and replaced by the default file,
 # nothing of it read - also in %LOCALAPPDATA%\TweaksV with a read-only game folder; a 1.x file inside
 # the read-only game folder cannot be renamed, which is reported. Fake LOCALAPPDATA: the real one is
@@ -31,13 +32,14 @@ check "the box streamer list capacity is 10000" 'grep -q "box caps: 10000 10000 
 check "the decal definitions limit is 2048" 'grep -q "decal limits: 2047 2048 0x28198, 23 agree" harness.out'
 check "no message box was needed (harness finished), no problem" 'grep -q "heap:" harness.out && log_lacks "PROBLEM"'
 
-echo "== a deleted key comes back with its default"
+echo "== a deleted key comes back with its default, without a comment"
 for k in HEAP_SIZE PACKFILEARRAY_SIZE OPEN_RPF CONSOLE; do sed -b -i "/^$k=/d" TweaksV.ini; done
 out=$(game full_game.exe); echo "      ${out:0:160}"
 check "HEAP_SIZE=2000 added back" 'grep -q "^HEAP_SIZE=2000" TweaksV.ini'
 check "PACKFILEARRAY_SIZE=13000 added back" 'grep -q "^PACKFILEARRAY_SIZE=13000" TweaksV.ini'
 check "OPEN_RPF=1 added back" 'grep -q "^OPEN_RPF=1" TweaksV.ini'
 check "CONSOLE=0 added back" 'grep -q "^CONSOLE=0" TweaksV.ini'
+check "a key added back carries no comment: TweaksV adds none to an existing file" 'tr -d "\r" < TweaksV.ini | grep -qx "HEAP_SIZE=2000"'
 check "the log names all 4 re-added keys" '[ "$(grep -c "added the missing key" TweaksV.log)" = 4 ]'
 
 echo "== a file with VERSION alone: every other key is added back"
@@ -58,6 +60,15 @@ check "CONSOLE=maybe: not on/off, off" "grep -q 'PROBLEM: TweaksV.ini: \[TWEAKSV
 check "VERSION=3: a newer layout is reported" "grep -q 'PROBLEM: TweaksV.ini comes from a newer TweaksV (layout 3; this TweaksV knows layout 2)' TweaksV.log"
 check "'  TRUE  ' and 'Off' are read, not reported" "grep -q 'SKIP_SPLASH_SCREEN=1' TweaksV.log && grep -q 'UNLOCK_FILES=0' TweaksV.log && log_lacks 'PROBLEM: .*SKIP_SPLASH_SCREEN\|PROBLEM: .*UNLOCK_FILES'"
 check "all six in one start-up summary, nothing written back" "grep -q 'Start-up summary not shown (ERROR_POPUP=0): 6 problem' TweaksV.log && grep -q '^HEAP_SIZE=5000' TweaksV.ini"
+
+echo "== a comment after a value - // as the default file writes it, or ; - is not part of the value"
+cp expected.ini TweaksV.ini; setkey ERROR_POPUP 0
+commented() { sed -b -i "s|^$1=.*\r\$|$1=$2\r|" TweaksV.ini; }	# the whole line with its comment: setkey takes no /
+commented HEAP_SIZE '1500   //my own heap'; commented SKIP_LEGAL_SCREEN '0 ; I want to see it'; commented DECALDEFS_SIZE 'abc //oops'
+out=$(game full_game.exe); echo "      ${out:0:160}"
+check "HEAP_SIZE=1500 with a // comment: 1500 used, nothing reported" "grep -q 'heap: 1500 MB' harness.out && log_lacks 'PROBLEM: .*HEAP_SIZE'"
+check "SKIP_LEGAL_SCREEN=0 with a ; comment: read as off, nothing reported" "grep -q 'SKIP_LEGAL_SCREEN=0' TweaksV.log && log_lacks 'PROBLEM: .*SKIP_LEGAL_SCREEN'"
+check "DECALDEFS_SIZE=abc with a comment: reported without the comment, the default used" "grep -q 'PROBLEM: TweaksV.ini: \[DECALS\] DECALDEFS_SIZE=abc is not a number - using 2048.' TweaksV.log"
 
 echo "== a 1.x TweaksV.ini (the 1.6.0 default with HEAP_SIZE=1500): renamed, replaced, reported once, nothing of it read"
 rm -f TweaksV.old.ini; sed 's/$/\r/' "$T/layout1.ini" > TweaksV.ini; setkey HEAP_SIZE 1500; cp TweaksV.ini old.before

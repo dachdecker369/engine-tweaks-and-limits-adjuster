@@ -2,7 +2,8 @@
 // TweaksV - every setting of TweaksV.ini, defined once in kSettings: its section, key, kind, default
 // and limits. The default TweaksV.ini, the keys added back when they are missing, the log header and
 // every reader come from this table, so a new setting is one new entry in it (and a named reference
-// below, for the code that reads it). The file carries no comments: README.md explains every key.
+// below, for the code that reads it). Each key of the default file carries a short comment from the
+// table after its value, and a comment is never part of a value; README.md explains every key in full.
 #pragma once
 
 #include <iterator>
@@ -52,64 +53,66 @@ namespace TweaksV
 		int minValue;				// a Number: the lowest value TweaksV accepts
 		int maxValue;				// a Number: the highest
 		bool testBuildOnly;			// not in TweaksV.ini; only test builds read it
+		const char* comment;		// after the value in the default file, "" for none; README.md says more
 	};
 
-	constexpr Setting Switch(const SettingsSection& section, const char* key, bool on)
+	constexpr Setting Switch(const SettingsSection& section, const char* key, bool on, const char* comment = "")
 	{
-		return { &section, key, SettingKind::Switch, on ? 1 : 0, 0, 1, false };
+		return { &section, key, SettingKind::Switch, on ? 1 : 0, 0, 1, false, comment };
 	}
 
-	constexpr Setting Number(const SettingsSection& section, const char* key, int value, int minValue, int maxValue)
+	constexpr Setting Number(const SettingsSection& section, const char* key, int value, int minValue, int maxValue,
+		const char* comment = "")
 	{
-		return { &section, key, SettingKind::Number, value, minValue, maxValue, false };
+		return { &section, key, SettingKind::Number, value, minValue, maxValue, false, comment };
 	}
 
 	constexpr Setting TestText(const SettingsSection& section, const char* key)
 	{
-		return { &section, key, SettingKind::Text, 0, 0, 0, true };
+		return { &section, key, SettingKind::Text, 0, 0, 0, true, "" };
 	}
 
 	// Every setting, in file order - the order of the default TweaksV.ini.
 	inline constexpr Setting kSettings[] = {
 		Switch(kTweaksVSection, "ENABLED", true),
-		Switch(kTweaksVSection, "LOG", true),
-		Switch(kTweaksVSection, "DIAGNOSTIC_MODE", false),
-		Switch(kTweaksVSection, "DRY_RUN", false),
-		Switch(kTweaksVSection, "CONSOLE", false),
-		Switch(kTweaksVSection, "ERROR_POPUP", true),
-		Switch(kTweaksVSection, "CONFLICT_CHECK", true),
-		Number(kTweaksVSection, "VERSION", kIniLayoutVersion, kIniLayoutVersion, 1000000),
+		Switch(kTweaksVSection, "LOG", true, "Writes to TweaksV.log"),
+		Switch(kTweaksVSection, "DIAGNOSTIC_MODE", false, "TESTING ONLY: logs patterns, sites and measurements"),
+		Switch(kTweaksVSection, "DRY_RUN", false, "TESTING ONLY: turns off game patching"),
+		Switch(kTweaksVSection, "CONSOLE", false, "Console window showing .log while the game is running"),
+		Switch(kTweaksVSection, "ERROR_POPUP", true, "Shows error message popups"),
+		Switch(kTweaksVSection, "CONFLICT_CHECK", true, "Turns off TweaksV parts while other plugins that do the same thing are installed"),
+		Number(kTweaksVSection, "VERSION", kIniLayoutVersion, kIniLayoutVersion, 1000000, "This file's version - leave this line alone!"),
 		TestText(kTweaksVSection, "TEST_BREAK_PATTERN"),
 		TestText(kTweaksVSection, "TEST_LOG_LIMIT_KB"),
 		TestText(kTweaksVSection, "TEST_DUMP_CODE"),
 
 		Switch(kHeapSection, "ENABLED", true),
-		Number(kHeapSection, "HEAP_SIZE", 2000, 1, 2047),
+		Number(kHeapSection, "HEAP_SIZE", 2000, 1, 2047, "Heap size in MB - Maximum 2047"),
 
 		Switch(kModkitSection, "ENABLED", true),
-		Number(kModkitSection, "MODKITARRAY_SIZE", 65536, 1, 65536),
+		Number(kModkitSection, "MODKITARRAY_SIZE", 65536, 1, 65536, "Number of modkit IDs - Maximum 65536"),
 
 		Switch(kPackfileSection, "ENABLED", true),
-		Number(kPackfileSection, "PACKFILEARRAY_SIZE", 13000, 1, 65535),
+		Number(kPackfileSection, "PACKFILEARRAY_SIZE", 13000, 1, 65535, "Number of archives - Maximum 65535"),
 
 		Switch(kBoxStreamerSection, "ENABLED", true),
-		Number(kBoxStreamerSection, "TRAVERSAL_LIST_SIZE", 10000, 1000, 100000),
+		Number(kBoxStreamerSection, "TRAVERSAL_LIST_SIZE", 10000, 1000, 100000, "Number of map boxes - Maximum 100000"),
 
 		Switch(kDecalsSection, "ENABLED", true),
-		Number(kDecalsSection, "DECALDEFS_SIZE", 2048, 260, 16384),
+		Number(kDecalsSection, "DECALDEFS_SIZE", 2048, 260, 16384, "Number of decal definitions - Maximum 16384"),
 
 		Switch(kRageOpenVSection, "ENABLED", true),
-		Switch(kRageOpenVSection, "MODS_FOLDER", true),
-		Switch(kRageOpenVSection, "OPEN_RPF", true),
-		Switch(kRageOpenVSection, "SKIP_RPF_CACHE_CHECK", true),
+		Switch(kRageOpenVSection, "MODS_FOLDER", true, "Loads \"mods\" folder in game directory"),
+		Switch(kRageOpenVSection, "OPEN_RPF", true, "Allows unencrypted (\"OPEN\") RPF archives"),
+		Switch(kRageOpenVSection, "SKIP_RPF_CACHE_CHECK", true, "Skips game RPF cache check"),
 
 		Switch(kStoryModeSection, "ENABLED", true),
-		Switch(kStoryModeSection, "SKIP_SPLASH_SCREEN", true),
-		Switch(kStoryModeSection, "SKIP_LEGAL_SCREEN", true),
-		Switch(kStoryModeSection, "SKIP_LANDING_PAGE", true),
+		Switch(kStoryModeSection, "SKIP_SPLASH_SCREEN", true, "Skips Splash Screen"),
+		Switch(kStoryModeSection, "SKIP_LEGAL_SCREEN", true, "Skips Legal Screen"),
+		Switch(kStoryModeSection, "SKIP_LANDING_PAGE", true, "Skips Landing Page"),
 
 		Switch(kDirectStorageSection, "ENABLED", true),
-		Switch(kDirectStorageSection, "UNLOCK_FILES", true),
+		Switch(kDirectStorageSection, "UNLOCK_FILES", true, "Keeps game directory files writable (not .rpf/.cache)"),
 	};
 
 	// The keys the default TweaksV.ini holds: layout 2 has 28.
@@ -122,6 +125,31 @@ namespace TweaksV
 		return keys;
 	}
 	static_assert(IniKeyCount() == 28, "TweaksV: layout 2 of TweaksV.ini has 28 keys - a new key means a new layout");
+
+	// The column at which a key's comment starts in the default file, the same for every key.
+	inline constexpr size_t kIniCommentColumn = 28;
+
+	// Every KEY=default that carries a comment ends short of the comment column, so that at least one
+	// blank stands before the comment; a key too long for it does not build.
+	consteval bool CommentsFitTheColumn()
+	{
+		for (const Setting& setting : kSettings)
+		{
+			if (setting.testBuildOnly || *setting.comment == '\0')
+				continue;
+			size_t length = std::string_view(setting.key).size() + 1;	// KEY=
+			for (int value = setting.defaultValue; ; value /= 10)		// the default's digits; no default is negative
+			{
+				length++;
+				if (value < 10)
+					break;
+			}
+			if (length >= kIniCommentColumn)
+				return false;
+		}
+		return true;
+	}
+	static_assert(CommentsFitTheColumn(), "TweaksV: a KEY=default of the default TweaksV.ini reaches its comment column");
 
 	// The entry for a section and key - checked when TweaksV is compiled: a name that is not in
 	// kSettings does not build.

@@ -386,7 +386,13 @@ namespace TweaksV
 		wchar_t buffer[256]{};
 		GetPrivateProfileStringW(Widen(section).c_str(), Widen(key).c_str(), L"", buffer,
 			static_cast<DWORD>(std::size(buffer)), GetIniPathW());
-		const std::wstring value = buffer;
+		std::wstring value = buffer;
+		// a comment after the value - "//", as the default file writes one, or ";" - is not part of it
+		const size_t slashes = value.find(L"//");
+		const size_t semicolon = value.find(L';');
+		const size_t comment = slashes < semicolon ? slashes : semicolon;
+		if (comment != std::wstring::npos)
+			value.resize(comment);
 		const size_t first = value.find_first_not_of(L" \t");
 		if (first == std::wstring::npos)
 			return {};
