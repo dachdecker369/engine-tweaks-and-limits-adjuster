@@ -1,6 +1,6 @@
 # Credits
 
-Five of TweaksV's parts are rewritten from Chiheb-Bacha's plugins below, and the other three - BoxStreamer, Decals and DirectStorage - are TweaksV's own, from the ideas credited below; the research and the original code are theirs, and what little of their code TweaksV still carries is named in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). All credit for them goes to their authors.
+Five of TweaksV's parts are rewritten from Chiheb-Bacha's plugins below, and the other four - BoxStreamer, Decals, DirectStorage and Blips - are TweaksV's own, from the ideas and the design credited below; the research and the original code are theirs, and what little of their code TweaksV still carries is named in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). All credit for them goes to their authors.
 
 ## Chiheb-Bacha - https://github.com/Chiheb-Bacha
 
@@ -32,6 +32,7 @@ Where a project's license allows no reuse, TweaksV took the idea alone: nothing 
 - **alloc8or** - DirectStorageFix, the idea behind TweaksV's DirectStorage part. Its repository carries no license, so only its README was read and none of its code: the part is a clean-room implementation of the idea - https://github.com/alloc8or/DirectStorageFix
 - **CitizenFX Collective** - the box streamer traversal list fix and the decal definitions limit fix in FiveM, the ideas behind TweaksV's BoxStreamer and Decals parts. FiveM's `gta-streaming-five` component lies outside the folders its license frees, so that code is all rights reserved: none of it was read, and none of it is used - https://github.com/citizenfx/fivem
 - **Tanuki / 0x-FADED** - the port of those fixes to GTA V Legacy. It carries an MIT license but says itself that it ports FiveM's code, which that license cannot cover; none of its code was read or used, and its Legacy layout differs from Enhanced's anyway - https://github.com/0x-FADED/GTA-V-fwBoxStreamerVariable-and-decals-limit-Patch
+- **rootBrz** - Blip Limit Fix 1.4.2 (commit 09bf742 of 2026-10-24), GPL-3.0: the design behind TweaksV's Blips part - `blip_controller` found by its name's hash and its name, its whole code decoded before its guard is matched, the match in a window of 256 bytes and its checks, the rewrite of the threshold, and the setting's range and default - and the findings of its README on the blip pool. Its license would allow its code, but its sources carry another project's code, which allows no reuse, in every file that matters: so none of its sources or tests was read, the design came as prose with every pattern, offset, layout value and opcode value held back, no line of it is carried over, and every game fact behind the part was found anew in Enhanced - https://github.com/rootBrz/gtav-blip-limit-fix
 
 ## Libraries and tools
 
