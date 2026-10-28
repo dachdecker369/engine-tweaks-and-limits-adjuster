@@ -74,6 +74,18 @@
 //                  second
 //   scripthooked   the call at the hook site already leads outside the game (another mod redirected it); nothing
 //                  is placed
+//   blipfused      blip_controller's guard (the Blips part) with the fused ILT_JZ in the place of its comparison and
+//                  JZ, two NOPs of room before the push, its body behind the branch and its way out a jump: the
+//                  polarity the other way round
+//   blippadded     the guard with two NOPs after the count
+//   bliproom       the guard with IGE and JZ, no NOT: three bytes before the branch
+//   blip240        the guard with the threshold 240
+//   blipnative     the guard calling WAIT through native 3, not below the program's native count
+//   bliptwice      a second guard at 0x800
+//   blipjump       a jump at 0x100 into the guard's span
+//   blipbadbyte    the byte 0xA0, no instruction, at 0x200
+// The blip pool's two sites are always there, the pool with 162 slots in use below its high-water mark, 170, and
+// two beyond it.
 #include <windows.h>
 #include <winternl.h>
 #include <cstddef>
@@ -332,6 +344,15 @@ volatile unsigned char g_scriptNativeLoop[] = { 0x41, 0x8B, 0x4C, 0x24, 0x1C, 0x
 volatile unsigned char g_scriptInterpreter[] = { 0x4D, 0x8B, 0x50, 0x10, 0x49, 0x63, 0x41, 0x1C, 0x4C, 0x8D, 0x7C, 0xC1, 0xF8, 0x49,
 	0x63, 0x41, 0x18, 0x4C, 0x8D, 0x0C, 0xC1, 0xCC };
 static Site g_scriptCallSite = SITE(g_scriptHookSite, 4);	// the rel32 of the E8 at +3
+
+// The blip pool (the Blips part's measurement): its allocator's "lea rbx, [rip+disp32]" of the pool, the rel32 at
+// +10, and its update of the high-water mark, "cmp [rip+disp32], esi" with the disp32 at +5 - then "mov [rip+disp32],
+// eax" of the mark, its disp32 at +16. The pool and the mark are below, outside this section, as the game's are.
+volatile unsigned char g_blipPoolSite[] = { 0xBA, 0x04, 0x00, 0x00, 0x00, 0x31, 0xC0, 0x48, 0x8D, 0x1D, 0, 0, 0, 0, 0x31, 0xF6, 0xCC };
+volatile unsigned char g_blipMarkSite[] = { 0x48, 0x89, 0x3B, 0x39, 0x35, 0, 0, 0, 0, 0x7F, 0x09, 0x8D, 0x46, 0x01, 0x89, 0x05,
+	0, 0, 0, 0, 0xCC };
+static Site g_blipPoolRef = SITE(g_blipPoolSite, 10);
+static Site g_blipMarkRefs[] = { SITE(g_blipMarkSite, 5), SITE(g_blipMarkSite, 16) };
 #pragma data_seg()
 
 // The game's own modkit array (1024 entries of 2 bytes) and packfile array (4500 entries of 8 bytes). The
@@ -354,6 +375,13 @@ static uint64_t* volatile g_oldBoxList = g_oldBoxListStorage;
 struct DecalStore { uint32_t count; uint32_t unused[3]; unsigned char entries[260 * 80]; };
 alignas(32) static DecalStore g_oldDecalStoreStorage;
 static DecalStore* volatile g_oldDecalStore = &g_oldDecalStoreStorage;
+
+// The game's blip pool, 2000 slots of 8 bytes - a blip's pointer, or 0 - and its high-water mark, a dword. The harness
+// reaches them only through these pointers, set when the program is loaded, as it does the arrays above.
+static uint64_t g_blipPoolStorage[2000];
+static uint64_t* volatile g_blipPool = g_blipPoolStorage;
+static int32_t g_blipMarkStorage = 0;
+static int32_t* volatile g_blipMark = &g_blipMarkStorage;
 
 // The game's two tree searches behind the box streamer's four calls: the first and the third call lead
 // to the first search, the second and the fourth to the second. Each writes the number of entries the
@@ -804,7 +832,7 @@ static void ForEachSite(void (*fn)(const Site&))
 		SITE(g_decalFull, 0), SITE(g_decalParserLea, 0), SITE(g_decalFindById, 0), SITE(g_decalPickVariant, 0), SITE(g_decalOverrideOne, 0), SITE(g_decalOverrideLoop, 0), SITE(g_decalOverrideCmp1, 0),
 		SITE(g_decalOverrideCmpEbp, 0), SITE(g_decalOverrideCmp2, 0), SITE(g_decalLoopStart, 0), SITE(g_decalLoopEnd, 0),
 		SITE(g_decalAddR8d, 0), SITE(g_decalAddEsi, 0), SITE(g_decalAddRel8, 0), SITE(g_decalAddEbx, 0), SITE(g_decalLeaExtra, 0),
-		SITE(g_scriptHookSite, 0), SITE(g_scriptNativeLoop, 0), SITE(g_scriptInterpreter, 0) };
+		SITE(g_scriptHookSite, 0), SITE(g_scriptNativeLoop, 0), SITE(g_scriptInterpreter, 0), SITE(g_blipPoolSite, 0), SITE(g_blipMarkSite, 0) };
 	for (const Site& site : singles) fn(site);
 	for (auto& row : g_decalAdd) { Site site = { row, 0, sizeof(row) }; fn(site); }
 	for (auto& row : g_decalLeas) { Site site = { row, 0, sizeof(row) }; fn(site); }
@@ -1340,18 +1368,67 @@ static void PlanScript(ScriptStorage& script, bool unknownNative = false, uint32
 		g_scriptPlan[g_scriptPlanned++] = { &script, unknownNative, codeLength, nativeCount };
 }
 
+// blip_controller's guard (the Blips part), at 0x3FE of its code: its bytes there - the guard, then its way out, a
+// NATIVE that makes a blip, and LEAVE - and where its branch lies, for each guard an option asks for. The part may
+// change the bytes from the end of the count's NATIVE up to the branch, and a fused branch's opcode; nothing else.
+struct BlipGuard
+{
+	const wchar_t* option;
+	unsigned char bytes[40];
+	uint32_t size;
+	uint32_t branch;
+	bool fused;
+};
+constexpr uint32_t kBlipGuard = 0x3FE;
+constexpr uint32_t kGuardSize = 0x15;	// the game's guard: 21 bytes, its way out at 0x413
+static const BlipGuard kBlipGuards[] = {
+	// as the game has it: the count (native 1), PUSH_CONST_U8 150, ILT, NOT, JZ +10; PUSH_CONST_S16 2000, WAIT (native 2), J -21
+	{ L"", { 0x2C, 0x01, 0x00, 0x01, 0x25, 0x96, 0x0C, 0x06, 0x56, 0x0A, 0x00, 0x43, 0xD0, 0x07, 0x2C, 0x04, 0x00, 0x02, 0x55, 0xEB, 0xFF,
+		0x2C, 0x00, 0x00, 0x00, 0x2E, 0x00, 0x00 }, 28, 0x406, false },
+	{ L"blip240", { 0x2C, 0x01, 0x00, 0x01, 0x25, 0xF0, 0x0C, 0x06, 0x56, 0x0A, 0x00, 0x43, 0xD0, 0x07, 0x2C, 0x04, 0x00, 0x02, 0x55, 0xEB, 0xFF,
+		0x2C, 0x00, 0x00, 0x00, 0x2E, 0x00, 0x00 }, 28, 0x406, false },
+	// WAIT through native 3, which the program's table of three does not have
+	{ L"blipnative", { 0x2C, 0x01, 0x00, 0x01, 0x25, 0x96, 0x0C, 0x06, 0x56, 0x0A, 0x00, 0x43, 0xD0, 0x07, 0x2C, 0x04, 0x00, 0x03, 0x55, 0xEB,
+		0xFF, 0x2C, 0x00, 0x00, 0x00, 0x2E, 0x00, 0x00 }, 28, 0x406, false },
+	// two NOPs after the count, JZ +10 at 0x408, J -23
+	{ L"blippadded", { 0x2C, 0x01, 0x00, 0x01, 0x00, 0x00, 0x25, 0x96, 0x0C, 0x06, 0x56, 0x0A, 0x00, 0x43, 0xD0, 0x07, 0x2C, 0x04, 0x00, 0x02,
+		0x55, 0xE9, 0xFF, 0x2C, 0x00, 0x00, 0x00, 0x2E, 0x00, 0x00 }, 30, 0x408, false },
+	// IGE and JZ +10 at 0x405, no NOT, J -20
+	{ L"bliproom", { 0x2C, 0x01, 0x00, 0x01, 0x25, 0x96, 0x0B, 0x56, 0x0A, 0x00, 0x43, 0xD0, 0x07, 0x2C, 0x04, 0x00, 0x02, 0x55, 0xEC, 0xFF,
+		0x2C, 0x00, 0x00, 0x00, 0x2E, 0x00, 0x00 }, 27, 0x405, false },
+	// two NOPs, PUSH_CONST_U8 150, ILT_JZ +3 at 0x406 to the body, J +12 to the way out at 0x418; the body, J -24; two NOPs
+	{ L"blipfused", { 0x2C, 0x01, 0x00, 0x01, 0x00, 0x00, 0x25, 0x96, 0x5B, 0x03, 0x00, 0x55, 0x0C, 0x00, 0x43, 0xD0, 0x07, 0x2C, 0x04, 0x00,
+		0x02, 0x55, 0xE8, 0xFF, 0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x2E, 0x00, 0x00 }, 33, 0x406, true },
+};
+static const BlipGuard* g_blipGuard = &kBlipGuards[0];
+static bool g_blipTwice = false, g_blipJump = false, g_blipBadByte = false;
+// What TweaksV left of what the fake placed: blip_controller's placements and those whose code is as placed but where
+// the part may change it, its guard through the branch after the last one, and the other programs' placements and
+// those whose code is as placed
+static int g_blipPlaced = 0, g_blipAsPlaced = 0, g_otherPlaced = 0, g_otherAsPlaced = 0;
+static unsigned char g_blipGuardAfter[40];
+static uint32_t g_blipGuardShown = 0;
+static wchar_t g_blipResult[256];
+
+// True if a program's code is as the fake placed it, but the bytes from..to of its first page; its second page only
+// while it can be read.
+static bool AsPlaced(const ScriptStorage& script, const unsigned char (&placed)[kScriptCodeLength], uint32_t from, uint32_t to)
+{
+	for (uint32_t i = 0; i < kScriptPage; i++)
+		if ((i < from || i >= to) && script.codePages[0][i] != placed[i])
+			return false;
+	return g_scriptPageUnreadable || memcmp(script.codePages[1], placed + kScriptPage, kScriptCodeLength - kScriptPage) == 0;
+}
+
 // blip_controller's code, decodable from its start to its end with the game's opcode lengths, as the game's own is
 // (PATTERNS.md, "Script programs"): ENTER and instructions of every kind a decoder must step over - a NATIVE, the
 // pushes, a CALL, a jump over three NOPs, a SWITCH whose entries hold bytes above the last opcode - then LEAVE; a
-// second function whose ENTER's name holds the guard's 21 bytes, which only a reader of bytes, not of instructions,
-// would take for a second guard; a third function with the guard at 0x3FE as the game has it - its count native
-// index 1 and WAIT index 2, as the fake's program has three natives - and its exit at 0x413, a NATIVE that makes a
-// blip; NOPs to the end of each page, every instruction within its page, and LEAVE last. Laid again before each
-// placement, as the game makes a new program each time - its second page only while it can be read.
-constexpr uint32_t kBlipGuard = 0x3FE;
-static const unsigned char kGuardBytes[] = { 0x2C, 0x01, 0x00, 0x01, 0x25, 0x96, 0x0C, 0x06, 0x56, 0x0A, 0x00, 0x43, 0xD0, 0x07,
-	0x2C, 0x04, 0x00, 0x02, 0x55, 0xEB, 0xFF };
-static_assert(sizeof(kGuardBytes) == 0x15, "the guard is 21 bytes, its exit at 0x413");
+// second function whose ENTER's name holds the game's guard, which only a reader of bytes, not of instructions,
+// would take for a second guard; a third function with the guard at 0x3FE - its count native index 1 and WAIT index
+// 2, as the fake's program has three natives - and its way out, a NATIVE that makes a blip; NOPs to the end of each
+// page, every instruction within its page, and LEAVE last. The options add a second guard at 0x800, a jump at 0x100
+// into the guard's span, the byte 0xA0 at 0x200. Laid again before each placement, as the game makes a new program
+// each time - its second page only while it can be read.
 static void LayBlipCode(ScriptStorage& script)
 {
 	static const unsigned char head[] = {
@@ -1366,15 +1443,20 @@ static void LayBlipCode(ScriptStorage& script)
 		0x2E, 0x00, 0x00,							// LEAVE
 		0x2D, 0x00, 0x00, 0x00, 0x15 };				// ENTER, its name of 21 bytes the guard's
 	static const unsigned char second[] = { 0x2E, 0x00, 0x00, 0x2D, 0x00, 0x00, 0x00, 0x00 };	// LEAVE; ENTER, the third function
-	static const unsigned char exit[] = { 0x2C, 0x00, 0x00, 0x00, 0x2E, 0x00, 0x00 };			// NATIVE, no argument, index 0; LEAVE
+	static const unsigned char jump[] = { 0x55, 0xFF, 0x02 };									// J +0x2FF, from 0x100 to 0x402
 	static const unsigned char leave[] = { 0x2E, 0x00, 0x00 };
 	unsigned char* const code = script.codePages[0];
 	memset(code, 0x00, kScriptPage);
 	memcpy(code, head, sizeof(head));
-	memcpy(code + sizeof(head), kGuardBytes, sizeof(kGuardBytes));
-	memcpy(code + sizeof(head) + sizeof(kGuardBytes), second, sizeof(second));
-	memcpy(code + kBlipGuard, kGuardBytes, sizeof(kGuardBytes));
-	memcpy(code + kBlipGuard + sizeof(kGuardBytes), exit, sizeof(exit));
+	memcpy(code + sizeof(head), kBlipGuards[0].bytes, kGuardSize);
+	memcpy(code + sizeof(head) + kGuardSize, second, sizeof(second));
+	memcpy(code + kBlipGuard, g_blipGuard->bytes, g_blipGuard->size);
+	if (g_blipTwice)
+		memcpy(code + 0x800, kBlipGuards[0].bytes, kBlipGuards[0].size);
+	if (g_blipJump)
+		memcpy(code + 0x100, jump, sizeof(jump));
+	if (g_blipBadByte)
+		code[0x200] = 0xA0;
 	if (g_scriptPageUnreadable)
 		return;
 	memset(script.codePages[1], 0x00, kScriptPage);
@@ -1440,6 +1522,17 @@ static DWORD WINAPI PlaceScripts(void*)
 			blipPlacements++;
 			if (p.codeLength == kScriptCodeLength && p.nativeCount == kFakeNatives)
 				WriteExpected(blipPlacements, script, placed, before);
+			g_blipPlaced++;
+			if (AsPlaced(script, placed, kBlipGuard + 4, g_blipGuard->branch + (g_blipGuard->fused ? 1 : 0)))
+				g_blipAsPlaced++;
+			g_blipGuardShown = g_blipGuard->branch + 3 - kBlipGuard;
+			memcpy(g_blipGuardAfter, script.codePages[0] + kBlipGuard, g_blipGuardShown);
+		}
+		else
+		{
+			g_otherPlaced++;
+			if (AsPlaced(script, placed, 0, 0))
+				g_otherAsPlaced++;
 		}
 	}
 	return 0;
@@ -1509,6 +1602,15 @@ static void PlaceScriptsAsAsked(int argc, wchar_t** argv)
 		L"image %llu %lu %lu | ", g_scriptPlaced, static_cast<unsigned long>(g_scriptThread), through, g_scriptResolved, g_scriptPlaced,
 		g_scriptErrorKept, g_scriptPlaced, static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(ImageBase())),
 		static_cast<unsigned long>(nt->OptionalHeader.SizeOfImage), static_cast<unsigned long>(nt->FileHeader.TimeDateStamp));
+
+	// "blips: 2 placed, guard 2C 01 00 01 43 6C 07 0B 56 0A 00, the rest as placed 2 of 2, other programs as placed 0 of 0 | " -
+	// blip_controller's guard from its count's NATIVE through its branch after the last placement ("-" with none)
+	wchar_t guard[160] = L"-";
+	size_t at = 0;
+	for (uint32_t i = 0; i < g_blipGuardShown; i++)
+		at += static_cast<size_t>(swprintf(guard + at, sizeof(guard) / sizeof(guard[0]) - at, i ? L" %02X" : L"%02X", g_blipGuardAfter[i]));
+	swprintf(g_blipResult, sizeof(g_blipResult) / sizeof(g_blipResult[0]), L"blips: %d placed, guard %ls, the rest as placed %d of %d, "
+		L"other programs as placed %d of %d | ", g_blipPlaced, guard, g_blipAsPlaced, g_blipPlaced, g_otherAsPlaced, g_otherPlaced);
 }
 
 int wmain(int argc, wchar_t** argv)
@@ -1674,6 +1776,22 @@ int wmain(int argc, wchar_t** argv)
 	SetRel32(g_scriptCallSite, reinterpret_cast<const void*>(&FakeResolveNatives));
 	if (HasOption(argc, argv, L"scripthooked"))	// ...unless another mod redirected it already
 		SetRel32(g_scriptCallSite, ImageEnd() + 0x60000);
+	// blip_controller's guard as an option asks for it, and what more its code holds
+	for (const BlipGuard& guard : kBlipGuards)
+		if (guard.option[0] && HasOption(argc, argv, guard.option))
+			g_blipGuard = &guard;
+	g_blipTwice = HasOption(argc, argv, L"bliptwice");
+	g_blipJump = HasOption(argc, argv, L"blipjump");
+	g_blipBadByte = HasOption(argc, argv, L"blipbadbyte");
+	// The blip pool: 162 slots in use below its high-water mark, 170 - eight below it empty - and two in use beyond it,
+	// which the part's measurement must not count; its two sites lead to it
+	for (int slot = 0; slot < 170; slot++)
+		g_blipPool[slot] = slot % 20 == 10 ? 0 : static_cast<uint64_t>(0x1000 + slot);
+	g_blipPool[500] = g_blipPool[1999] = 0x5000;
+	*g_blipMark = 170;
+	SetRel32(g_blipPoolRef, g_blipPool);
+	for (const Site& site : g_blipMarkRefs)
+		SetRel32(site, g_blipMark);
 
 	RovSetup(argc, argv);
 	ForEachSite(TouchSite);
@@ -1759,7 +1877,8 @@ int wmain(int argc, wchar_t** argv)
 	PrintBoxStreamer();
 	PrintDecals();
 	RovReport();
-	wprintf(L"%ls%ls%ls%ls%ls%ls", g_dstorageResult, g_floodResult, g_shareResult, g_ownResult, g_fileOpensResult, g_scriptResult);
+	wprintf(L"%ls%ls%ls%ls%ls%ls%ls", g_dstorageResult, g_floodResult, g_shareResult, g_ownResult, g_fileOpensResult, g_scriptResult,
+		g_blipResult);
 	CheckStub(Rel32Target(g_packCallSite));
 	CheckStub(Rel32Target(g_scriptCallSite));
 	for (const Site& site : g_boxCalls)

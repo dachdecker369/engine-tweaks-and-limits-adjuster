@@ -11,7 +11,7 @@ set -u
 T="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$T/.." && pwd)"
 export TWEAKSV_TEST_DIR="$R/object/TestRun"
-SUITES="patterns ini_default story modkit packfile boxstreamer decals rageopenv directstorage integration"
+SUITES="patterns ini_default story modkit packfile boxstreamer decals rageopenv directstorage blips integration"
 
 build=1; keep=0
 for a in "$@"; do

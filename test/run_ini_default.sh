@@ -3,7 +3,9 @@
 # The default TweaksV.ini: a first start without a TweaksV.ini creates exactly the default text
 # (expected_default.ini, a comment after each key's value) and uses its defaults; a deleted key comes
 # back with its default and no comment; crafted values are reported and clamped; a comment after a
-# value, // or ;, is not part of it. A file without VERSION under [TWEAKSV] has the layout of TweaksV 1.x
+# value, // or ;, is not part of it. A layout-2 file is carried to layout 3 - the keys it lacks added,
+# VERSION=3 written back, its values kept - and only logged where it is read-only; a layout-3 file is
+# left as it is, a newer one reported. A file without VERSION under [TWEAKSV] has the layout of TweaksV 1.x
 # (layout1.ini is the 1.6.0 default): it is renamed to TweaksV.old.ini and replaced by the default file,
 # nothing of it read - also in %LOCALAPPDATA%\TweaksV with a read-only game folder; a 1.x file inside
 # the read-only game folder cannot be renamed, which is reported. Fake LOCALAPPDATA: the real one is
@@ -69,6 +71,33 @@ out=$(game full_game.exe); echo "      ${out:0:160}"
 check "HEAP_SIZE=1500 with a // comment: 1500 used, nothing reported" "grep -q 'heap: 1500 MB' harness.out && log_lacks 'PROBLEM: .*HEAP_SIZE'"
 check "SKIP_LEGAL_SCREEN=0 with a ; comment: read as off, nothing reported" "grep -q 'SKIP_LEGAL_SCREEN=0' TweaksV.log && log_lacks 'PROBLEM: .*SKIP_LEGAL_SCREEN'"
 check "DECALDEFS_SIZE=abc with a comment: reported without the comment, the default used" "grep -q 'PROBLEM: TweaksV.ini: \[DECALS\] DECALDEFS_SIZE=abc is not a number - using 2048.' TweaksV.log"
+
+echo "== a layout-2 file, as 2.2.3 wrote it (HEAP_SIZE=1500): carried to layout 3 - the keys of [BLIPS] added, VERSION=3 written back in its line, every value kept"
+layout2() { head -n 54 expected.ini | sed -b 's/^VERSION=3 /VERSION=2 /' > TweaksV.ini; setkey ERROR_POPUP 0; }	# the default file without [BLIPS], VERSION=2
+layout2; setkey HEAP_SIZE 1500; cp TweaksV.ini layout2.before
+out=$(game full_game.exe); echo "      ${out:0:160}"
+check "carried, its line word for word, once; the two keys added; no problem" "[ \$(count 'TweaksV.ini: carried from layout') -eq 1 ] && log_line '\[TweaksV\] TweaksV.ini: carried from layout 2 to layout 3 (the keys it lacked are added).\$' && [ \$(count 'added the missing key') -eq 2 ] && log_has 'added the missing key \[BLIPS\] ENABLED=1.' && log_has 'added the missing key \[BLIPS\] ACTIVE_BLIP_LIMIT=1900.' && log_lacks 'PROBLEM'"
+check "VERSION=3 in its line, its comment kept; the log header says VERSION=3" "tr -d '\r' < TweaksV.ini | grep -qx 'VERSION=3                   //This file.s version - leave this line alone!' && log_has 'CONFLICT_CHECK=1 VERSION=3'"
+check "every other line as it was, HEAP_SIZE=1500 among them, and used; the part on with its default" "head -n 54 TweaksV.ini | sed -b 's/^VERSION=3 /VERSION=2 /' | cmp -s - layout2.before && grep -q 'heap: 1500 MB' harness.out && log_has 'Blips: ACTIVE_BLIP_LIMIT=1900'"
+out=$(game full_game.exe)
+check "the next start: nothing more to carry or add" "log_lacks 'carried from layout' && log_lacks 'added the missing key' && log_lacks 'PROBLEM'"
+
+echo "== a layout-3 file: left as it is"
+cp expected.ini TweaksV.ini; setkey ERROR_POPUP 0; cp TweaksV.ini layout3.before
+out=$(game full_game.exe)
+check "byte for byte as it was; nothing carried or added; no problem" "cmp -s TweaksV.ini layout3.before && log_lacks 'carried from layout' && log_lacks 'added the missing key' && log_lacks 'PROBLEM'"
+
+echo "== VERSION=4, a newer TweaksV's file: reported, nothing carried or written back"
+cp expected.ini TweaksV.ini; setkey ERROR_POPUP 0; setkey VERSION 4
+out=$(game full_game.exe)
+check "the newer layout reported; VERSION=4 stays; nothing carried" "log_has 'PROBLEM: TweaksV.ini comes from a newer TweaksV (layout 4; this TweaksV knows layout 3)' && grep -q '^VERSION=4' TweaksV.ini && log_lacks 'carried from layout'"
+
+echo "== a read-only layout-2 file: neither its keys nor VERSION can be written - logged, not reported; the defaults used"
+layout2; cp TweaksV.ini layout2.before; chmod -w TweaksV.ini
+out=$(game full_game.exe)
+chmod +w TweaksV.ini
+check "the file as it was; the two lines, logged, not a problem; VERSION=2 in the header; the part on with its default" "cmp -s TweaksV.ini layout2.before && log_has 'TweaksV.ini: VERSION=3 could not be written back (Windows error 5, access denied), so the file keeps VERSION=2 and is carried forward again at the next start.' && log_has 'TweaksV.ini: the missing key \[BLIPS\] ENABLED could not be added (Windows error 5, access denied). Its default (1) is used.' && log_lacks 'PROBLEM' && log_has 'CONFLICT_CHECK=1 VERSION=2' && log_has 'Blips: ACTIVE_BLIP_LIMIT=1900'"
+rm -f layout2.before layout3.before
 
 echo "== a 1.x TweaksV.ini (the 1.6.0 default with HEAP_SIZE=1500): renamed, replaced, reported once, nothing of it read"
 rm -f TweaksV.old.ini; sed 's/$/\r/' "$T/layout1.ini" > TweaksV.ini; setkey HEAP_SIZE 1500; cp TweaksV.ini old.before
