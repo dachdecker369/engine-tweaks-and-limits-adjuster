@@ -8,7 +8,8 @@
 // ResolveHook, which hands the program to every user before and after it calls the game's function, keeps
 // the game's last error around their work, lets no exception out and returns the game's byte. Y-E-N1 and
 // Y-E-I1 pin three of a program's fields: they must be found too, or the layout the users rely on cannot be
-// trusted on this game build.
+// trusted on this game build. Y-E-H1 pins two facts more: the strings' length's offset and the page rounding,
+// in the constructor's loop over the strings' pages that follows the call.
 // Written for TweaksV from the facts in PATTERNS.md; no code of another project is used.
 
 #include "TweaksVScripts.h"
@@ -37,10 +38,16 @@ namespace TweaksV
 			constexpr const GamePattern& kNativeLoopPattern = Pattern("Y-E-N1");	// the code length's and the native table's offsets
 			constexpr const GamePattern& kInterpreterPattern = Pattern("Y-E-I1");	// the code page table's offset
 			constexpr size_t kCallOffset = 3;
+			constexpr size_t kPageRoundingAt = 10;	// in Y-E-H1's match: "mov r14d, 0x3FFF", the imm32
+			constexpr size_t kStringLengthAt = 18;	// in Y-E-H1's match: "mov eax, [r12+0x70]"
 			constexpr size_t kCodeLengthAt = 4;		// in Y-E-N1's match: "mov ecx, [r12+0x1C]"
 			constexpr size_t kNativesAt = 11;		// in Y-E-N1's match: "mov rdx, [r12+0x40]"
 			constexpr size_t kCodePagesAt = 3;		// in Y-E-I1's match: "mov r10, [r8+0x10]"
 			static_assert(PatternByte(kHookPattern, kCallOffset) == 0xE8, "TweaksV: Y-E-H1 holds the call at +3");
+			static_assert(PatternByte(kHookPattern, kStringLengthAt) == kStringLengthOffset, "TweaksV: Y-E-H1 pins the strings' length's offset");
+			static_assert(PatternByte(kHookPattern, kPageRoundingAt) == ((kPageSize - 1) & 0xFF) &&
+				PatternByte(kHookPattern, kPageRoundingAt + 1) == ((kPageSize - 1) >> 8) && PatternByte(kHookPattern, kPageRoundingAt + 2) == 0 &&
+				PatternByte(kHookPattern, kPageRoundingAt + 3) == 0, "TweaksV: Y-E-H1 pins the page rounding");
 			static_assert(PatternByte(kNativeLoopPattern, kCodeLengthAt) == kCodeLengthOffset, "TweaksV: Y-E-N1 pins the code length's offset");
 			static_assert(PatternByte(kNativeLoopPattern, kNativesAt) == kNativesOffset, "TweaksV: Y-E-N1 pins the native table's offset");
 			static_assert(PatternByte(kInterpreterPattern, kCodePagesAt) == kCodePagesOffset, "TweaksV: Y-E-I1 pins the code page table's offset");
@@ -127,7 +134,8 @@ namespace TweaksV
 				if (IsDiagnosticMode())
 				{
 					WriteLog(tag, std::string("DIAGNOSTIC: ") + kWhat + " at " + DescribeAddress(call) + " -> " +
-						(target ? DescribeAddress(target) : std::string("not a call")) + " (" + kHookPattern.label + ")");
+						(target ? DescribeAddress(target) : std::string("not a call")) + ", strings' length offset at " +
+						DescribeAddress(hook + kStringLengthAt) + " " + Holds(hook + kStringLengthAt) + " (" + kHookPattern.label + ")");
 					WriteLog(tag, "DIAGNOSTIC: code length offset at " + DescribeAddress(nativeLoop + kCodeLengthAt) + " " +
 						Holds(nativeLoop + kCodeLengthAt) + ", native table offset at " + DescribeAddress(nativeLoop + kNativesAt) + " " +
 						Holds(nativeLoop + kNativesAt) + " (" + kNativeLoopPattern.label + ")");
@@ -153,6 +161,37 @@ namespace TweaksV
 						"program the game places passes TweaksV, before and after the game resolves its natives.");
 				return true;
 			}
+		}
+
+		bool ReadName(const char* name, char (&out)[kNameRead])
+		{
+			constexpr uintptr_t kMemoryPage = 0x1000;	// Windows protects memory in pages of this size
+			memset(out, 0, sizeof(out));
+			for (size_t done = 0; done < kNameRead;)
+			{
+				const uintptr_t at = reinterpret_cast<uintptr_t>(name) + done;
+				const size_t take = std::min<size_t>(kNameRead - done, kMemoryPage - at % kMemoryPage);
+				if (!IsReadable(name + done, take))
+					break;
+				memcpy(out + done, name + done, take);
+				if (const void* end = memchr(out + done, 0, take))
+				{
+					const size_t length = static_cast<size_t>(static_cast<const char*>(end) - out);
+					memset(out + length, 0, kNameRead - length);
+					return true;
+				}
+				done += take;
+			}
+			memset(out, 0, sizeof(out));
+			return false;
+		}
+
+		std::string Printable(const char* name)
+		{
+			std::string printable;
+			for (; *name; name++)
+				printable += (*name < 0x20 || *name > 0x7E) ? '?' : *name;
+			return printable;
 		}
 
 		bool AddUser(const User& user, std::string& reason)

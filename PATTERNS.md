@@ -226,3 +226,10 @@ The Blips part (PLAN.md, the Blips section; ROADMAP.md, 2.4.0) has the game's ow
 - **The room:** the 4 bytes 0x402..0x405 between the count's NATIVE and the JZ. PUSH_CONST_S16 and IGE fill them for any limit up to 32,767 (`43 lo hi 0B`), and NOP, PUSH_CONST_U8 and IGE for a limit up to 255 (`00 25 nn 0B`): IGE in the place of ILT and NOT keeps the polarity, and the JZ keeps its target.
 - **The highest limit that still holds with the pool full** is 1,997, the count's lowest answer then: above it, the script can pass the guard with the pool full, where making a blip fails.
 - **Not settled:** which of the game's two copies of the script it runs - update2.rpf's, resource version 12, or x64b.rpf's, 10. A lead: the script store is built with 12 at its +0x2C (RVA 0x13FA29D and 0x30E40). The part reads the program as the game placed it, so it does not depend on it.
+
+The pool's two sites, for the part's measurement: looked for only with `DIAGNOSTIC_MODE=1`, each matching exactly once in the dump of 1.0.1158.16. The research's other two sites of the pool, the count's three slots it leaves out, have no pattern: the measurement counts the slots in use, not the count's answer.
+
+| Label | Pattern | Use | 1.0.1158.16 | RVA |
+|---|---|---|---|---|
+| L-E-P1 | `BA 04 00 00 00 31 C0 48 8D 1D ? ? ? ? 31 F6` | +10: the rel32 of `lea rbx, [rip+disp32]` (`48 8D 1D` at +7) in the pool's allocator - the blip pool, 2,000 slots of 8 bytes (RVA 0x3DEBD70) | found | 0x55D897 |
+| L-E-P2 | `48 89 3B 39 35 ? ? ? ? 7F 09 8D 46 01 89 05` | +5: the disp32 of `cmp [rip+disp32], esi` (`39 35` at +3) in the pool's update of its high-water mark - the mark, a dword (RVA 0x3DEFBF0) | found | 0x55DA0E |

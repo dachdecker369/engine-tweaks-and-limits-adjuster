@@ -123,6 +123,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="TweaksVBlips.cpp" />
     <ClCompile Include="TweaksVBoxStreamer.cpp" />
     <ClCompile Include="TweaksVConflicts.cpp" />
     <ClCompile Include="TweaksVDecals.cpp" />
@@ -162,6 +163,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="TweaksVBlips.h" />
     <ClInclude Include="TweaksVBoxStreamer.h" />
     <ClInclude Include="TweaksVConflicts.h" />
     <ClInclude Include="TweaksVDecals.h" />

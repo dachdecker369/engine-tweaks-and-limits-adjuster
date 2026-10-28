@@ -60,7 +60,7 @@ check "the list, the 3 references after the capacity sites and the 8 places that
 check "the 12 writes logged" "[ \$(count 'BoxStreamer\] DIAGNOSTIC: box streamer.s traversal list reference at RVA') -eq 8 ] && [ \$(count 'BoxStreamer\] DIAGNOSTIC: box streamer.s traversal list limit at RVA') -eq 4 ]"
 check "the four tree-search calls and their targets logged, the four redirections logged as writes" "[ \$(count 'BoxStreamer\] DIAGNOSTIC: tree-search call at RVA .* -> RVA') -eq 4 ] && [ \$(count 'BoxStreamer\] DIAGNOSTIC: tree-search call at RVA .*: E8 .* -> E8') -eq 4 ]"
 check "still applied; all four calls redirected to the counting wrappers, the game's searches still run with the game's arguments and their results come back unchanged" "has '$MOVED' && has '$NEW_CAPS' && has '$CALLS_COUNTED'"
-check "the four stubs are read+execute, every page back to its own protection" "has 'stubs: 10, all RX' && has 'protect: all restored (RX)'"
+check "the four stubs are read+execute, every page back to its own protection (11 in all: the packfile hook's, RageOpenV's 5, the script programs' hook's and these 4)" "has 'stubs: 11, all RX' && has 'protect: all restored (RX)'"
 check "the log says what is counted" "log_has 'DIAGNOSTIC: the 4 tree-search calls are counted; a summary follows after 10 seconds, then every minute while the numbers change.'"
 
 echo "== B8 [BOXSTREAMER] ENABLED=0"

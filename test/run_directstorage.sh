@@ -95,7 +95,7 @@ check "nothing to do, said once" "[ \$(count 'UNLOCK_FILES=0 and DIAGNOSTIC_MODE
 check "the files stay locked, every call reaches the stand-in, the game runs on" "has '$LOCKED' && has '$OWN_LOCKED' && has '$OPENED' && has 'protect: all restored'"
 
 echo "== D7 the section is missing from an older TweaksV.ini: its two keys are added, with their defaults"
-fresh_ini; sed -b -i '/^\[DIRECTSTORAGE\]\r$/,$d' TweaksV.ini; out=$(game full_game.exe ownshare)
+fresh_ini; sed -b -i '/^\[DIRECTSTORAGE\]\r$/,/^UNLOCK_FILES=/d' TweaksV.ini; out=$(game full_game.exe ownshare)
 check "the keys added" "log_has 'added the missing key \[DIRECTSTORAGE\] ENABLED=1' && log_has 'added the missing key \[DIRECTSTORAGE\] UNLOCK_FILES=1' && [ \$(count 'added the missing key') -eq 2 ]"
 check "and in the file" "grep -q '^\[DIRECTSTORAGE\]' TweaksV.ini && grep -q '^UNLOCK_FILES=1' TweaksV.ini"
 check "and used: freed" "has '$OWN_SHARED'"

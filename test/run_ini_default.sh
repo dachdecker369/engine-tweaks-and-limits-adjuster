@@ -24,7 +24,7 @@ out=$(game full_game.exe); echo "      ${out:0:160}"
 check "TweaksV.ini is created" '[ -f TweaksV.ini ]'
 check "it is exactly the new default text (CRLF)" 'cmp -s TweaksV.ini expected.ini'
 check "the log says it was created" 'grep -q "Created TweaksV.ini with the default settings" TweaksV.log'
-check "log header: HEAP_SIZE=2000, PACKFILEARRAY_SIZE=13000, TRAVERSAL_LIST_SIZE=10000, DECALDEFS_SIZE=2048, the [TWEAKSV] line with VERSION=2" 'grep -q "HeapAdjuster: HEAP_SIZE=2000" TweaksV.log && grep -q "PackfileLimit: PACKFILEARRAY_SIZE=13000" TweaksV.log && grep -q "BoxStreamer: TRAVERSAL_LIST_SIZE=10000" TweaksV.log && grep -q "Decals: DECALDEFS_SIZE=2048" TweaksV.log && grep -q "TweaksV: LOG=1 DIAGNOSTIC_MODE=0 DRY_RUN=0 CONSOLE=0 ERROR_POPUP=1 CONFLICT_CHECK=1 VERSION=2" TweaksV.log'
+check "log header: HEAP_SIZE=2000, PACKFILEARRAY_SIZE=13000, TRAVERSAL_LIST_SIZE=10000, DECALDEFS_SIZE=2048, the [TWEAKSV] line with VERSION=3" 'grep -q "HeapAdjuster: HEAP_SIZE=2000" TweaksV.log && grep -q "PackfileLimit: PACKFILEARRAY_SIZE=13000" TweaksV.log && grep -q "BoxStreamer: TRAVERSAL_LIST_SIZE=10000" TweaksV.log && grep -q "Decals: DECALDEFS_SIZE=2048" TweaksV.log && grep -q "TweaksV: LOG=1 DIAGNOSTIC_MODE=0 DRY_RUN=0 CONSOLE=0 ERROR_POPUP=1 CONFLICT_CHECK=1 VERSION=3" TweaksV.log'
 check "log header: no newmods line, no testing switch of a part" 'log_lacks -i "newmods" && log_lacks "LOG_DUMP\|LOG_SEARCHES\|LOG_DECALDEFS\|LOG_CALLS\|LOG_FILE_OPENS\|LOG_INFO\|LOG_MODS"'
 check "the heap is set to 2000 MB" 'grep -q "heap: 2000 MB" harness.out'
 check "the packfile limit is 13000" 'grep -q "I=12996 |" harness.out'
@@ -43,13 +43,13 @@ check "a key added back carries no comment: TweaksV adds none to an existing fil
 check "the log names all 4 re-added keys" '[ "$(grep -c "added the missing key" TweaksV.log)" = 4 ]'
 
 echo "== a file with VERSION alone: every other key is added back"
-printf '[TWEAKSV]\r\nVERSION=2\r\n' > TweaksV.ini
+printf '[TWEAKSV]\r\nVERSION=3\r\n' > TweaksV.ini
 out=$(game full_game.exe); echo "      ${out:0:160}"
-check "27 keys added, the defaults used, nothing renamed" '[ $(grep -c "added the missing key" TweaksV.log) -eq 27 ] && grep -q "heap: 2000 MB" harness.out && log_lacks "TweaksV.old.ini" && [ ! -e TweaksV.old.ini ]'
+check "29 keys added, the defaults used, nothing renamed" '[ $(grep -c "added the missing key" TweaksV.log) -eq 29 ] && grep -q "heap: 2000 MB" harness.out && log_lacks "TweaksV.old.ini" && [ ! -e TweaksV.old.ini ]'
 
 echo "== crafted values: each one is reported for the start-up summary, its default or nearest limit used"
 cp expected.ini TweaksV.ini; setkey ERROR_POPUP 0
-setkey HEAP_SIZE 5000; setkey CONSOLE maybe; setkey PACKFILEARRAY_SIZE -5; setkey VERSION 3
+setkey HEAP_SIZE 5000; setkey CONSOLE maybe; setkey PACKFILEARRAY_SIZE -5; setkey VERSION 4
 setkey MODKITARRAY_SIZE "$(printf '0%.0s' $(seq 1 250))99999$(printf 'x%.0s' $(seq 1 45))"	# 300 characters, longer than TweaksV reads
 setkey SKIP_SPLASH_SCREEN '  TRUE  '; setkey UNLOCK_FILES 'Off'	# spaces and capitals are fine
 out=$(game full_game.exe); echo "      ${out:0:160}"
@@ -57,7 +57,7 @@ check "HEAP_SIZE=5000: outside 1..2047, 2047 used" "grep -q 'PROBLEM: TweaksV.in
 check "MODKITARRAY_SIZE of 300 characters: only the first 255 are read, 250 zeros and 99999 - a number outside its limits, 65536 used (all 300 would be no number)" "grep -q 'PROBLEM: TweaksV.ini: \[MODKIT_LIMIT\] MODKITARRAY_SIZE=99999 is outside 1..65536 - using 65536.' TweaksV.log && log_lacks 'MODKITARRAY_SIZE=.* is not a number'"
 check "PACKFILEARRAY_SIZE=-5: outside, 1 used, which is then raised to the game's own size - both reported" "grep -q 'PROBLEM: TweaksV.ini: \[PACKFILE_LIMIT\] PACKFILEARRAY_SIZE=-5 is outside 1..65535 - using 1.' TweaksV.log && grep -q 'PROBLEM: TweaksV.ini: PACKFILEARRAY_SIZE=1 is outside 4500..65535 - using 4500.' TweaksV.log && grep -q 'I=4496 |' harness.out"
 check "CONSOLE=maybe: not on/off, off" "grep -q 'PROBLEM: TweaksV.ini: \[TWEAKSV\] CONSOLE=maybe is not a valid on/off value - using 0.' TweaksV.log"
-check "VERSION=3: a newer layout is reported" "grep -q 'PROBLEM: TweaksV.ini comes from a newer TweaksV (layout 3; this TweaksV knows layout 2)' TweaksV.log"
+check "VERSION=4: a newer layout is reported" "grep -q 'PROBLEM: TweaksV.ini comes from a newer TweaksV (layout 4; this TweaksV knows layout 3)' TweaksV.log"
 check "'  TRUE  ' and 'Off' are read, not reported" "grep -q 'SKIP_SPLASH_SCREEN=1' TweaksV.log && grep -q 'UNLOCK_FILES=0' TweaksV.log && log_lacks 'PROBLEM: .*SKIP_SPLASH_SCREEN\|PROBLEM: .*UNLOCK_FILES'"
 check "all six in one start-up summary, nothing written back" "grep -q 'Start-up summary not shown (ERROR_POPUP=0): 6 problem' TweaksV.log && grep -q '^HEAP_SIZE=5000' TweaksV.ini"
 

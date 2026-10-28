@@ -29,18 +29,21 @@ namespace TweaksV
 	inline constexpr SettingsSection kRageOpenVSection{ "RAGEOPENV", "RageOpenV" };
 	inline constexpr SettingsSection kStoryModeSection{ "STRAIGHTTOSTORYMODE", "StraightToStoryMode" };
 	inline constexpr SettingsSection kDirectStorageSection{ "DIRECTSTORAGE", "DirectStorage" };
+	inline constexpr SettingsSection kBlipsSection{ "BLIPS", "Blips" };
 
 	// The sections in file order; every one but the first is a part of TweaksV with an ENABLED key.
 	inline constexpr const SettingsSection* kSections[] = { &kTweaksVSection, &kHeapSection, &kModkitSection,
-		&kPackfileSection, &kBoxStreamerSection, &kDecalsSection, &kRageOpenVSection, &kStoryModeSection, &kDirectStorageSection };
+		&kPackfileSection, &kBoxStreamerSection, &kDecalsSection, &kRageOpenVSection, &kStoryModeSection, &kDirectStorageSection,
+		&kBlipsSection };
 
 	// The layout of TweaksV.ini this build writes and reads: VERSION, the last key of [TWEAKSV]. A file
 	// without VERSION has the layout of TweaksV 1.x and is replaced (TweaksVIni.h); a file with a higher
 	// number comes from a newer TweaksV and is reported. It goes up with every new key in the file (the
 	// static_assert on IniKeyCount below), and when a key changes its meaning or moves. An older file is
-	// not carried forward: it gets the keys it lacks, but VERSION is never written back, so after a new
-	// layout it reports its VERSION, now below the minimum, at every start (NOTES.md, T-LAYOUT).
-	inline constexpr int kIniLayoutVersion = 2;
+	// carried forward: from kIniFirstLayout on, it gets the keys it lacks and then the current number
+	// written back (TweaksVIni.h). Layout 2 came with TweaksV 2.0.0, layout 3 with the Blips part.
+	inline constexpr int kIniLayoutVersion = 3;
+	inline constexpr int kIniFirstLayout = 2;		// the first layout with VERSION, the oldest one carried forward
 
 	enum class SettingKind { Switch, Number, Text };
 
@@ -81,7 +84,7 @@ namespace TweaksV
 		Switch(kTweaksVSection, "CONSOLE", false, "Console window showing .log while the game is running"),
 		Switch(kTweaksVSection, "ERROR_POPUP", true, "Shows error message popups"),
 		Switch(kTweaksVSection, "CONFLICT_CHECK", true, "Turns off TweaksV parts while other plugins that do the same thing are installed"),
-		Number(kTweaksVSection, "VERSION", kIniLayoutVersion, kIniLayoutVersion, 1000000, "This file's version - leave this line alone!"),
+		Number(kTweaksVSection, "VERSION", kIniLayoutVersion, kIniFirstLayout, 1000000, "This file's version - leave this line alone!"),
 		TestText(kTweaksVSection, "TEST_BREAK_PATTERN"),
 		TestText(kTweaksVSection, "TEST_LOG_LIMIT_KB"),
 		TestText(kTweaksVSection, "TEST_DUMP_CODE"),
@@ -114,9 +117,12 @@ namespace TweaksV
 
 		Switch(kDirectStorageSection, "ENABLED", true),
 		Switch(kDirectStorageSection, "UNLOCK_FILES", true, "Keeps game directory files writable (not .rpf/.cache)"),
+
+		Switch(kBlipsSection, "ENABLED", true),
+		Number(kBlipsSection, "ACTIVE_BLIP_LIMIT", 1900, 150, 1997, "Active blips up to which the game adds its own - Maximum 1997"),
 	};
 
-	// The keys the default TweaksV.ini holds: layout 2 has 28.
+	// The keys the default TweaksV.ini holds: layout 3 has 30.
 	consteval size_t IniKeyCount()
 	{
 		size_t keys = 0;
@@ -125,7 +131,7 @@ namespace TweaksV
 				keys++;
 		return keys;
 	}
-	static_assert(IniKeyCount() == 28, "TweaksV: layout 2 of TweaksV.ini has 28 keys - a new key means a new layout");
+	static_assert(IniKeyCount() == 30, "TweaksV: layout 3 of TweaksV.ini has 30 keys - a new key means a new layout");
 
 	// The column at which a key's comment starts in the default file, the same for every key.
 	inline constexpr size_t kIniCommentColumn = 28;
@@ -186,6 +192,7 @@ namespace TweaksV
 	inline constexpr const Setting& kSkipLegalScreen = FindSetting(kStoryModeSection, "SKIP_LEGAL_SCREEN");
 	inline constexpr const Setting& kSkipLandingPage = FindSetting(kStoryModeSection, "SKIP_LANDING_PAGE");
 	inline constexpr const Setting& kUnlockFiles = FindSetting(kDirectStorageSection, "UNLOCK_FILES");
+	inline constexpr const Setting& kActiveBlipLimit = FindSetting(kBlipsSection, "ACTIVE_BLIP_LIMIT");
 
 	// Reads every setting once, after CreateOrUpdateIni() has chosen TweaksV.ini. A value that is not
 	// valid, or outside its limits, is reported for the start-up summary; its default (or the nearest

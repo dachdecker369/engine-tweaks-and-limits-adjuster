@@ -1276,9 +1276,9 @@ static void OpenFiles()
 	swprintf(g_fileOpensResult, 160, L"file opens: missing file error %lu | ", static_cast<unsigned long>(missingError));
 }
 
-// The script programs (TweaksVScripts, TEST_DUMP_SCRIPT): blip_controller with its code over two pages of 16 KB,
-// the second holding 0x123 bytes, three natives and 0x1F0 bytes of strings in one page; other_script and
-// blip_imposter - blip_controller's hash under another name - with code and strings of their own. Every page is
+// The script programs (TweaksVScripts, TEST_DUMP_SCRIPT, the Blips part): blip_controller with its code over two
+// pages of 16 KB, the second holding 0x123 bytes, three natives and 0x1F0 bytes of strings in one page; other_script
+// and blip_imposter - blip_controller's hash under another name - with code and strings of their own. Every page is
 // a VirtualAlloc of its own, so that one can be made unreadable. The placements run on a thread of their own,
 // as the game's resource placement thread places programs, each through the call at the hook site.
 constexpr uint32_t kScriptPage = 0x4000;
@@ -1340,20 +1340,61 @@ static void PlanScript(ScriptStorage& script, bool unknownNative = false, uint32
 		g_scriptPlan[g_scriptPlanned++] = { &script, unknownNative, codeLength, nativeCount };
 }
 
-// What a copy of blip_controller's n-th placement must hold after its header: the program object, the code
-// (the unreadable page as zeros), the natives before and after the game's resolution, the strings.
-static void WriteExpected(int n, const ScriptStorage& script, const uint64_t (&before)[kFakeNatives])
+// blip_controller's code, decodable from its start to its end with the game's opcode lengths, as the game's own is
+// (PATTERNS.md, "Script programs"): ENTER and instructions of every kind a decoder must step over - a NATIVE, the
+// pushes, a CALL, a jump over three NOPs, a SWITCH whose entries hold bytes above the last opcode - then LEAVE; a
+// second function whose ENTER's name holds the guard's 21 bytes, which only a reader of bytes, not of instructions,
+// would take for a second guard; a third function with the guard at 0x3FE as the game has it - its count native
+// index 1 and WAIT index 2, as the fake's program has three natives - and its exit at 0x413, a NATIVE that makes a
+// blip; NOPs to the end of each page, every instruction within its page, and LEAVE last. Laid again before each
+// placement, as the game makes a new program each time - its second page only while it can be read.
+constexpr uint32_t kBlipGuard = 0x3FE;
+static const unsigned char kGuardBytes[] = { 0x2C, 0x01, 0x00, 0x01, 0x25, 0x96, 0x0C, 0x06, 0x56, 0x0A, 0x00, 0x43, 0xD0, 0x07,
+	0x2C, 0x04, 0x00, 0x02, 0x55, 0xEB, 0xFF };
+static_assert(sizeof(kGuardBytes) == 0x15, "the guard is 21 bytes, its exit at 0x413");
+static void LayBlipCode(ScriptStorage& script)
+{
+	static const unsigned char head[] = {
+		0x2D, 0x00, 0x02, 0x00, 0x00,				// ENTER, 2 locals, no name
+		0x2C, 0x00, 0x00, 0x00,						// NATIVE, no argument, no result, index 0
+		0x25, 0x07, 0x26, 0x01, 0x02, 0x27, 0x01, 0x02, 0x03,		// PUSH_CONST_U8, _U8_U8, _U8_U8_U8
+		0x28, 0xE8, 0x03, 0x00, 0x00, 0x29, 0x00, 0x00, 0x80, 0x3F,	// PUSH_CONST_U32 1000, PUSH_CONST_F 1.0
+		0x5D, 0x00, 0x00, 0x00,						// CALL 0
+		0x64, 0x00, 0x01, 0x00,						// PUSH_CONST_U24 256
+		0x55, 0x03, 0x00, 0x00, 0x00, 0x00,			// J +3, over three NOPs
+		0x65, 0x02, 0xAA, 0xBB, 0xCC, 0xDD, 0x06, 0x00, 0x99, 0x88, 0x77, 0x66, 0x00, 0x00,	// SWITCH, two entries, both to the LEAVE
+		0x2E, 0x00, 0x00,							// LEAVE
+		0x2D, 0x00, 0x00, 0x00, 0x15 };				// ENTER, its name of 21 bytes the guard's
+	static const unsigned char second[] = { 0x2E, 0x00, 0x00, 0x2D, 0x00, 0x00, 0x00, 0x00 };	// LEAVE; ENTER, the third function
+	static const unsigned char exit[] = { 0x2C, 0x00, 0x00, 0x00, 0x2E, 0x00, 0x00 };			// NATIVE, no argument, index 0; LEAVE
+	static const unsigned char leave[] = { 0x2E, 0x00, 0x00 };
+	unsigned char* const code = script.codePages[0];
+	memset(code, 0x00, kScriptPage);
+	memcpy(code, head, sizeof(head));
+	memcpy(code + sizeof(head), kGuardBytes, sizeof(kGuardBytes));
+	memcpy(code + sizeof(head) + sizeof(kGuardBytes), second, sizeof(second));
+	memcpy(code + kBlipGuard, kGuardBytes, sizeof(kGuardBytes));
+	memcpy(code + kBlipGuard + sizeof(kGuardBytes), exit, sizeof(exit));
+	if (g_scriptPageUnreadable)
+		return;
+	memset(script.codePages[1], 0x00, kScriptPage);
+	memcpy(script.codePages[1] + (kScriptCodeLength - kScriptPage) - sizeof(leave), leave, sizeof(leave));
+}
+
+// What a copy of blip_controller's n-th placement must hold after its header: the program object, the code as the
+// fake placed it, before the call (the unreadable page as zeros), the natives before and after the game's resolution,
+// the strings.
+static void WriteExpected(int n, const ScriptStorage& script, const unsigned char (&placed)[kScriptCodeLength],
+	const uint64_t (&before)[kFakeNatives])
 {
 	wchar_t name[48];
 	swprintf(name, 48, L"script_placed_%d.bin", n);
 	const HANDLE file = CreateFileW(name, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (file == INVALID_HANDLE_VALUE)
 		return;
-	static const unsigned char zeros[kScriptPage] = {};
 	DWORD written = 0;
 	WriteFile(file, &script.program, sizeof(script.program), &written, nullptr);
-	WriteFile(file, script.codePages[0], kScriptPage, &written, nullptr);
-	WriteFile(file, g_scriptPageUnreadable ? zeros : script.codePages[1], kScriptCodeLength - kScriptPage, &written, nullptr);
+	WriteFile(file, placed, sizeof(placed), &written, nullptr);
 	WriteFile(file, before, sizeof(before), &written, nullptr);
 	WriteFile(file, script.natives, sizeof(script.natives), &written, nullptr);
 	WriteFile(file, script.stringPages[0], kScriptStringLength, &written, nullptr);
@@ -1370,7 +1411,8 @@ static DWORD WINAPI PlaceScripts(void*)
 	{
 		ScriptStorage& script = *g_scriptPlan[i].script;
 		FakeScriptProgram& p = script.program;
-		// as the game's constructor leaves the program before the call: the natives' hashes in the table
+		// as the game's constructor leaves the program before the call: a new program's code, the natives' hashes in
+		// the table - and what it placed, which TweaksV may change in the call
 		uint64_t before[kFakeNatives] = {};
 		for (size_t k = 0; k < kFakeNatives; k++)
 			before[k] = script.natives[k] = g_fakeNatives[k].hash;
@@ -1378,6 +1420,14 @@ static DWORD WINAPI PlaceScripts(void*)
 			before[1] = script.natives[1] = kUnknownNativeHash;
 		p.codeLength = g_scriptPlan[i].codeLength;
 		p.nativeCount = g_scriptPlan[i].nativeCount;
+		if (&script == &g_blipController)
+			LayBlipCode(script);
+		static unsigned char placed[kScriptCodeLength];
+		memcpy(placed, script.codePages[0], kScriptPage);
+		if (g_scriptPageUnreadable)
+			memset(placed + kScriptPage, 0, kScriptCodeLength - kScriptPage);
+		else
+			memcpy(placed + kScriptPage, script.codePages[1], kScriptCodeLength - kScriptPage);
 		SetLastError(0);
 		const unsigned char resolved = resolve(reinterpret_cast<unsigned char*>(&p));
 		if (GetLastError() == kResolveLastError)
@@ -1389,7 +1439,7 @@ static DWORD WINAPI PlaceScripts(void*)
 		{
 			blipPlacements++;
 			if (p.codeLength == kScriptCodeLength && p.nativeCount == kFakeNatives)
-				WriteExpected(blipPlacements, script, before);
+				WriteExpected(blipPlacements, script, placed, before);
 		}
 	}
 	return 0;

@@ -36,17 +36,17 @@ nve_line() { tr -d '\r' < TweaksV.log | grep -c -- "\\[TweaksV\\] Conflict check
 # features_say [PART...]: the log header's Features: line says off for each PART and on for every other part
 features_say() {
 	local want="Features:" part sep=" "
-	for part in HeapAdjuster ModkitLimit PackfileLimit BoxStreamer Decals RageOpenV StraightToStoryMode DirectStorage; do
+	for part in HeapAdjuster ModkitLimit PackfileLimit BoxStreamer Decals RageOpenV StraightToStoryMode DirectStorage Blips; do
 		if [[ " $* " == *" $part "* ]]; then want+="$sep$part off"; else want+="$sep$part on"; fi
 		sep=", "
 	done
 	tr -d '\r' < TweaksV.log | grep -qx -- ".* \[TweaksV\] $want"
 }
 # after_header PATTERN: the first line of TweaksV.log that matches PATTERN stands after the header, whose last line
-# in a release build holds the values of [DIRECTSTORAGE]
+# in a release build holds the values of [BLIPS]
 after_header() {
 	local header line
-	header=$(grep -n -m 1 -- '\[TweaksV\] DirectStorage: UNLOCK_FILES=' TweaksV.log | cut -d: -f1)
+	header=$(grep -n -m 1 -- '\[TweaksV\] Blips: ACTIVE_BLIP_LIMIT=' TweaksV.log | cut -d: -f1)
 	line=$(grep -n -m 1 -- "$1" TweaksV.log | cut -d: -f1)
 	[ -n "$header" ] && [ -n "$line" ] && [ "$line" -gt "$header" ]
 }
@@ -157,7 +157,7 @@ echo "== I7 no code may be changed (Windows' dynamic code policy): every write f
 fresh_ini; out=$(game full_game.exe nodyncode); echo "      $out"
 check "harness survived to its report, the policy was set" "has 'protect: ' && ! has 'dynamic code policy not set'"
 check "nothing written: game code, protection and call targets as they were" "has '$GAME_HEAP' && has '$STORY_OFF' && has '$MODKIT_OFF' && has '$PACK_OFF' && has '$BOX_OFF' && has '$DECAL_OFF' && has 'stubs: 0, all RX' && has 'protect: all restored (RX)'"
-check "every part reported" "log_has 'PROBLEM: The heap size is not changed this session: the game code could not be made writable' && [ \$(count 'is not skipped this session: the game code could not be made writable') -eq 3 ] && log_has 'PROBLEM: .*modkit' && log_has 'PROBLEM: The packfile limit is not changed' && log_has 'PROBLEM: The box streamer.s traversal list is not enlarged' && log_has 'PROBLEM: The decal definitions limit is not raised' && log_has 'PROBLEM: RageOpenV could not start'"
+check "every part reported" "log_has 'PROBLEM: The heap size is not changed this session: the game code could not be made writable' && [ \$(count 'is not skipped this session: the game code could not be made writable') -eq 3 ] && log_has 'PROBLEM: .*modkit' && log_has 'PROBLEM: The packfile limit is not changed' && log_has 'PROBLEM: The box streamer.s traversal list is not enlarged' && log_has 'PROBLEM: The decal definitions limit is not raised' && log_has 'PROBLEM: RageOpenV could not start' && log_has 'PROBLEM: blip_controller.s threshold is not raised this session: the game code could not be changed'"
 check "one start-up summary" "summary_once"
 
 echo "== I8 the Windows user name stays out of the log: the profile folder is written as %USERPROFILE%, in both its forms"
@@ -292,7 +292,9 @@ rm -rf $d
 # Test builds only: a script program as the game places it in memory, for reading a script's code. The fake game
 # places blip_controller - and with some options other_script or blip_imposter - through the call at the hook
 # site, on a thread of its own, and writes what it placed to script_placed_<n>.bin, n counting blip_controller's
-# placements, which the copies must hold byte for byte after their header.
+# placements, which the copies must hold byte for byte after their header. The Blips part, which changes
+# blip_controller each time it is placed, is off in these runs ([BLIPS] ENABLED=0), so that they test the switch
+# alone: the switch next to the part is the blips suite's scenario.
 echo "== I17 TEST_DUMP_SCRIPT in a test build: the script program saved in %LOCALAPPDATA%\\TweaksV each time the game places it"
 d=appdata/TweaksV
 BLIP_HASH=$((0x80CFE974))
@@ -322,9 +324,10 @@ header_ok() {
 }
 # blocks_ok FILE N: after its header, the copy holds byte for byte what the fake game placed the N-th time
 blocks_ok() { tail -c +177 "$1" | cmp -s - "script_placed_$2.bin"; }
-# scripts: how many copies of a script program there are; script_run [OPTION...]: the fake game with the test build
+# scripts: how many copies of a script program there are; script_run [OPTION...]: the fake game with the test build,
+# the Blips part off
 scripts() { ls $d 2> /dev/null | grep -c '^Script-'; }
-script_run() { rm -rf $d; rm -f script_placed_*.bin; out=$(ASI=TweaksV_test.asi game full_game.exe "$@"); script_report; }
+script_run() { rm -rf $d; rm -f script_placed_*.bin; setkey ENABLED 0 BLIPS; out=$(ASI=TweaksV_test.asi game full_game.exe "$@"); script_report; }
 saved_line() {	# saved_line N PLACED NATIVES UNREADABLE: the log's line for the N-th copy, word for word but the folder
 	log_line "\[TweaksV\] TEST BUILD: Script-blip_controller-$1.bin saved in .*TweaksV: blip_controller placed the $(ordinal $1) time, as the game's $(ordinal $2) script program, on thread $thread - code 16675 bytes in 2 pages, 3 natives, $3, strings 496 bytes; $4.\$"
 }
@@ -340,7 +343,7 @@ check "the placement went through TweaksV's stub, read+execute; the game's resol
 
 fresh_ini; setkey DIAGNOSTIC_MODE 1; addkey TEST_DUMP_SCRIPT BLIP_Controller; script_run scripttwice
 check "placed twice, the name asked for in capitals: two copies, the second with a native the game does not know - not every one resolved - each with its blocks and its line" "[ \$(scripts) = 2 ] && header_ok $d/Script-blip_controller-1.bin 1 1 1 0 && header_ok $d/Script-blip_controller-2.bin 2 2 0 0 && blocks_ok $d/Script-blip_controller-1.bin 1 && blocks_ok $d/Script-blip_controller-2.bin 2 && saved_line 1 1 'every one resolved' 'none unreadable' && saved_line 2 2 'not every one resolved' 'none unreadable' && has 'resolved 1 of 2, last error kept 2 of 2'"
-check "DIAGNOSTIC_MODE: the three sites under [TweaksV], with what each holds, and the call's write" "log_has '\[TweaksV\] DIAGNOSTIC: natives. resolution call at RVA 0x[0-9A-F]* -> RVA 0x[0-9A-F]* (Y-E-H1)' && log_has '\[TweaksV\] DIAGNOSTIC: code length offset at RVA 0x[0-9A-F]* holds 0x1C, native table offset at RVA 0x[0-9A-F]* holds 0x40 (Y-E-N1)' && log_has '\[TweaksV\] DIAGNOSTIC: code page table offset at RVA 0x[0-9A-F]* holds 0x10 (Y-E-I1)' && log_has '\[TweaksV\] DIAGNOSTIC: natives. resolution call at RVA 0x[0-9A-F]*: E8 .* -> E8 '"
+check "DIAGNOSTIC_MODE: the three sites under [TweaksV], with what each holds, and the call's write" "log_has '\[TweaksV\] DIAGNOSTIC: natives. resolution call at RVA 0x[0-9A-F]* -> RVA 0x[0-9A-F]*, strings. length offset at RVA 0x[0-9A-F]* holds 0x70 (Y-E-H1)' && log_has '\[TweaksV\] DIAGNOSTIC: code length offset at RVA 0x[0-9A-F]* holds 0x1C, native table offset at RVA 0x[0-9A-F]* holds 0x40 (Y-E-N1)' && log_has '\[TweaksV\] DIAGNOSTIC: code page table offset at RVA 0x[0-9A-F]* holds 0x10 (Y-E-I1)' && log_has '\[TweaksV\] DIAGNOSTIC: natives. resolution call at RVA 0x[0-9A-F]*: E8 .* -> E8 '"
 
 fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; script_run scriptother
 check "another program placed first: other_script is the first program in the log and is not saved; blip_controller is saved as the game's 2nd program" "log_line '\[TweaksV\] TEST BUILD: TEST_DUMP_SCRIPT: the first script program the game placed is other_script (hash 0x0F74EC00), on thread $thread - the hook runs.\$' && [ \$(scripts) = 1 ] && header_ok $d/Script-blip_controller-1.bin 1 2 1 0 && blocks_ok $d/Script-blip_controller-1.bin 1 && saved_line 1 2 'every one resolved' 'none unreadable'"
@@ -374,12 +377,12 @@ fresh_ini; setkey DRY_RUN 1; addkey TEST_DUMP_SCRIPT blip_controller; script_run
 check "DRY_RUN: the call found and checked, its would line, nothing redirected or saved, no problem" "log_has 'DRY_RUN: would redirect the natives. resolution call at RVA 0x[0-9A-F]*.' && log_has 'TEST BUILD: TEST_DUMP_SCRIPT=blip_controller: DRY_RUN - the call is not redirected, so no script program is saved.' && has 'through the game function' && [ \$(scripts) = 0 ] && log_lacks 'PROBLEM'"
 
 mkdir -p $d; echo "not a copy" > victim.txt
-fresh_ini; setkey ERROR_POPUP 1; addkey TEST_DUMP_SCRIPT blip_controller; rm -f script_placed_*.bin; ln victim.txt $f
+fresh_ini; setkey ERROR_POPUP 1; setkey ENABLED 0 BLIPS; addkey TEST_DUMP_SCRIPT blip_controller; rm -f script_placed_*.bin; ln victim.txt $f
 out=$(ASI=TweaksV_test.asi game full_game.exe script)
 check "Script-blip_controller-1.bin a hard link to another file: that file left alone; a problem, shown in a box of its own after the start-up summary" "[ \"\$(cat victim.txt)\" = 'not a copy' ] && log_has 'PROBLEM: TEST_DUMP_SCRIPT: Script-blip_controller-1.bin was not saved: it is a hard link' && log_has 'TEST BUILD: message box not shown (TWEAKSV_TEST_NO_BOXES=1): TweaksV: a part stopped working after the start-up:'"
 rm -f victim.txt
 
-fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; rm -rf $d; rm -f script_placed_*.bin; out=$(game full_game.exe script)
+fresh_ini; setkey ENABLED 0 BLIPS; addkey TEST_DUMP_SCRIPT blip_controller; rm -rf $d; rm -f script_placed_*.bin; out=$(game full_game.exe script)
 check "the release build ignores TEST_DUMP_SCRIPT: nothing hooked or saved, no TEST BUILD line, no problem" "has 'script: 1 placed on thread' && has 'through the game function' && [ \$(scripts) = 0 ] && log_lacks 'TEST BUILD' && log_lacks 'PROBLEM'"
 rm -rf $d; rm -f script_placed_*.bin
 

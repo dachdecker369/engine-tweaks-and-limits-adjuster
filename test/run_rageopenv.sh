@@ -26,7 +26,7 @@ check "OPEN archives: 5 calls redirected; OPEN not decrypted, others decrypted; 
 check "status lines; no line per hooked function without DIAGNOSTIC_MODE" "log_has 'Files in the mods folder are used (8 file functions hooked)' && log_has 'Unencrypted (OPEN) RPF archives can be loaded (5 calls redirected)' && log_lacks ' hooked at RVA'"
 check "the other plugins still applied" "has 'heap: 1024 MB' && has 'splash: E9 86 01 00 00 90' && has 'modkit refs: new array (RW, 128 KB)' && has 'pack sizes: D3=12000 '"
 check "every patched page back to its own protection (read+execute, as the game's code)" "has 'protect: all restored (RX)'"
-check "the 6 redirected calls each lead to a call stub that is read+execute, never writable" "has 'stubs: 6, all RX'"
+check "the 7 redirected calls - the packfile hook, the 5 OPEN calls, the script programs' hook - each lead to a call stub that is read+execute, never writable" "has 'stubs: 7, all RX'"
 check "no problems; DIAGNOSTIC_MODE off, so no hot-path lines; nothing of newmods" "log_lacks 'PROBLEM' && log_lacks ' asked for ' && log_lacks ' served ' && log_lacks 'newmods'"
 
 echo "== R1b an OPEN archive with an implausible entry count, parsed twice: left alone, logged each time, reported once after the start-up summary"

@@ -10,11 +10,13 @@
 // This module owns the one redirect of that call, for every part of TweaksV that works on a script program:
 // the call goes through a call stub to TweaksV, which hands the program to the module's users before and
 // after the game resolves its natives. Its users: the test builds' TEST_DUMP_SCRIPT (TweaksVDump.h), which
-// saves a program; the Blips part will patch one. The facts are in PATTERNS.md, "Script programs".
+// saves a program, and the Blips part (TweaksVBlips.h), which raises blip_controller's threshold. The facts
+// are in PATTERNS.md, "Script programs".
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <string_view>
 
@@ -32,11 +34,17 @@ namespace TweaksV
 		inline constexpr size_t kNameHashOffset = 0x58;		// the hash of the program's name, a dword (NameHash; no pattern)
 		inline constexpr size_t kNameOffset = 0x60;			// the name: a pointer to a zero-terminated string (no pattern)
 		inline constexpr size_t kStringPagesOffset = 0x68;	// the strings' page table, paged as the code is (no pattern)
-		inline constexpr size_t kStringLengthOffset = 0x70;	// the strings' length in bytes, a dword (no pattern)
+		inline constexpr size_t kStringLengthOffset = 0x70;	// the strings' length in bytes, a dword (Y-E-H1, +18)
 		inline constexpr size_t kProgramSize = 0x80;		// a program object is at least this long
 
+		// The bounds a program's fields are read within: the code and the strings 16 MB each - a call's
+		// target in the code is 24 bits - and 65536 natives - a native's index is 16 bits.
+		inline constexpr uint32_t kMaxLength = 16u << 20;
+		inline constexpr uint32_t kMaxNatives = 65536;
+
 		// The code and the strings lie in pages of kPageSize bytes: a length gives (length + 0x3FFF) >> 14
-		// pages, every one full but the last, which holds length & 0x3FFF bytes - 0x4000 when that is 0.
+		// pages, every one full but the last, which holds length & 0x3FFF bytes - 0x4000 when that is 0. The
+		// rounding, kPageSize - 1, is pinned by Y-E-H1 (+10, "mov r14d, 0x3FFF").
 		inline constexpr uint32_t kPageSize = 0x4000;
 		constexpr uint32_t PageCount(uint32_t length)
 		{
@@ -88,6 +96,27 @@ namespace TweaksV
 			return hash < 2 ? hash + 2 : hash;
 		}
 		static_assert(NameHash("blip_controller") == 0x80CFE974, "TweaksV: the name hash must be the game's");
+
+		// A field of a program - or of a table it points to - as it lies in memory, read only once IsReadable
+		// (TweaksVPatch.h) has said the bytes can be read.
+		template <typename T> T Field(const void* at, size_t offset)
+		{
+			T value{};
+			memcpy(&value, static_cast<const uint8_t*>(at) + offset, sizeof(value));
+			return value;
+		}
+
+		// A program's name - the string its field at kNameOffset points to - is read within this many bytes, the
+		// terminating zero included.
+		inline constexpr size_t kNameRead = 64;
+
+		// The zero-terminated name at name into out, zero-padded, read within kNameRead bytes and only where it can
+		// be read, a memory page at a time; false, and out all zeros, if it cannot be read or does not end within
+		// them.
+		bool ReadName(const char* name, char (&out)[kNameRead]);
+
+		// A name ReadName read, for a log line: a byte that cannot be printed becomes '?'.
+		std::string Printable(const char* name);
 
 		// A user of the hook. before runs for every script program the game places, before the game resolves
 		// its natives - the native table still holds their hashes - with how many programs the hook has seen

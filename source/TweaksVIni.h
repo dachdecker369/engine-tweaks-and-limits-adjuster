@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - TweaksV.ini, the file: where it is, creating it and adding keys that are missing. What is
-// in it - every setting, its default and its reader - is in TweaksVSettings.h.
+// TweaksV - TweaksV.ini, the file: where it is, creating it, adding keys that are missing and carrying an
+// older layout forward. What is in it - every setting, its default and its reader - is in TweaksVSettings.h.
 #pragma once
 
 #include <string>
@@ -24,10 +24,11 @@ namespace TweaksV
 	// Picks the TweaksV.ini to use (see GetIniPathW) and writes the full default file
 	// (DefaultIniText) if there is none. An existing file with the layout of TweaksV 1.x - no VERSION
 	// under [TWEAKSV] - is renamed to TweaksV.old.ini and the default file written in its place; any
-	// other existing file only gets the keys it is missing, and a value is never changed. The file is
-	// used only if it is what its path says
-	// (TweaksVFiles.h), and is then held until ReleaseIniFile(); a file that fails the check
-	// is reported and not read at all, so every setting keeps its default.
+	// other existing file gets the keys it is missing, and one of an older layout from kIniFirstLayout on
+	// then gets the current VERSION written back (TweaksVSettings.h); no other value is ever changed. The
+	// file is used only if it is what its path says (TweaksVFiles.h), and is then held until
+	// ReleaseIniFile(); a file that fails the check is reported and not read at all, so every setting
+	// keeps its default.
 	void CreateOrUpdateIni();
 
 	// Lets go of the TweaksV.ini that CreateOrUpdateIni() holds - once LoadSettings() has read it.

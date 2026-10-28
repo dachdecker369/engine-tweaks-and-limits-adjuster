@@ -274,11 +274,8 @@ namespace TweaksV
 		constexpr char kScriptMagic[8] = { 'T', 'W', 'K', 'V', 'S', 'C', 'R', 'P' };
 		constexpr uint32_t kScriptFormatVersion = 1;
 		constexpr size_t kMaxScriptName = 63;
-		constexpr size_t kNameRead = kMaxScriptName + 1;	// a program's name is read within this many bytes
-		constexpr uint32_t kMaxScriptBytes = 16u << 20;		// the code and the strings, each: a call's target in the code is 24 bits
-		constexpr uint32_t kMaxNatives = 65536;				// a native's index is 16 bits
+		static_assert(Scripts::kNameRead == kMaxScriptName + 1, "TweaksV: a program's name is read within the longest name and its zero");
 		constexpr uint32_t kMaxScriptCopies = 16;			// a session
-		constexpr uintptr_t kMemoryPage = 0x1000;			// Windows protects memory in pages of this size
 
 		// Set before the hook can call: the name asked for, in lower case, and its hash as the game makes it
 		std::string g_script;
@@ -301,13 +298,6 @@ namespace TweaksV
 			std::wstring name;			// Script-<name>-<n>.bin
 		};
 
-		template <typename T> T Field(const uint8_t* program, size_t offset)
-		{
-			T value{};
-			memcpy(&value, program + offset, sizeof(value));
-			return value;
-		}
-
 		std::string Hex(uint32_t value)
 		{
 			char text[16];
@@ -328,44 +318,10 @@ namespace TweaksV
 			return std::to_string(n) + " " + thing + (n == 1 ? "" : "s");
 		}
 
-		// A name from the game for a log line: a byte that cannot be printed becomes '?'.
-		std::string Printable(const char* name)
+		// True if a name Scripts::ReadName read is the one asked for, A to Z taken as a to z.
+		bool IsAskedFor(const char (&name)[Scripts::kNameRead])
 		{
-			std::string printable;
-			for (; *name; name++)
-				printable += (*name < 0x20 || *name > 0x7E) ? '?' : *name;
-			return printable;
-		}
-
-		// The zero-terminated name at name into out, zero-padded, read within kNameRead bytes and only where it
-		// can be read, a memory page at a time; false, and out all zeros, if it cannot be read or does not end
-		// within them.
-		bool ReadName(const char* name, char (&out)[kNameRead])
-		{
-			memset(out, 0, sizeof(out));
-			for (size_t done = 0; done < kNameRead;)
-			{
-				const uintptr_t at = reinterpret_cast<uintptr_t>(name) + done;
-				const size_t take = std::min<size_t>(kNameRead - done, kMemoryPage - at % kMemoryPage);
-				if (!IsReadable(name + done, take))
-					break;
-				memcpy(out + done, name + done, take);
-				if (const void* end = memchr(out + done, 0, take))
-				{
-					const size_t length = static_cast<size_t>(static_cast<const char*>(end) - out);
-					memset(out + length, 0, kNameRead - length);
-					return true;
-				}
-				done += take;
-			}
-			memset(out, 0, sizeof(out));
-			return false;
-		}
-
-		// True if a name ReadName read is the one asked for, A to Z taken as a to z.
-		bool IsAskedFor(const char (&name)[kNameRead])
-		{
-			const size_t length = strnlen(name, kNameRead);
+			const size_t length = strnlen(name, Scripts::kNameRead);
 			if (length != g_script.size())
 				return false;
 			for (size_t i = 0; i < length; i++)
@@ -402,7 +358,7 @@ namespace TweaksV
 			}
 			uint32_t unreadable = 0;
 			for (uint32_t page = 0; page < pages; page++)
-				unreadable += CopyBlock(Field<const uint8_t*>(table, size_t{ page } * sizeof(void*)), Scripts::PageLength(length, page),
+				unreadable += CopyBlock(Scripts::Field<const uint8_t*>(table, size_t{ page } * sizeof(void*)), Scripts::PageLength(length, page),
 					out + size_t{ page } * Scripts::kPageSize);
 			return unreadable;
 		}
@@ -419,10 +375,10 @@ namespace TweaksV
 						"is not looked at (logged once).");
 				return nullptr;
 			}
-			const uint32_t hash = Field<uint32_t>(program, Scripts::kNameHashOffset);
-			char name[kNameRead];
-			const bool named = ReadName(Field<const char*>(program, Scripts::kNameOffset), name);
-			const auto shown = [&] { return named ? Printable(name) : std::string("(a name that cannot be read)"); };
+			const uint32_t hash = Scripts::Field<uint32_t>(program, Scripts::kNameHashOffset);
+			char name[Scripts::kNameRead];
+			const bool named = Scripts::ReadName(Scripts::Field<const char*>(program, Scripts::kNameOffset), name);
+			const auto shown = [&] { return named ? Scripts::Printable(name) : std::string("(a name that cannot be read)"); };
 			if (g_firstPlacement.exchange(false))
 				WriteLog(kTag, "TEST BUILD: TEST_DUMP_SCRIPT: the first script program the game placed is " + shown() + " (hash " + Hex(hash) +
 					"), on thread " + std::to_string(GetCurrentThreadId()) + " - the hook runs.");
@@ -450,15 +406,15 @@ namespace TweaksV
 			}
 			const std::wstring file = L"Script-" + FromUtf8(g_script) + L"-" + std::to_wstring(placement) + L".bin";
 			const std::string what = "TEST_DUMP_SCRIPT: " + ToUtf8(file);
-			const uint32_t codeLength = Field<uint32_t>(program, Scripts::kCodeLengthOffset);
-			const uint32_t nativeCount = Field<uint32_t>(program, Scripts::kNativeCountOffset);
-			const uint32_t stringLength = Field<uint32_t>(program, Scripts::kStringLengthOffset);
+			const uint32_t codeLength = Scripts::Field<uint32_t>(program, Scripts::kCodeLengthOffset);
+			const uint32_t nativeCount = Scripts::Field<uint32_t>(program, Scripts::kNativeCountOffset);
+			const uint32_t stringLength = Scripts::Field<uint32_t>(program, Scripts::kStringLengthOffset);
 			std::string beyond;
-			if (codeLength > kMaxScriptBytes)
+			if (codeLength > Scripts::kMaxLength)
 				beyond = "its code length, " + std::to_string(codeLength) + " bytes, is beyond 16 MB.";
-			else if (nativeCount > kMaxNatives)
-				beyond = "its native count, " + std::to_string(nativeCount) + ", is beyond " + std::to_string(kMaxNatives) + ".";
-			else if (stringLength > kMaxScriptBytes)
+			else if (nativeCount > Scripts::kMaxNatives)
+				beyond = "its native count, " + std::to_string(nativeCount) + ", is beyond " + std::to_string(Scripts::kMaxNatives) + ".";
+			else if (stringLength > Scripts::kMaxLength)
 				beyond = "its string length, " + std::to_string(stringLength) + " bytes, is beyond 16 MB.";
 			if (!beyond.empty())
 			{
@@ -492,7 +448,7 @@ namespace TweaksV
 				header.nativesAfterOffset = header.nativesBeforeOffset + natives;
 				header.stringsOffset = header.nativesAfterOffset + natives;
 				copy->file.resize(static_cast<size_t>(header.stringsOffset + stringLength));
-				header.unreadable = CopyBlock(Field<const uint8_t*>(program, Scripts::kNativesOffset), static_cast<size_t>(natives),
+				header.unreadable = CopyBlock(Scripts::Field<const uint8_t*>(program, Scripts::kNativesOffset), static_cast<size_t>(natives),
 					copy->file.data() + header.nativesBeforeOffset);
 				return copy.release();
 			}
@@ -513,7 +469,7 @@ namespace TweaksV
 			ScriptDumpHeader& header = copy->header;
 			uint8_t* const file = copy->file.data();
 			const bool readable = IsReadable(program, Scripts::kProgramSize);
-			const auto pointer = [&](size_t offset) { return readable ? Field<const uint8_t*>(program, offset) : nullptr; };
+			const auto pointer = [&](size_t offset) { return readable ? Scripts::Field<const uint8_t*>(program, offset) : nullptr; };
 			header.resolved = resolved;
 			header.unreadable += CopyBlock(program, Scripts::kProgramSize, file + header.programOffset);
 			header.unreadable += CopyPages(pointer(Scripts::kCodePagesOffset), header.codeLength, file + header.codeOffset);

@@ -7,6 +7,7 @@
 
 #include <iterator>
 
+#include "TweaksVBlips.h"
 #include "TweaksVBoxStreamer.h"
 #include "TweaksVDecals.h"
 #include "TweaksVDirectStorage.h"
@@ -28,11 +29,12 @@ namespace TweaksV
 		constexpr PeerPlugin kNveLoader{ L"onigiri.asi", "NaturalVision Enhanced's loader" };
 
 		// The five original plugins in the order an ASI loader loaded their .asi files (alphabetical),
-		// TweaksV's own box streamer and decal definitions parts among the limit adjusters, and its
-		// DirectStorage part last. ZHeapAdjuster.asi is the rename the HeapAdjuster author recommends;
-		// OpenRPF.asi and OpenIV.asi do RageOpenV's job, alloc8or's DirectStorageFix.asi that of the
-		// DirectStorage part, and the closed-source DecalPatch.asi that of both the box streamer and the
-		// decal definitions parts, so it switches both off.
+		// TweaksV's own box streamer and decal definitions parts among the limit adjusters, then its
+		// DirectStorage part and, last, its Blips part. ZHeapAdjuster.asi is the rename the HeapAdjuster
+		// author recommends; OpenRPF.asi and OpenIV.asi do RageOpenV's job, alloc8or's DirectStorageFix.asi
+		// that of the DirectStorage part, rootBrz's BlipLimitFix.asi that of the Blips part, and the
+		// closed-source DecalPatch.asi that of both the box streamer and the decal definitions parts, so it
+		// switches both off.
 		constexpr Feature kFeatures[] = {
 			{ &kHeapSection, { L"HeapAdjuster.asi", L"ZHeapAdjuster.asi" }, {},
 				[] { InitHeapAdjuster(); return false; } },
@@ -51,6 +53,8 @@ namespace TweaksV
 				[] { InitStraightToStoryMode(); return false; } },
 			{ &kDirectStorageSection, { L"DirectStorageFix.asi" }, {},
 				[] { InitDirectStorage(); return false; } },
+			{ &kBlipsSection, { L"BlipLimitFix.asi" }, {},
+				[] { InitBlips(); return false; } },
 		};
 
 		// Every section of TweaksV.ini but [TWEAKSV] belongs to a feature, in the same order.

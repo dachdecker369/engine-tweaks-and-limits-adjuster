@@ -13,6 +13,9 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <ClCompile Include="TweaksVBlips.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVBoxStreamer.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -93,6 +96,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="TweaksVBlips.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVBoxStreamer.h">
       <Filter>TweaksV</Filter>
     </ClInclude>

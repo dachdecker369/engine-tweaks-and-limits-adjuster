@@ -11,7 +11,7 @@ namespace TweaksV
 {
 	struct GamePattern
 	{
-		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, D- Decals, R- RageOpenV, S- StraightToStoryMode, Y- the script programs
+		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, D- Decals, R- RageOpenV, S- StraightToStoryMode, Y- the script programs, L- Blips
 		const char* text;	// the bytes in hex, one space apart; ? matches any byte
 	};
 
@@ -140,6 +140,11 @@ namespace TweaksV
 		{ "Y-E-H1", "4C 89 E1 E8 ? ? ? ? 41 BE FF 3F 00 00 41 8B 44 24 70" },
 		{ "Y-E-N1", "41 8B 4C 24 1C 01 C1 49 8B 54 24 40 48 D3 04 C2" },
 		{ "Y-E-I1", "4D 8B 50 10 49 63 41 1C 4C 8D 7C C1 F8 49 63 41 18 4C 8D 0C C1" },
+
+		// Blips (TweaksVBlips.cpp), for its measurement with DIAGNOSTIC_MODE only: the blip pool's allocator, whose
+		// lea loads the pool (P1), and its update of the pool's high-water mark, whose cmp reads the mark (P2)
+		{ "L-E-P1", "BA 04 00 00 00 31 C0 48 8D 1D ? ? ? ? 31 F6" },
+		{ "L-E-P2", "48 89 3B 39 35 ? ? ? ? 7F 09 8D 46 01 89 05" },
 	};
 
 	// A text the scanner can use: bytes as two hex digits or ?, one space apart, at least one of them

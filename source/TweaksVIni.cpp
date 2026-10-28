@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - TweaksV.ini, the file: where it is, creating it, adding keys that are missing, and
-// replacing a file that has the layout of TweaksV 1.x.
+// TweaksV - TweaksV.ini, the file: where it is, creating it, adding keys that are missing, carrying an
+// older layout forward, and replacing a file that has the layout of TweaksV 1.x.
 
 #include "TweaksVIni.h"
 
@@ -187,6 +187,48 @@ namespace TweaksV
 				WritePrivateProfileStringW(nullptr, nullptr, nullptr, g_iniPath.c_str()); // flush
 		}
 
+		// Carries a file of an older layout forward - its VERSION from kIniFirstLayout up to below this
+		// layout - once AddMissingKeys has given it every key this layout has: this layout's number is
+		// written back in place of the old one, the rest of the line, a comment after it, as it was. A
+		// VERSION that is no number or outside that range is left as it is, for LoadSettings to report.
+		void CarryForward()
+		{
+			const std::wstring value = ReadIniValue(kTweaksVSection.name, kIniVersion.key);
+			if (value.empty())
+				return;
+			wchar_t* end = nullptr;
+			const long layout = wcstol(value.c_str(), &end, 10);
+			if (!end || *end != L'\0' || layout < kIniFirstLayout || layout >= kIniLayoutVersion)
+				return;
+
+			const std::wstring section = Widen(kTweaksVSection.name);
+			const std::wstring key = Widen(kIniVersion.key);
+			const std::string from = std::to_string(layout);
+			const std::string to = std::to_string(kIniLayoutVersion);
+			wchar_t line[1024]{};	// the value as the file has it, a comment included
+			const DWORD length = GetPrivateProfileStringW(section.c_str(), key.c_str(), L"", line, static_cast<DWORD>(std::size(line)),
+				g_iniPath.c_str());
+			std::wstring written = Widen(to.c_str());
+			const std::wstring raw(line, length);
+			const size_t at = raw.find(value);
+			if (length + 2 < std::size(line) && at != std::wstring::npos)	// a value cut short is not written back whole
+				written = raw.substr(0, at) + written + raw.substr(at + value.size());
+
+			if (WritePrivateProfileStringW(section.c_str(), key.c_str(), written.c_str(), g_iniPath.c_str()))
+			{
+				WritePrivateProfileStringW(nullptr, nullptr, nullptr, g_iniPath.c_str()); // flush
+				WriteLog("TweaksV", "TweaksV.ini: carried from layout " + from + " to layout " + to + " (the keys it lacked are added).");
+				return;
+			}
+			const DWORD error = GetLastError();
+			const std::string text = "TweaksV.ini: VERSION=" + to + " could not be written back (" + DescribeError(error) + "), so the file "
+				"keeps VERSION=" + from + " and is carried forward again at the next start.";
+			if (error == ERROR_ACCESS_DENIED)
+				WriteLog("TweaksV", text);	// a read-only TweaksV.ini is not a problem
+			else
+				ReportFailure("TweaksV", text);
+		}
+
 		// True if the TweaksV.ini in use has the layout of TweaksV 1.x: no VERSION under [TWEAKSV]. Only
 		// the key names of that section are read - no value of a 1.x file is ever used.
 		bool HasLayout1()
@@ -231,14 +273,17 @@ namespace TweaksV
 				"TweaksV.ini written with the default settings - set your values again.");
 		}
 
-		// The TweaksV.ini in use exists and has passed its check: a 1.x file is replaced, a layout-2
-		// file gets the keys it is missing.
+		// The TweaksV.ini in use exists and has passed its check: a 1.x file is replaced, any other file
+		// gets the keys it is missing, and one of an older layout is carried forward.
 		void UpdateIni()
 		{
 			if (HasLayout1())
 				ReplaceLayout1Ini();
 			else
+			{
 				AddMissingKeys();
+				CarryForward();
+			}
 		}
 	}
 
