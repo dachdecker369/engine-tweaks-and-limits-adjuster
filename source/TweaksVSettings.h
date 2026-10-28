@@ -119,7 +119,7 @@ namespace TweaksV
 		Switch(kDirectStorageSection, "UNLOCK_FILES", true, "Keeps game directory files writable (not .rpf/.cache)"),
 
 		Switch(kBlipsSection, "ENABLED", true),
-		Number(kBlipsSection, "ACTIVE_BLIP_LIMIT", 1900, 150, 1997, "Active blips up to which the game adds its own - Maximum 1997"),
+		Number(kBlipsSection, "ACTIVE_BLIP_LIMIT", 1900, 150, 1997, "Number of map blips before the game stops adding its own - Maximum 1997"),
 	};
 
 	// The keys the default TweaksV.ini holds: layout 3 has 30.

@@ -193,7 +193,7 @@ UNLOCK_FILES=1              //Keeps game directory files writable (not .rpf/.cac
 
 [BLIPS]
 ENABLED=1
-ACTIVE_BLIP_LIMIT=1900      //Active blips up to which the game adds its own - Maximum 1997
+ACTIVE_BLIP_LIMIT=1900      //Number of map blips before the game stops adding its own - Maximum 1997
 ```
 
 What each key does is README's table. The two testing switches: `DRY_RUN=1` makes every part find and check everything, logging what it would change, and nothing in the game is written or hooked (only RageOpenV's one-shot hook on `GetSystemTimeAsFileTime`, which runs its checks and switches itself off) - the Blips part, which sees a script program only through the hook a dry run does not make, finds and checks the hook's sites and not the program; `DIAGNOSTIC_MODE=1` makes every part that is on log every site it finds, the value it holds and every write, run its measurement where it has one, and makes the scanner log a line per pattern. A part with `ENABLED=0` does nothing at all, so a diagnostic check of every pattern needs every part on. `DIAGNOSTIC_MODE=1` with `DRY_RUN=1` is the quiet check after a game update; `DIAGNOSTIC_MODE=1` alone is the full measurement of the running game, which hooks a little more than a normal boot (the box streamer's four search calls, DirectStorage's configuration calls - and its factory and `OpenFile` with `UNLOCK_FILES=0` - and the file opens).
