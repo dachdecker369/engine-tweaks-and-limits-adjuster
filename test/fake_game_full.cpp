@@ -83,6 +83,10 @@
 //   blipnative     the guard calling WAIT through native 3, not below the program's native count
 //   bliptwice      a second guard at 0x800
 //   blipjump       a jump at 0x100 into the guard's span
+//   blipcall       a CALL at 0x100 into the guard's span
+//   blipswitch     a SWITCH at 0x100 whose one case leads into the guard's span
+//   blipcatch      a CATCH, whose target is computed while the script runs, at 0x200
+//   blipchanged    the guard's threshold changed to 151 while the game resolves the natives, as another mod could
 //   blipbadbyte    the byte 0xA0, no instruction, at 0x200
 // The blip pool's two sites are always there, the pool with 162 slots in use below its high-water mark, 170, and
 // two beyond it.
@@ -464,12 +468,16 @@ constexpr DWORD kResolveLastError = 0x2A1B;	// the last error the fake's resolut
 
 // The game's own function behind the call at the hook site: the program's native table, hashes until now,
 // gets the handlers; 1 when every hash was known. It reads no more entries than the fake's tables have, whatever
-// the program's native count says.
+// the program's native count says. With the option blipchanged it also changes blip_controller's threshold, at
+// 0x403 of its code, to 151 - between the Blips part's look at the program and its write, as another mod could.
 static int g_resolveCalls = 0;
+static bool g_blipChanged = false;
 static __declspec(noinline) unsigned char FakeResolveNatives(unsigned char* program)
 {
 	g_resolveCalls++;
 	const auto p = reinterpret_cast<FakeScriptProgram*>(program);
+	if (g_blipChanged && p->name && strcmp(p->name, "blip_controller") == 0)
+		p->codePages[0][0x403] = 0x97;
 	unsigned char every = 1;
 	for (uint32_t i = 0; i < p->nativeCount && i < kFakeNatives; i++)
 	{
@@ -1401,7 +1409,7 @@ static const BlipGuard kBlipGuards[] = {
 		0x02, 0x55, 0xE8, 0xFF, 0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x2E, 0x00, 0x00 }, 33, 0x406, true },
 };
 static const BlipGuard* g_blipGuard = &kBlipGuards[0];
-static bool g_blipTwice = false, g_blipJump = false, g_blipBadByte = false;
+static bool g_blipTwice = false, g_blipJump = false, g_blipCall = false, g_blipSwitch = false, g_blipCatch = false, g_blipBadByte = false;
 // What TweaksV left of what the fake placed: blip_controller's placements and those whose code is as placed but where
 // the part may change it, its guard through the branch after the last one, and the other programs' placements and
 // those whose code is as placed
@@ -1426,9 +1434,9 @@ static bool AsPlaced(const ScriptStorage& script, const unsigned char (&placed)[
 // second function whose ENTER's name holds the game's guard, which only a reader of bytes, not of instructions,
 // would take for a second guard; a third function with the guard at 0x3FE - its count native index 1 and WAIT index
 // 2, as the fake's program has three natives - and its way out, a NATIVE that makes a blip; NOPs to the end of each
-// page, every instruction within its page, and LEAVE last. The options add a second guard at 0x800, a jump at 0x100
-// into the guard's span, the byte 0xA0 at 0x200. Laid again before each placement, as the game makes a new program
-// each time - its second page only while it can be read.
+// page, every instruction within its page, and LEAVE last. The options add a second guard at 0x800, a jump, a CALL
+// or a SWITCH case at 0x100 into the guard's span, a CATCH or the byte 0xA0 at 0x200. Laid again before each
+// placement, as the game makes a new program each time - its second page only while it can be read.
 static void LayBlipCode(ScriptStorage& script)
 {
 	static const unsigned char head[] = {
@@ -1444,6 +1452,8 @@ static void LayBlipCode(ScriptStorage& script)
 		0x2D, 0x00, 0x00, 0x00, 0x15 };				// ENTER, its name of 21 bytes the guard's
 	static const unsigned char second[] = { 0x2E, 0x00, 0x00, 0x2D, 0x00, 0x00, 0x00, 0x00 };	// LEAVE; ENTER, the third function
 	static const unsigned char jump[] = { 0x55, 0xFF, 0x02 };									// J +0x2FF, from 0x100 to 0x402
+	static const unsigned char call[] = { 0x5D, 0x02, 0x04, 0x00 };								// CALL 0x402, from 0x100
+	static const unsigned char cases[] = { 0x65, 0x01, 0x00, 0x00, 0x00, 0x00, 0xFA, 0x02 };	// SWITCH, one case: 0x108 + 0x2FA = 0x402
 	static const unsigned char leave[] = { 0x2E, 0x00, 0x00 };
 	unsigned char* const code = script.codePages[0];
 	memset(code, 0x00, kScriptPage);
@@ -1455,6 +1465,12 @@ static void LayBlipCode(ScriptStorage& script)
 		memcpy(code + 0x800, kBlipGuards[0].bytes, kBlipGuards[0].size);
 	if (g_blipJump)
 		memcpy(code + 0x100, jump, sizeof(jump));
+	if (g_blipCall)
+		memcpy(code + 0x100, call, sizeof(call));
+	if (g_blipSwitch)
+		memcpy(code + 0x100, cases, sizeof(cases));
+	if (g_blipCatch)
+		code[0x200] = 0x6D;	// CATCH
 	if (g_blipBadByte)
 		code[0x200] = 0xA0;
 	if (g_scriptPageUnreadable)
@@ -1782,6 +1798,10 @@ int wmain(int argc, wchar_t** argv)
 			g_blipGuard = &guard;
 	g_blipTwice = HasOption(argc, argv, L"bliptwice");
 	g_blipJump = HasOption(argc, argv, L"blipjump");
+	g_blipCall = HasOption(argc, argv, L"blipcall");
+	g_blipSwitch = HasOption(argc, argv, L"blipswitch");
+	g_blipCatch = HasOption(argc, argv, L"blipcatch");
+	g_blipChanged = HasOption(argc, argv, L"blipchanged");
 	g_blipBadByte = HasOption(argc, argv, L"blipbadbyte");
 	// The blip pool: 162 slots in use below its high-water mark, 170 - eight below it empty - and two in use beyond it,
 	// which the part's measurement must not count; its two sites lead to it

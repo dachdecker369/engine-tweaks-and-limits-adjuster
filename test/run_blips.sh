@@ -4,9 +4,10 @@
 # program - as the game does at the start and at every save load - through the script programs' hook; after each
 # placement the guard is printed from its count's NATIVE through its branch, and the rest of the code compared with
 # what the fake placed. The guard as the game has it, NOP-padded, fused with its body behind the branch, and with
-# too little room; the threshold the configured limit already, and another mod's; the guard twice, a jump into its
-# span, a byte that is no instruction, a native the program does not have, a page that cannot be read - each left
-# as placed, a problem the first time, after the start-up summary in a box of its own; another program and
+# too little room; the threshold the configured limit already, and another mod's; the guard twice, a jump, a call or
+# a SWITCH case into its span, a CATCH in the program, a byte that is no instruction, a native the program does not
+# have, a page that cannot be read, the guard changed while the natives are resolved - each left as placed, a
+# problem the first time, after the start-up summary in a box of its own; another program and
 # blip_controller's hash under another name left alone; the old plugin, ENABLED=0, DRY_RUN, DIAGNOSTIC_MODE with the
 # natives' line and the blip pool's summary, a broken pattern, the call another mod redirected; the Release and the
 # test build alike, and the test build's copy of the program next to the part. Fake LOCALAPPDATA: the real one is
@@ -150,6 +151,22 @@ fresh_ini; addkey TEST_DUMP_SCRIPT blip_controller; rm -rf $d; rm -f script_plac
 check "after its header the copy is byte for byte what the fake placed - 25 96 0C 06 at 0x402 of the code; the program holds 43 6C 07 0B there" "tail -c +177 $d/Script-blip_controller-1.bin | cmp -s - script_placed_1.bin && [ \"\$(od -An -tx1 -j\$((304 + 0x402)) -N4 $d/Script-blip_controller-1.bin | tr -d ' ')\" = 25960c06 ] && guard_after '$RAISED'"
 check "one hook, made by the switch, which joins first: its line under [TweaksV]; the part raises the guard after it" "log_has '\[TweaksV\] The natives. resolution call at RVA 0x[0-9A-F]* is redirected' && log_lacks '\[Blips\] The natives. resolution call' && raised_line 1 1900 && has 'stubs: 7, all RX' && log_lacks 'PROBLEM'"
 rm -rf $d; rm -f script_placed_*.bin
+
+echo "== L28 a call from elsewhere into the span: left as placed"
+fresh_ini; out=$(game full_game.exe script blipcall)
+check "nothing written; the problem names the call, word for word" "guard_after '$GAME' && refused 'a call at 0x100 leads into its guard at 0x3FE of its code, between 0x402 and 0x408.'"
+
+echo "== L29 a SWITCH case from elsewhere into the span, its offset unsigned: left as placed"
+fresh_ini; out=$(game full_game.exe script blipswitch)
+check "nothing written; the problem names the SWITCH, word for word" "guard_after '$GAME' && refused 'a SWITCH case at 0x100 leads into its guard at 0x3FE of its code, between 0x402 and 0x408.'"
+
+echo "== L30 a CATCH in the program, its target computed while the script runs: left as placed"
+fresh_ini; out=$(game full_game.exe script blipcatch)
+check "nothing written; the problem names it, word for word" "guard_after '$GAME' && refused 'its code holds a CATCH, THROW or CALLINDIRECT at 0x200, whose target is computed while the script runs and could lead into its guard at 0x3FE of its code.'"
+
+echo "== L31 the threshold changed while the game resolves the natives, as another mod could: nothing written over it"
+fresh_ini; out=$(game full_game.exe script blipchanged)
+check "the change as it was made, nothing of the part's; the problem word for word" "guard_after '2C 01 00 01 25 97 0C 06 56 0A 00' && refused 'its guard at 0x3FE of its code changed between the game.s placement and the write (another mod may be at work) - left as it is.'"
 
 echo
 echo "BLIPS SCENARIOS: $pass passed, $fail failed"

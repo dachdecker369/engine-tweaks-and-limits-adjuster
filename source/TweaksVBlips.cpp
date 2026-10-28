@@ -100,9 +100,9 @@ namespace TweaksV
 			constexpr uint8_t kIgeJumpZero = 0x5A;	// the fused IEQ_JZ to ILE_JZ, 0x57 to 0x5C, jump when their comparison is false
 			constexpr uint8_t kIltJumpZero = 0x5B;
 			constexpr uint8_t kLastFused = 0x5C;
-			constexpr uint8_t kCall = 0x5D;			// a 24-bit address in the code
+			constexpr uint8_t kCall = 0x5D;			// a 24-bit address in the code, unsigned
 			constexpr uint8_t kPushU24 = 0x64;		// PUSH_CONST_U24
-			constexpr uint8_t kSwitch = 0x65;		// +1: n; then n entries of a 32-bit value and a 16-bit offset from the entry's end
+			constexpr uint8_t kSwitch = 0x65;		// +1: n; then n entries of a 32-bit value and an unsigned 16-bit offset from the entry's end
 			constexpr uint8_t kCatch = 0x6D;		// CATCH, THROW and CALLINDIRECT: their targets are computed while the script runs
 			constexpr uint8_t kThrow = 0x6E;
 			constexpr uint8_t kCallIndirect = 0x6F;
@@ -435,8 +435,8 @@ namespace TweaksV
 		}
 
 		// The first instruction whose jump, call or SWITCH case leads into [first, end): its offset, with what it
-		// is; kNowhere when there is none. A SWITCH entry's 16-bit offset is taken both signed and unsigned -
-		// PATTERNS.md does not say which it is - and either leading in counts.
+		// is; kNowhere when there is none. A jump's 16-bit offset is signed; a CALL's 24-bit address and a SWITCH
+		// entry's 16-bit offset are unsigned, as the interpreter reads them (PATTERNS.md).
 		uint32_t LeadsInto(const Code& code, const Starts& starts, uint32_t first, uint32_t end, const char*& what)
 		{
 			const auto into = [&](int64_t target) { return target >= first && target < end; };
@@ -468,7 +468,7 @@ namespace TweaksV
 					{
 						const uint32_t entryEnd = at + 2 + 6 * (entry + 1);
 						const uint16_t offset = static_cast<uint16_t>(code.At(entryEnd - 2) | code.At(entryEnd - 1) << 8);
-						if (into(int64_t{ entryEnd } + offset) || into(int64_t{ entryEnd } + static_cast<int16_t>(offset)))
+						if (into(int64_t{ entryEnd } + offset))
 						{
 							what = "SWITCH case";
 							return at;
