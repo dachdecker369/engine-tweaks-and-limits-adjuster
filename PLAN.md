@@ -57,7 +57,7 @@ The phases:
 
 **The verification:** section 2 against the dump, done by the overview session on 2026-10-27, its record in my research tools' `output-1158.16\blips_verification_of_section2.md`: every fact the switch rests on confirmed; seven other claims wrong and four not settled, the corrections handed to the research session with its prompt; the one the part had to settle - the blip count reaching 1,998 to 2,000 with the pool full, not only 1,997 - section 3 settled: the highest limit that still holds with the pool full is 1,997, the count's lowest answer then. Section 3 against both saved programs, done by the overview session on 2026-10-27 with a decoder of its own over the game's length table, its record `output-1158.16\blips_verification_of_section3.md`: every claim of 3.2 to 3.7 confirmed, none wrong; 3.1's lead as found, not settled.
 
-**The part's track:** under way since 2026-10-28, in its worktree on a branch of its own, from d58114d, with the prompt `blips-part-session.md`.
+**The part's track:** under way since 2026-10-28, in its worktree on a branch of its own, from d58114d, with the prompt `blips-part-session.md`. Its verification, my boots and its release go to a fresh overview session, with the hand-over prompt `overview-handover-2.md`: the overview session of 2026-10-27 and 28 had used 78% of its context.
 
 **Decisions waiting on me:** none.
 
