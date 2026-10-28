@@ -203,7 +203,7 @@ A script program is one of the game's compiled scripts - `blip_controller` and t
 
 ## Blips
 
-The Blips part (`TweaksVBlips`, SPECIFICATIONS.md section 11.9; PLAN.md, the Blips section) has the game's own `blip_controller` script make its blips while a mod's blips fill the blip pool; its patterns are the rows at the end of this section (`L` for the pool's). The facts it rests on, from the dump of 1.0.1158.16 and from the program the switch saved at my boot of 2026-10-27, verified against both:
+The Blips part (`TweaksVBlips`, SPECIFICATIONS.md section 11.9) has the game's own `blip_controller` script make its blips while a mod's blips fill the blip pool; its patterns are the rows at the end of this section (`L` for the pool's). The facts it rests on, from the dump of 1.0.1158.16 and from the program the switch saved at my boot of 2026-10-27, verified against both:
 
 - **The blip pool:** 2,000 slots of 8 bytes at RVA 0x3DEBD70, its high-water mark at RVA 0x3DEFBF0; a blip's handle is (serial << 16) | index, and the pool's code bounds an index with 0x7CF.
 - **The count native** (on this build its hash is 0xC802478C8862BDAD and its handler is at RVA 0x1D51F40, which starts with a jump into the game's protected code) counts the slots below the mark that hold a blip, except three: the slot whose index the dword at RVA 0x288FEF0 holds, and the slots of the handles at RVA 0x3DEB7F8 and 0x3DEB7F4, those two only while the byte at RVA 0x3DEB7F0 is set. With all 2,000 slots taken it answers 1,997 while the three name live blips, and 1,998, 1,999 or 2,000 when one or more of them names none.
@@ -223,7 +223,7 @@ The Blips part (`TweaksVBlips`, SPECIFICATIONS.md section 11.9; PLAN.md, the Bli
   | 0x413 | `38 04` | after the guard: its way out, where the JZ leads - a 2-byte instruction, neither a NOP nor a jump |
 
   It holds the script back - WAIT with 2,000, then the count again - while count >= 150, and lets it on to make a blip as soon as count < 150. The count native is called nowhere else in the program, 150 is pushed nowhere else, no jump, call or SWITCH case lands in 0x402..0x408, and no target is computed (the program holds no CATCH, THROW or CALLINDIRECT). Told apart by their argument and result counts alone, the guard's NATIVE is the only one with 0 arguments and 1 result that a constant push and a comparison follow.
-- **The threshold** is 150, the game's own. The program holds no 240, the value some setups show (PLAN.md, D4); where that comes from is open.
+- **The threshold** is 150, the game's own. The program holds no 240, the value some setups show, which the part leaves as it is and logs; where that comes from is open.
 - **The room:** the 4 bytes 0x402..0x405 between the count's NATIVE and the JZ. PUSH_CONST_S16 and IGE fill them for any limit up to 32,767 (`43 lo hi 0B`), and NOP, PUSH_CONST_U8 and IGE for a limit up to 255 (`00 25 nn 0B`): IGE in the place of ILT and NOT keeps the polarity, and the JZ keeps its target.
 - **The highest limit that still holds with the pool full** is 1,997, the count's lowest answer then: above it, the script can pass the guard with the pool full, where making a blip fails.
 - **Not settled:** which of the game's two copies of the script it runs - update2.rpf's, resource version 12, or x64b.rpf's, 10. A lead: the script store is built with 12 at its +0x2C (RVA 0x13FA29D and 0x30E40). The part reads the program as the game placed it, so it does not depend on it.

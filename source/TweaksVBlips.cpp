@@ -111,7 +111,7 @@ namespace TweaksV
 		constexpr uint8_t kCountCall = 0 << 2 | 1;	// the count's NATIVE: no argument, one result
 		constexpr uint8_t kWaitCall = 1 << 2 | 0;	// WAIT's: one argument, no result
 
-		// The lengths of the opcodes, the game's own table (PATTERNS.md, "The interpreter") as constants (D11): "When
+		// The lengths of the opcodes, the game's own table (PATTERNS.md, "The interpreter") as constants: "When
 		// Game Updates" item 5 checks it against the game's table after an update. 0 for the two of variable length,
 		// ENTER and SWITCH.
 		struct LengthRange
