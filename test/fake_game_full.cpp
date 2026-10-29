@@ -217,7 +217,10 @@
 //   tbgrow         once TweaksV's first texture budget summary is in TweaksV.log, the textures grow by 200 MB and 800 objects,
 //                  past the budget, the game's mark with them, and the update check's flag goes up; then it waits for the
 //                  next summary (TWEAKSV_TEST_SUMMARY_MS), 10 seconds at most
-//   tbshift        the shift between the two stores of the budgets is psllq 21, not 20
+//   tblate         its data all 0 - the counters, the index, the flag, the update check's switch and factors - as before the
+//                  game's start-up reads gameconfig.xml, until TweaksV's first texture budget summary is in TweaksV.log; then
+//                  set as the game's start-up sets them, and the next summary waited for, 10 seconds at most
+//   tbshift       the shift between the two stores of the budgets is psllq 21, not 20
 //   tbcallhooked   the call after the budgets' stores already leads outside the game (another mod's hook)
 //   tbindexout     the getter's index lies outside the game
 //   tbcounters     the update check's lea of the counters leads 8 bytes past them
@@ -1734,6 +1737,25 @@ static void TextureBudgetNextStep()
 	g_textureBudgetNextSteps = g_textureBudgetNextSteps + 1;
 }
 
+// The data as the game's start-up leaves them, at the game's own sizes: textures 2456 MB and buffers 389 MB in 22222 and 1234
+// objects, the mark at 2900 MB, 98304 objects allowed, the budgets 1500, 1500, 3000 and 3000 MB, the texture quality's index 2,
+// the update check's flag down and its switch on with its factors 0.9, 0.8 and 0.95
+static void TextureBudgetSetAsTheGame(TextureBudgetData& data)
+{
+	data.counters.buffers = (389ull << 20) + 12345;
+	data.counters.textures = (2456ull << 20) + 54321;
+	data.counters.buffersNumber = 1234;
+	data.counters.texturesNumber = 22222;
+	data.counters.highest = 2900ull << 20;
+	data.counters.most = 98304;
+	const uint64_t budgetsMb[] = { 1500, 1500, 3000, 3000 };
+	for (int i = 0; i < 4; i++)
+		data.counters.budgets[i] = budgetsMb[i] << 20;
+	data.index = 2;
+	data.flag = 0;
+	data.updateCheck = { 1, 0.9f, 0.8f, 0.95f };
+}
+
 // The four sites' bytes in a row, to keep them as placed or to compare them with that
 static void TextureBudgetSites(unsigned char* to, bool compare, int& asPlaced)
 {
@@ -1771,27 +1793,34 @@ static int TextureBudgetSummaries()
 	return summaries;
 }
 
-// tbgrow: once TweaksV's first summary is in its log, the textures grow by 200 MB and 800 objects, past the budget, the game's mark
-// with them, and the update check's flag goes up, as the game's streaming would have it; then the next summary is waited for
-static wchar_t g_textureBudgetGrown[64] = L"";
-static void TextureBudgetGrow()
+// tbgrow and tblate: once TweaksV's first summary is in its log, the textures grow by 200 MB and 800 objects, past the budget, the
+// game's mark with them, and the update check's flag goes up, as the game's streaming would have it (grow) - or the data, all 0 so
+// far, are set as the game's start-up sets them (late); then the next summary is waited for
+static wchar_t g_textureBudgetLater[64] = L"";
+static void TextureBudgetLater(bool grow)
 {
 	for (int waited = 0; TextureBudgetSummaries() < 1 && waited < 25000; waited += 250)
 		Sleep(250);
 	if (TextureBudgetSummaries() < 1)
 	{
-		swprintf(g_textureBudgetGrown, sizeof(g_textureBudgetGrown) / sizeof(g_textureBudgetGrown[0]), L", not grown: no first summary");
+		swprintf(g_textureBudgetLater, sizeof(g_textureBudgetLater) / sizeof(g_textureBudgetLater[0]), L", nothing done: no first summary");
 		return;
 	}
 	TextureBudgetData& data = *g_textureBudgetData;
-	data.counters.textures += 200ull << 20;
-	data.counters.texturesNumber += 800;
-	data.counters.highest = data.counters.buffers + data.counters.textures;
-	data.flag = 1;
+	if (grow)
+	{
+		data.counters.textures += 200ull << 20;
+		data.counters.texturesNumber += 800;
+		data.counters.highest = data.counters.buffers + data.counters.textures;
+		data.flag = 1;
+	}
+	else
+		TextureBudgetSetAsTheGame(data);
 	g_textureBudgetDataAsSet = data;
 	for (int waited = 0; TextureBudgetSummaries() < 2 && waited < 10000; waited += 250)
 		Sleep(250);
-	swprintf(g_textureBudgetGrown, sizeof(g_textureBudgetGrown) / sizeof(g_textureBudgetGrown[0]), L", grown after the first summary");
+	swprintf(g_textureBudgetLater, sizeof(g_textureBudgetLater) / sizeof(g_textureBudgetLater[0]), grow ? L", grown after the first summary" :
+		L", set after the first summary");
 }
 // [streaming memory]
 
@@ -3639,22 +3668,12 @@ int wmain(int argc, wchar_t** argv)
 		g_pedPropsDataSum = PedPropsSum(false);
 	}
 	// [texture budget]
-	// The texture budget: the counters as the game's start-up leaves them, at the game's own sizes, the texture quality's index 2,
-	// the update check's flag down and its switch on; every site leads to them as the game's do, but where an option asks otherwise
+	// The texture budget: the data as the game's start-up leaves them - with "tblate" all 0, as before it - and every site leading
+	// to them as the game's do, but where an option asks otherwise
 	{
 		TextureBudgetData& data = *g_textureBudgetData;
-		data.counters.buffers = (389ull << 20) + 12345;
-		data.counters.textures = (2456ull << 20) + 54321;
-		data.counters.buffersNumber = 1234;
-		data.counters.texturesNumber = 22222;
-		data.counters.highest = 2900ull << 20;
-		data.counters.most = 98304;
-		const uint64_t budgetsMb[] = { 1500, 1500, 3000, 3000 };
-		for (int i = 0; i < 4; i++)
-			data.counters.budgets[i] = budgetsMb[i] << 20;
-		data.index = 2;
-		data.flag = 0;
-		data.updateCheck = { 1, 0.9f, 0.8f, 0.95f };
+		if (!HasOption(argc, argv, L"tblate"))
+			TextureBudgetSetAsTheGame(data);
 		const auto counters = reinterpret_cast<const unsigned char*>(&data.counters);
 		SetRel32(g_textureBudgetMostRef, counters + 0x20);
 		SetRel32(g_textureBudgetBudgetRefs[0], counters + 0x28);
@@ -3787,8 +3806,8 @@ int wmain(int argc, wchar_t** argv)
 		PedPropsGrow();
 	}
 	// [texture budget]
-	if (HasOption(argc, argv, L"tbgrow"))
-		TextureBudgetGrow();
+	if (HasOption(argc, argv, L"tbgrow") || HasOption(argc, argv, L"tblate"))
+		TextureBudgetLater(HasOption(argc, argv, L"tbgrow"));
 	// [streaming memory]
 	if (HasOption(argc, argv, L"wait"))
 		Sleep(11000);	// TweaksV's UNLOCK_FILES summary comes 10 s after the first open it counts, the OpenFile summary 10 s
@@ -3853,7 +3872,7 @@ int wmain(int argc, wchar_t** argv)
 		wprintf(L"texture budget: sites as placed %d of 4, data %ls, its page %ls%ls; stores RVA 0x%llX, getter RVA 0x%llX, placement RVA 0x%llX, "
 			L"update RVA 0x%llX, next step RVA 0x%llX, counters RVA 0x%llX, index RVA 0x%llX, flag RVA 0x%llX, switch RVA 0x%llX | ", asPlaced,
 			memcmp(&data, &g_textureBudgetDataAsSet, sizeof(data)) == 0 ? L"as set" : L"CHANGED", ProtectionOf(&data) == PAGE_READWRITE ? L"RW" : L"not RW",
-			g_textureBudgetGrown, rva(g_textureBudgetStores), rva(g_textureBudgetGetter), rva(g_textureBudgetPlacement), rva(g_textureBudgetUpdate),
+			g_textureBudgetLater, rva(g_textureBudgetStores), rva(g_textureBudgetGetter), rva(g_textureBudgetPlacement), rva(g_textureBudgetUpdate),
 			rva(reinterpret_cast<const void*>(&TextureBudgetNextStep)), rva(&data.counters), rva(&data.index), rva(&data.flag), rva(&data.updateCheck));
 	}
 	// [streaming memory]

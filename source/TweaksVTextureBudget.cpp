@@ -15,8 +15,9 @@
 //                    getter with the index (T3), the placement's check of the counters (T4) and the update check
 //                    with its switch, flag and factors (T5) - every address checked inside the game and against
 //                    the others, every site logged; then the counters read 10 seconds in and again every minute
-//                    that brings a new high, a change of the update check's flag or of the budget in use; the
-//                    update check's switch and factors read once
+//                    that brings a new high, a change of the update check or of the budget in use; the update
+//                    check's switch and factors logged at the first summary and again if they change, a summary
+//                    before the game has read gameconfig.xml saying that its budgets are not set yet
 //   DRY_RUN          changes nothing here: the module writes nothing to the game
 // Every read of the game's data - the counters, the index, the flag, the switch and its factors - is an aligned
 // read after IsReadable; nothing is written or called. Windows' own budget for the game's video memory is not read:
@@ -35,6 +36,7 @@
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
+#include <iterator>
 #include <string>
 
 #include "TweaksVConflicts.h"
@@ -322,11 +324,19 @@ namespace TweaksV
 			uint64_t budgets[kBudgetCount] = {};
 			int32_t index = 0;
 			uint8_t flag = 0;
+			bool updateCheckReadable = false;
+			uint32_t updateCheck[kSwitchSize / sizeof(uint32_t)] = {};	// the switch and its three factors, as they lie
 		};
 
 		Reading ReadCounters()
 		{
 			Reading reading;
+			if (IsReadable(g_switch, kSwitchSize))
+			{
+				reading.updateCheckReadable = true;
+				for (size_t i = 0; i < std::size(reading.updateCheck); i++)
+					reading.updateCheck[i] = Load<uint32_t>(g_switch + i * sizeof(uint32_t));
+			}
 			if (!IsReadable(g_counters, kCountersSize) || !IsReadable(g_index, sizeof(int32_t)) || !IsReadable(g_flag, 1))
 				return reading;
 			reading.readable = true;
@@ -359,16 +369,22 @@ namespace TweaksV
 		}
 
 		// The measurement's state, kept by its thread alone: the reading of the last summary, TweaksV's own highs of
-		// every reading, and how many readings had something new to say.
+		// every reading, how many readings had something new to say, and the update check as its line last gave it.
 		Reading g_logged;
 		uint64_t g_mostBytes = 0, g_mostObjects = 0;
 		uint64_t g_loggedMostMb = 0, g_loggedMostObjects = 0;
 		uint64_t g_news = 0;
-		bool g_updateCheckLogged = false;
+		bool g_updateCheckShown = false;
+		Reading g_updateCheckLine;
+
+		bool SameUpdateCheck(const Reading& a, const Reading& b)
+		{
+			return a.updateCheckReadable == b.updateCheckReadable && memcmp(a.updateCheck, b.updateCheck, sizeof(a.updateCheck)) == 0;
+		}
 
 		// Changes with every reading that has something new to say: the first; a new high - of the bytes in MB, of
-		// the objects, of the game's own mark in MB; the update check's flag raised or lowered; another index, budget
-		// or most; the counters readable or not.
+		// the objects, of the game's own mark in MB; the update check's flag raised or lowered, its switch or a factor
+		// changed; another index, budget or most; the counters readable or not.
 		uint64_t BudgetNumbers()
 		{
 			const Reading now = ReadCounters();
@@ -377,9 +393,10 @@ namespace TweaksV
 				g_mostBytes = std::max(g_mostBytes, Bytes(now));
 				g_mostObjects = std::max(g_mostObjects, Objects(now));
 			}
-			const bool news = g_news == 0 || now.readable != g_logged.readable || (now.readable && ((g_mostBytes >> 20) > g_loggedMostMb ||
-				g_mostObjects > g_loggedMostObjects || (now.highest >> 20) > (g_logged.highest >> 20) || now.flag != g_logged.flag ||
-				now.index != g_logged.index || now.most != g_logged.most || memcmp(now.budgets, g_logged.budgets, sizeof(now.budgets)) != 0));
+			const bool news = g_news == 0 || now.readable != g_logged.readable || !SameUpdateCheck(now, g_logged) || (now.readable &&
+				((g_mostBytes >> 20) > g_loggedMostMb || g_mostObjects > g_loggedMostObjects || (now.highest >> 20) > (g_logged.highest >> 20) ||
+				now.flag != g_logged.flag || now.index != g_logged.index || now.most != g_logged.most ||
+				memcmp(now.budgets, g_logged.budgets, sizeof(now.budgets)) != 0));
 			if (news)
 			{
 				g_logged = now;
@@ -390,36 +407,36 @@ namespace TweaksV
 			return g_news;
 		}
 
-		std::string Factor(const uint8_t* at)
+		std::string Factor(uint32_t bits)
 		{
 			char text[32];
-			snprintf(text, sizeof(text), "%.3g", static_cast<double>(std::bit_cast<float>(Load<uint32_t>(at))));
+			snprintf(text, sizeof(text), "%.3g", static_cast<double>(std::bit_cast<float>(bits)));
 			return text;
 		}
 
-		// Once, at the first summary: the update check's switch and factors, which lie in the game's data and which no
-		// code is known to write.
-		void LogUpdateCheck()
+		// The update check's switch and factors, at the first summary and again whenever they changed: they lie in the game's
+		// data, which the research could not see, and whether the game sets them only after its start is not known.
+		void LogUpdateCheck(const Reading& now)
 		{
-			if (!IsReadable(g_switch, kSwitchSize))
+			if (g_updateCheckShown && SameUpdateCheck(now, g_updateCheckLine))
+				return;
+			g_updateCheckShown = true;
+			g_updateCheckLine = now;
+			if (!now.updateCheckReadable)
 			{
 				WriteLog(kTag, "DIAGNOSTIC: texture budget: the update check's switch and factors at " + DescribeAddress(g_switch) + " cannot be read.");
 				return;
 			}
-			const int32_t on = Load<int32_t>(g_switch);
+			const auto on = static_cast<int32_t>(now.updateCheck[0]);
 			WriteLog(kTag, "DIAGNOSTIC: texture budget: the update check's switch holds " + std::to_string(on) + (on ? " (on)" :
-				" (off: nothing is evicted ahead of time)") + ", its factors " + Factor(g_switch + kRaiseFactor) + " of the budget to start evicting, " +
-				Factor(g_switch + kLowerFactor) + " to stop, and " + Factor(g_switch + kWindowsFactor) + " of the video memory Windows gives the game to "
-				"start evicting too (read once).");
+				" (off: nothing is evicted ahead of time)") + ", its factors " + Factor(now.updateCheck[kRaiseFactor / sizeof(uint32_t)]) +
+				" of the budget to start evicting, " + Factor(now.updateCheck[kLowerFactor / sizeof(uint32_t)]) + " to stop, and " +
+				Factor(now.updateCheck[kWindowsFactor / sizeof(uint32_t)]) + " of the video memory Windows gives the game to start evicting too.");
 		}
 
 		void LogBudget(uint64_t)
 		{
-			if (!g_updateCheckLogged)
-			{
-				g_updateCheckLogged = true;
-				LogUpdateCheck();
-			}
+			LogUpdateCheck(g_logged);
 			const Reading& now = g_logged;
 			if (!now.readable)
 			{
@@ -437,9 +454,12 @@ namespace TweaksV
 				std::to_string(now.buffersNumber) + " buffers; the most so far " + Mb(now.highest) + " MB by the game's own mark, " + Mb(g_mostBytes) +
 				" MB and " + std::to_string(g_mostObjects) + " objects at TweaksV's readings; the update check's flag is " +
 				(now.flag ? "up: it evicts ahead of time" : "down");
-			if (known && Bytes(now) >= budget)
+			// all 0 before the game's start-up has read gameconfig.xml, which can come after the first summary: no limit then
+			if (now.most == 0 && std::all_of(std::begin(now.budgets), std::end(now.budgets), [](uint64_t bytes) { return bytes == 0; }))
+				line += " - the budgets and the most are not set yet (the game sets them when it reads gameconfig.xml)";
+			if (known && budget != 0 && Bytes(now) >= budget)
 				line += " - at the budget: the streaming engine evicts what it cannot place (texture loss)";
-			if (Objects(now) >= now.most)
+			if (now.most != 0 && Objects(now) >= now.most)
 				line += " - at the most objects: the streaming engine evicts what it cannot place (texture loss)";
 			WriteLog(kTag, line + ".");
 		}
@@ -453,7 +473,7 @@ namespace TweaksV
 		if (!FindAndCheck())
 			return;
 		WriteLog(kTag, "DIAGNOSTIC: the texture budget's counters at " + DescribeAddress(g_counters) + At(kPlacement) + ": the streamed textures and buffers "
-			"are logged after 10 seconds, then every minute while their highs, the update check's flag or the budget in use change.");
+			"are logged after 10 seconds, then every minute while their highs, the update check or the budget in use change.");
 		StartMeasurement<kMeasurement>();	// one that cannot start is logged
 	}
 }
