@@ -201,9 +201,9 @@ namespace TweaksV
 			const std::string size = std::to_string(g_listSize);
 			// past the list, the definition after its last entry was stored over the count: what it reads is no count
 			if (count < 0 || static_cast<uint32_t>(count) > g_listSize)
-				WriteLog(kTag, "DIAGNOSTIC: the count of weapon component definitions reads " + std::to_string(count) + ", from " + files +
-					" - past the game's own list of " + size + ": the list has overflowed into its count and the memory after it, and the game "
-					"is likely to crash.");
+				WriteLog(kTag, "DIAGNOSTIC: the weapon component list's count reads " + std::to_string(count) + ", from " + files +
+					" - outside the game's own list of " + size + ": the list has overflowed, a definition past its end written over the count "
+					"and the memory after it, and the game is likely to crash.");
 			else
 				WriteLog(kTag, "DIAGNOSTIC: " + Counted(static_cast<uint32_t>(count), "weapon component definition") + " from " + files +
 					" (the game's own list holds " + size + ")" + (static_cast<uint32_t>(count) == g_listSize ? " - it is full: one more "

@@ -27,6 +27,7 @@ SUITES=(
 	# [weapon infos]
 	weaponinfos
 	# [weapon components]
+	weaponcomponents
 	# [siren ids]
 	# [siren count]
 	# [ped props]
