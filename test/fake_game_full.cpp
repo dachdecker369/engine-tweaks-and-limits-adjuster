@@ -52,6 +52,12 @@
 //   ownshare       other programs' opens next to the fake's own opens in its folder (ShareOwnOpens)
 //   dstypes        read-only opens of 17 files of 17 types in its folder that are not there
 //   dsopenflood    opens 100,001 files in its folder that are not there, each by another name, after TweaksV has started
+//   dsreplace      with dstorage: a file the stand-in holds open written the four ways from inside the game - the
+//                  classic replace, a POSIX rename, ReplaceFile, a write in place - and by the classic replace from
+//                  another program, renamer.exe (ReplaceHeldFile)
+//   dsrenames      with dstorage: the renames TweaksV's NtSetInformationFile hook passes on and turns, most of them
+//                  against a file the stand-in holds open (RenameAsked)
+//   dsrenameflood  20,001 classic replace-renames in its folder after TweaksV has started
 //   fileopens      opens files in its folder (and one outside, in %TEMP%) after TweaksV has started
 //   nodyncode      no code may be changed or made once TweaksV loads (Windows' dynamic code policy)
 //   lockedlog      while TweaksV starts, holds the TweaksV.log in its folder open as another program
@@ -1267,6 +1273,277 @@ static void FloodOpens()
 	}
 }
 
+// The replace-renames (TweaksV's UNLOCK_FILES on NtSetInformationFile): ds_held.txt in the game folder, holding
+// "old", held open by the stand-in as DirectStorage holds the game's files, and written while it is held, one of
+// the ways a program saves a file at a time; ds_new.txt holds "new". What a way gave - 0 when it went through,
+// else Windows' error, or NtSetInformationFile's status - then what the file's name holds afterwards and what
+// the stand-in's handle reads: "new/old" is a replace, which the holder sees once it opens the file again,
+// "new/new" a write in place, "old/old" nothing done.
+static const wchar_t* Content(HANDLE file)
+{
+	char bytes[8] = {};
+	DWORD read = 0;
+	if (!ReadFile(file, bytes, sizeof(bytes) - 1, &read, nullptr))
+		return L"none";
+	return read == 3 && memcmp(bytes, "old", 3) == 0 ? L"old" : read == 3 && memcmp(bytes, "new", 3) == 0 ? L"new" : L"?";
+}
+
+static const wchar_t* ContentByName(const wchar_t* path)
+{
+	const HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+		return L"none";
+	const wchar_t* const content = Content(file);
+	CloseHandle(file);
+	return content;
+}
+
+struct HeldWrite
+{
+	DWORD result;			// 0: it went through; 9999: the stand-in could not hold the file
+	const wchar_t* named;	// what ds_held.txt holds afterwards
+	const wchar_t* held;	// what the stand-in's handle reads
+};
+
+// ds_held.txt written by write while the stand-in holds it - made read-only first with readOnly.
+static HeldWrite WriteHeld(DWORD (*write)(), bool readOnly = false)
+{
+	HeldWrite outcome = { 9999, L"none", L"none" };
+	MakeFile(L"ds_held.txt", "old");
+	MakeFile(L"ds_new.txt", "new");
+	void* file = nullptr;
+	if (g_openFile && SUCCEEDED(g_openFile(g_factory, L"ds_held.txt", g_factoryId, &file)) && file)
+	{
+		if (readOnly)
+			SetFileAttributesW(L"ds_held.txt", FILE_ATTRIBUTE_READONLY);
+		outcome.result = write();
+		outcome.named = ContentByName(L"ds_held.txt");
+		const HANDLE handle = g_fileHandle(file);
+		const LARGE_INTEGER start{};
+		outcome.held = SetFilePointerEx(handle, start, nullptr, FILE_BEGIN) ? Content(handle) : L"none";
+		g_closeFile(file);
+	}
+	SetFileAttributesW(L"ds_held.txt", FILE_ATTRIBUTE_NORMAL);
+	DeleteFileW(L"ds_held.txt");
+	DeleteFileW(L"ds_new.txt");
+	return outcome;
+}
+
+// The classic replace: MoveFileExW with MOVEFILE_REPLACE_EXISTING, the usual safe way to save a file.
+static DWORD ClassicReplace()
+{
+	return MoveFileExW(L"ds_new.txt", L"ds_held.txt", MOVEFILE_REPLACE_EXISTING) ? 0 : GetLastError();
+}
+
+// A POSIX rename: SetFileInformationByHandle with FileRenameInfoEx, replace-if-exists and POSIX semantics.
+static DWORD PosixRename()
+{
+	const HANDLE file = CreateFileW(L"ds_new.txt", DELETE | SYNCHRONIZE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+		return GetLastError();
+	wchar_t target[MAX_PATH + 1] = {};
+	const DWORD length = GetFullPathNameW(L"ds_held.txt", MAX_PATH + 1, target, nullptr);
+	alignas(FILE_RENAME_INFO) unsigned char buffer[sizeof(FILE_RENAME_INFO) + (MAX_PATH + 1) * sizeof(wchar_t)] = {};
+	FILE_RENAME_INFO* const info = reinterpret_cast<FILE_RENAME_INFO*>(buffer);
+	info->Flags = FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS;
+	info->FileNameLength = length * sizeof(wchar_t);
+	memcpy(info->FileName, target, (length + 1) * sizeof(wchar_t));
+	const DWORD error = SetFileInformationByHandle(file, FileRenameInfoEx, info, sizeof(buffer)) ? 0 : GetLastError();
+	CloseHandle(file);
+	return error;
+}
+
+static DWORD ReplaceHeld()
+{
+	return ReplaceFileW(L"ds_held.txt", L"ds_new.txt", nullptr, 0, nullptr, nullptr) ? 0 : GetLastError();
+}
+
+// A write in place: the file opened for writing, emptied and written, as the C runtime's fopen with "w" does.
+static DWORD WriteInPlace()
+{
+	const HANDLE file = CreateFileW(L"ds_held.txt", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+		nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+		return GetLastError();
+	DWORD written = 0;
+	const DWORD error = WriteFile(file, "new", 3, &written, nullptr) ? 0 : GetLastError();
+	CloseHandle(file);
+	return error;
+}
+
+// The classic replace from another program, outside the game (renamer.exe, fake_renamer.cpp): its exit code, the
+// error it got; 9998 if it cannot be started, 9997 if it does not end within 10 seconds.
+static DWORD ClassicReplaceOutside()
+{
+	wchar_t command[] = L"renamer.exe ds_new.txt ds_held.txt";
+	STARTUPINFOW startup{};
+	startup.cb = sizeof(startup);
+	PROCESS_INFORMATION process{};
+	if (!CreateProcessW(nullptr, command, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process))
+		return 9998;
+	DWORD code = 9997;
+	if (WaitForSingleObject(process.hProcess, 10000) == WAIT_OBJECT_0)
+		GetExitCodeProcess(process.hProcess, &code);
+	CloseHandle(process.hThread);
+	CloseHandle(process.hProcess);
+	return code;
+}
+
+// dsreplace (with dstorage): the four ways of writing a held file from inside the game - the classic replace, a
+// POSIX rename, ReplaceFile, a write in place - and the classic replace from another program.
+static wchar_t g_replaceResult[256];
+static void ReplaceHeldFile()
+{
+	const size_t size = sizeof(g_replaceResult) / sizeof(g_replaceResult[0]);
+	if (!g_openFile)
+	{
+		swprintf(g_replaceResult, size, L"replace: no stand-in | ");
+		return;
+	}
+	const HeldWrite classic = WriteHeld(ClassicReplace), posix = WriteHeld(PosixRename), replace = WriteHeld(ReplaceHeld),
+		inPlace = WriteHeld(WriteInPlace), other = WriteHeld(ClassicReplaceOutside);
+	swprintf(g_replaceResult, size, L"replace: classic %lu %ls/%ls, posix %lu %ls/%ls, replacefile %lu %ls/%ls, inplace %lu %ls/%ls, "
+		L"other %lu %ls/%ls | ", classic.result, classic.named, classic.held, posix.result, posix.named, posix.held, replace.result,
+		replace.named, replace.held, inPlace.result, inPlace.named, inPlace.held, other.result, other.named, other.held);
+}
+
+// NtSetInformationFile as a program that calls it directly - ntdll's, which passes TweaksV's hook as every rename
+// in the game does: from, opened for deleting, renamed to name (nameLength characters), relative to root when
+// given, with the class and flags asked for (FileRenameInformation's ReplaceIfExists is the first byte of flags).
+// The status, 0x9999 if from cannot be opened. The last error set before the call must be there after it.
+using NtSetInformationFileFn = LONG(NTAPI*)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, ULONG);
+static bool g_lastErrorKept = true;
+static LONG RenameNt(const wchar_t* from, const wchar_t* name, size_t nameLength, HANDLE root, ULONG informationClass, ULONG flags)
+{
+	const auto setInformation = reinterpret_cast<NtSetInformationFileFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"),
+		"NtSetInformationFile"));
+	const HANDLE file = CreateFileW(from, DELETE | SYNCHRONIZE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (!setInformation || file == INVALID_HANDLE_VALUE)
+		return 0x9999;
+	// FILE_RENAME_INFORMATION: the flags at 0, the folder handle at 8, the name's length in bytes at 16, the name at 20
+	alignas(8) static unsigned char buffer[24 + 4096 * sizeof(wchar_t)];
+	const ULONG bytes = static_cast<ULONG>(nameLength * sizeof(wchar_t));
+	memset(buffer, 0, 24);
+	memcpy(buffer, &flags, sizeof(flags));
+	memcpy(buffer + 8, &root, sizeof(root));
+	memcpy(buffer + 16, &bytes, sizeof(bytes));
+	memcpy(buffer + 20, name, bytes);
+	IO_STATUS_BLOCK io{};
+	SetLastError(0xA5A5);
+	const LONG status = setInformation(file, &io, buffer, 20 + bytes < 24 ? 24 : 20 + bytes, informationClass);
+	if (GetLastError() != 0xA5A5)
+		g_lastErrorKept = false;
+	CloseHandle(file);
+	return status;
+}
+
+constexpr ULONG kRenameInformation = 10, kRenameInformationEx = 65;
+static wchar_t g_heldNtName[MAX_PATH * 2];			// \??\<the game folder>\ds_held.txt
+static HANDLE g_gameFolderHandle = INVALID_HANDLE_VALUE;
+
+// dsrenames (with dstorage): the renames TweaksV's hook sees, against the held file unless said otherwise - onto a
+// file outside the game folder that the fake holds with every sharing (MoveFileExW, refused if passed on: 5), one
+// without replace-if-exists (MoveFileExW without MOVEFILE_REPLACE_EXISTING: 183), one that asks for POSIX semantics
+// itself, then the classic ones TweaksV turns: by a bare name, by a name relative to the game folder's handle, and
+// FileRenameInformationEx with replace-if-exists and FILE_RENAME_IGNORE_READONLY_ATTRIBUTE onto the held file made
+// read-only, which only goes through with that flag kept; onto a file in the game folder that nothing holds; and a
+// name longer than TweaksV copies (2100 characters in the game folder), passed on as made.
+static wchar_t g_renamesResult[384];
+static void RenameAsked()
+{
+	const size_t size = sizeof(g_renamesResult) / sizeof(g_renamesResult[0]);
+	if (!g_openFile)
+	{
+		swprintf(g_renamesResult, size, L"renames: no stand-in | ");
+		return;
+	}
+	wchar_t folder[MAX_PATH + 1] = {};
+	GetCurrentDirectoryW(MAX_PATH, folder);
+	swprintf(g_heldNtName, MAX_PATH * 2, L"\\??\\%ls\\ds_held.txt", folder);
+	g_gameFolderHandle = CreateFileW(L".", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+		OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+
+	wchar_t temp[MAX_PATH + 1] = {}, outsideHeld[MAX_PATH + 64] = {}, outsideNew[MAX_PATH + 64] = {};
+	GetTempPathW(MAX_PATH, temp);
+	swprintf(outsideHeld, MAX_PATH + 64, L"%lstweaksv_ds_held.txt", temp);
+	swprintf(outsideNew, MAX_PATH + 64, L"%lstweaksv_ds_new.txt", temp);
+	MakeFile(outsideHeld, "old");
+	MakeFile(outsideNew, "new");
+	const HANDLE outside = CreateFileW(outsideHeld, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	DWORD outsideResult = 9999;
+	if (outside != INVALID_HANDLE_VALUE)
+	{
+		outsideResult = MoveFileExW(outsideNew, outsideHeld, MOVEFILE_REPLACE_EXISTING) ? 0 : GetLastError();
+		CloseHandle(outside);
+	}
+	DeleteFileW(outsideHeld);
+	DeleteFileW(outsideNew);
+
+	const HeldWrite noReplace = WriteHeld([]() -> DWORD { return MoveFileExW(L"ds_new.txt", L"ds_held.txt", 0) ? 0 : GetLastError(); });
+	const HeldWrite posix = WriteHeld([]() -> DWORD {
+		return static_cast<DWORD>(RenameNt(L"ds_new.txt", g_heldNtName, wcslen(g_heldNtName), nullptr, kRenameInformationEx, 0x3)); });
+	const HeldWrite bare = WriteHeld([]() -> DWORD {
+		return static_cast<DWORD>(RenameNt(L"ds_new.txt", L"ds_held.txt", 11, nullptr, kRenameInformation, 1)); });
+	const HeldWrite relative = WriteHeld([]() -> DWORD {
+		return static_cast<DWORD>(RenameNt(L"ds_new.txt", L"ds_held.txt", 11, g_gameFolderHandle, kRenameInformation, 1)); });
+	const HeldWrite ex = WriteHeld([]() -> DWORD {
+		return static_cast<DWORD>(RenameNt(L"ds_new.txt", g_heldNtName, wcslen(g_heldNtName), nullptr, kRenameInformationEx, 0x41)); },
+		true);
+
+	wchar_t freeName[MAX_PATH * 2] = {};
+	swprintf(freeName, MAX_PATH * 2, L"\\??\\%ls\\ds_free.txt", folder);
+	MakeFile(L"ds_free.txt", "old");
+	MakeFile(L"ds_new.txt", "new");
+	const LONG freeResult = RenameNt(L"ds_new.txt", freeName, wcslen(freeName), nullptr, kRenameInformation, 1);
+	const wchar_t* const freeNamed = ContentByName(L"ds_free.txt");
+	DeleteFileW(L"ds_free.txt");
+	DeleteFileW(L"ds_new.txt");
+
+	static wchar_t longName[MAX_PATH + 2200];
+	const int prefix = swprintf(longName, MAX_PATH + 2200, L"\\??\\%ls\\", folder);
+	LONG longResult = 0x9999;
+	MakeFile(L"ds_new.txt", "new");
+	if (prefix > 0)
+	{
+		wmemset(longName + prefix, L'a', 2100);
+		longName[prefix + 2100] = L'\0';
+		longResult = RenameNt(L"ds_new.txt", longName, wcslen(longName), nullptr, kRenameInformation, 1);
+	}
+	DeleteFileW(L"ds_new.txt");
+	if (g_gameFolderHandle != INVALID_HANDLE_VALUE)
+		CloseHandle(g_gameFolderHandle);
+
+	swprintf(g_renamesResult, size, L"renames: outside %lu, noreplace %lu %ls/%ls, posix 0x%lX %ls/%ls, bare 0x%lX %ls/%ls, "
+		L"relative 0x%lX %ls/%ls, ex 0x%lX %ls/%ls, free 0x%lX %ls, long 0x%lX, last error %ls | ", outsideResult, noReplace.result,
+		noReplace.named, noReplace.held, posix.result, posix.named, posix.held, bare.result, bare.named, bare.held, relative.result,
+		relative.named, relative.held, ex.result, ex.named, ex.held, static_cast<unsigned long>(freeResult), freeNamed,
+		static_cast<unsigned long>(longResult), g_lastErrorKept ? L"kept" : L"CHANGED");
+}
+
+// dsrenameflood: 20,001 classic replace-renames in the game folder, ds_flood_a.txt onto ds_flood_b.txt and back -
+// with DIAGNOSTIC_MODE, more than the 20,000 rename lines TweaksV writes.
+static wchar_t g_renameFloodResult[64];
+static void FloodRenames()
+{
+	MakeFile(L"ds_flood_a.txt");
+	MakeFile(L"ds_flood_b.txt");
+	int renamed = 0;
+	for (int i = 0; i < 20001; i++)
+	{
+		const bool even = i % 2 == 0;
+		if (MoveFileExW(even ? L"ds_flood_a.txt" : L"ds_flood_b.txt", even ? L"ds_flood_b.txt" : L"ds_flood_a.txt",
+			MOVEFILE_REPLACE_EXISTING))
+			renamed++;
+	}
+	DeleteFileW(L"ds_flood_a.txt");
+	DeleteFileW(L"ds_flood_b.txt");
+	swprintf(g_renameFloodResult, sizeof(g_renameFloodResult) / sizeof(g_renameFloodResult[0]), L"rename flood: %d renamed | ", renamed);
+}
+
 // File opens in the game folder (TweaksV's DIAGNOSTIC_MODE): one file 6 times with the same sharing,
 // a missing file, the folder itself, a file in a subfolder and a file outside the game folder.
 static wchar_t g_fileOpensResult[160];
@@ -1871,6 +2148,12 @@ int wmain(int argc, wchar_t** argv)
 		OpenFiles();
 	if (HasOption(argc, argv, L"dsopenflood"))
 		FloodOpens();
+	if (HasOption(argc, argv, L"dsreplace"))
+		ReplaceHeldFile();
+	if (HasOption(argc, argv, L"dsrenames"))
+		RenameAsked();
+	if (HasOption(argc, argv, L"dsrenameflood"))
+		FloodRenames();
 	if (HasOption(argc, argv, L"wait"))
 		Sleep(11000);	// TweaksV's UNLOCK_FILES summary comes 10 s after the first open it counts, the OpenFile summary 10 s
 						// after the first OpenFile, the interface check 10 s after the request
@@ -1897,8 +2180,8 @@ int wmain(int argc, wchar_t** argv)
 	PrintBoxStreamer();
 	PrintDecals();
 	RovReport();
-	wprintf(L"%ls%ls%ls%ls%ls%ls%ls", g_dstorageResult, g_floodResult, g_shareResult, g_ownResult, g_fileOpensResult, g_scriptResult,
-		g_blipResult);
+	wprintf(L"%ls%ls%ls%ls%ls%ls%ls%ls%ls%ls", g_dstorageResult, g_floodResult, g_shareResult, g_ownResult, g_fileOpensResult,
+		g_replaceResult, g_renamesResult, g_renameFloodResult, g_scriptResult, g_blipResult);
 	CheckStub(Rel32Target(g_packCallSite));
 	CheckStub(Rel32Target(g_scriptCallSite));
 	for (const Site& site : g_boxCalls)
