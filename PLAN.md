@@ -116,7 +116,7 @@ The topics:
 
 **Texture budget:** under way since 10:53: item 1 done - the PE rebuilt from the dump (55,809,024 bytes), the full analysis running since 10:54, slower than 25 minutes beside six others; next item 2, the original's pages as D3 allows, beside the byte-level tools on the dump.
 
-**Streaming memory:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
+**Streaming memory:** under way since 10:53: items 1 and 2 done - the PE rebuilt from the dump and the full analysis running since 10:54; the original's page read on 2026-10-29: Resource Adjuster 1.0 (zombieguy, 2022-12-21), no license and no source, idea only, its files `GTAV.ResourceAdjuster.asi` and `ResourceAdjuster.ini`; the Enhanced port's page shows its file withdrawn, without a description; item 3 under way: Enhanced keeps two streaming budgets - an allocator at RVA 0x42F9E10, set by 0xCE5E90 from two sizes in MB of the game's configuration beside the archive count PackfileLimit raises, each capped to a resource heap's size - next the heaps' sizes and whether the budgets bind.
 
 **The verification:** none yet.
 
