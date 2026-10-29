@@ -104,17 +104,17 @@ The topics:
 
 **The replace-rename:** under way since 10:53, in a worktree and on a branch of its own; its paragraph there carries its state until the merge session rebases it onto main.
 
-**Weapon infos:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
+**Weapon infos:** under way since 10:53: items 1 and 2 done - the PE rebuilt from the dump (55,809,024 bytes) and the full analysis running since about 10:55; the original's license unchanged (FiveM's terms for its components function, MIT for the rest); at master both halves share one file, `dllmain.cpp`, which was not read; the one file of the original read is `CWeaponInfoBlob Adjuster/dllmain.cpp` at revision 698f729 (2021-08-14, the last before the components function; 1,582 bytes; that revision's LICENSE plain MIT of 2018, no FiveM notice), told apart by the history, the names and the sizes before it was opened - a liberty of method, recorded with its reasons in its findings, recommended to accept: it is D3's CWeaponInfoBlob half under MIT, without the FiveM function; its idea, one capacity as an imm32 handed to the call that allocates the blob array, the game's own value + 25; the old plugin's files confirmed, `WeaponLimitsAdjuster.asi` and `CWeaponInfoBlob Adjuster.asi`, each with its INI; next item 3, the limit in the dump.
 
-**Weapon components:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
+**Weapon components:** under way since 10:53: item 1 done - the PE rebuilt from the dump, the full analysis running since 10:56; next item 2, the original's page, README, license and changelog, no source file, beside the byte-level tools on the dump.
 
-**Siren IDs:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
+**Siren IDs:** under way since 10:53: item 1 done - the PE rebuilt from the dump, the full analysis running since 10:54; next item 2, the original's pages and license as D3 allows, beside the byte-level tools on the dump.
 
-**Siren count:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
+**Siren count:** under way since 10:53: item 1 done - the PE rebuilt from the dump (55,809,024 bytes, PE timestamp 0x6AA45F10), the full analysis running since about 10:56; next item 2, the original's pages as D3 allows, beside the byte-level tools on the dump.
 
-**Ped props:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
+**Ped props:** under way since 10:53: item 1 done - the PE rebuilt from the dump (55,809,024 bytes, PE timestamp 0x6AA45F10), the full analysis running since 10:54; next item 2, the original's pages and license as D3 allows, beside the byte-level tools on the dump.
 
-**Texture budget:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
+**Texture budget:** under way since 10:53: item 1 done - the PE rebuilt from the dump (55,809,024 bytes), the full analysis running since 10:54, slower than 25 minutes beside six others; next item 2, the original's pages as D3 allows, beside the byte-level tools on the dump.
 
 **Streaming memory:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
 
