@@ -139,26 +139,19 @@
     <ClCompile Include="TweaksVModkitLimit.cpp" />
     <ClCompile Include="TweaksVPackfileLimit.cpp" />
     <ClCompile Include="TweaksVPatch.cpp" />
-    <!-- [ped props] -->
     <ClCompile Include="TweaksVPedProps.cpp" />
     <ClCompile Include="TweaksVRageOpenV.cpp" />
     <ClCompile Include="TweaksVRelocation.cpp" />
     <ClCompile Include="TweaksVScanner.cpp" />
     <ClCompile Include="TweaksVScripts.cpp" />
     <ClCompile Include="TweaksVSettings.cpp" />
-    <!-- [siren count] -->
     <ClCompile Include="TweaksVSirenCount.cpp" />
-    <!-- [siren ids] -->
     <ClCompile Include="TweaksVSirenIds.cpp" />
     <ClCompile Include="TweaksVStraightToStoryMode.cpp" />
-    <!-- [streaming memory] -->
     <ClCompile Include="TweaksVStreamingMemory.cpp" />
     <ClCompile Include="TweaksVSummary.cpp" />
-    <!-- [texture budget] -->
     <ClCompile Include="TweaksVTextureBudget.cpp" />
-    <!-- [weapon components] -->
     <ClCompile Include="TweaksVWeaponComponents.cpp" />
-    <!-- [weapon infos] -->
     <ClCompile Include="TweaksVWeaponInfos.cpp" />
     <!-- MinHook v1.3.4, compiled unchanged from vendor\MinHook (x64 only: hde64, not hde32), at warning
          level 3, which it builds without a warning: its code is not TweaksV's to change, and /W4 finds
@@ -195,26 +188,19 @@
     <ClInclude Include="TweaksVPackfileLimit.h" />
     <ClInclude Include="TweaksVPatch.h" />
     <ClInclude Include="TweaksVPatterns.h" />
-    <!-- [ped props] -->
     <ClInclude Include="TweaksVPedProps.h" />
     <ClInclude Include="TweaksVRageOpenV.h" />
     <ClInclude Include="TweaksVRelocation.h" />
     <ClInclude Include="TweaksVScanner.h" />
     <ClInclude Include="TweaksVScripts.h" />
     <ClInclude Include="TweaksVSettings.h" />
-    <!-- [siren count] -->
     <ClInclude Include="TweaksVSirenCount.h" />
-    <!-- [siren ids] -->
     <ClInclude Include="TweaksVSirenIds.h" />
     <ClInclude Include="TweaksVStraightToStoryMode.h" />
-    <!-- [streaming memory] -->
     <ClInclude Include="TweaksVStreamingMemory.h" />
     <ClInclude Include="TweaksVSummary.h" />
-    <!-- [texture budget] -->
     <ClInclude Include="TweaksVTextureBudget.h" />
-    <!-- [weapon components] -->
     <ClInclude Include="TweaksVWeaponComponents.h" />
-    <!-- [weapon infos] -->
     <ClInclude Include="TweaksVWeaponInfos.h" />
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h" />
   </ItemGroup>

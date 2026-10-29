@@ -27,9 +27,10 @@
 //     against the room the game's code gives and the room the array has, the game's own 160 in this build, since
 //     nothing raises it; and whether the array is full, or a file was already written past its end.
 // Nothing is written to the game.
-// Written for TweaksV from the facts its own research found in the running game (PATTERNS.md); no code of anyone's
-// was read for it. The part to come takes its idea - the limit, a capacity handed as an immediate to the call that
-// allocates the blobs - from Weapon Limits Adjuster by alexguirre, its MIT half (CREDITS.md, once the part is built).
+// Written for TweaksV from the facts its own research found in the running game (PATTERNS.md); no line of anyone's
+// code is in it. The part to come takes its idea - the limit, a capacity handed as an immediate to the call that
+// allocates the blobs - from Weapon Limits Adjuster by alexguirre, its MIT half (CREDITS.md, once the part is built):
+// "CWeaponInfoBlob Adjuster/dllmain.cpp" at revision 698f729, the only file of its code the research read.
 
 #include "TweaksVWeaponInfos.h"
 

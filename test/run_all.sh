@@ -24,19 +24,12 @@ SUITES=(
 	rageopenv
 	directstorage
 	blips
-	# [weapon infos]
 	weaponinfos
-	# [weapon components]
 	weaponcomponents
-	# [siren ids]
 	sirenids
-	# [siren count]
 	sirencount
-	# [ped props]
 	pedprops
-	# [texture budget]
 	texturebudget
-	# [streaming memory]
 	streamingmemory
 	integration
 )
@@ -96,11 +89,12 @@ for s in "${SUITES[@]}"; do
 	stopped=""
 	if [ -z "$p" ]; then p=0; f=1; stopped=" - no result line (the suite stopped early)"; fi
 	total_pass=$((total_pass + p)); total_fail=$((total_fail + f))
-	summary+="  $(printf '%-14s' "$s") $p passed, $f failed$stopped"$'\n'
+	summary+="  $(printf '%-16s' "$s") $p passed, $f failed$stopped"$'\n'
 done
 
-# the number of checks NOTES.md gives ("Tests: ... (N checks)"): a check that silently stops running shows
-expected=$(grep -oE '[0-9]+ checks' "$R/NOTES.md" | head -n 1 | grep -oE '[0-9]+')
+# the number of checks NOTES.md's "Tests:" bullet gives ("(N checks)") - that bullet's, not the first number
+# before "checks" anywhere in the file: a check that silently stops running shows
+expected=$(grep -E '^- \*\*Tests:\*\*' "$R/NOTES.md" | grep -oE '\([0-9]+ checks\)' | head -n 1 | grep -oE '[0-9]+')
 ok=1
 [ "$total_fail" = 0 ] || ok=0
 echo; echo "======== RESULTS"

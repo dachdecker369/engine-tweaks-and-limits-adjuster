@@ -61,7 +61,6 @@
     <ClCompile Include="TweaksVPatch.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
-    <!-- [ped props] -->
     <ClCompile Include="TweaksVPedProps.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -80,33 +79,27 @@
     <ClCompile Include="TweaksVSettings.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
-    <!-- [siren count] -->
     <ClCompile Include="TweaksVSirenCount.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
-    <!-- [siren ids] -->
     <ClCompile Include="TweaksVSirenIds.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
     <ClCompile Include="TweaksVStraightToStoryMode.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
-    <!-- [streaming memory] -->
     <ClCompile Include="TweaksVStreamingMemory.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
     <ClCompile Include="TweaksVSummary.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
-    <!-- [texture budget] -->
     <ClCompile Include="TweaksVTextureBudget.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
-    <!-- [weapon components] -->
     <ClCompile Include="TweaksVWeaponComponents.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
-    <!-- [weapon infos] -->
     <ClCompile Include="TweaksVWeaponInfos.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -178,7 +171,6 @@
     <ClInclude Include="TweaksVPatterns.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
-    <!-- [ped props] -->
     <ClInclude Include="TweaksVPedProps.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
@@ -197,33 +189,27 @@
     <ClInclude Include="TweaksVSettings.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
-    <!-- [siren count] -->
     <ClInclude Include="TweaksVSirenCount.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
-    <!-- [siren ids] -->
     <ClInclude Include="TweaksVSirenIds.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVStraightToStoryMode.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
-    <!-- [streaming memory] -->
     <ClInclude Include="TweaksVStreamingMemory.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
     <ClInclude Include="TweaksVSummary.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
-    <!-- [texture budget] -->
     <ClInclude Include="TweaksVTextureBudget.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
-    <!-- [weapon components] -->
     <ClInclude Include="TweaksVWeaponComponents.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
-    <!-- [weapon infos] -->
     <ClInclude Include="TweaksVWeaponInfos.h">
       <Filter>TweaksV</Filter>
     </ClInclude>

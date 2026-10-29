@@ -148,13 +148,12 @@ namespace TweaksV
 
 		// The parts measured first (SPECIFICATIONS 11.10), looked for with DIAGNOSTIC_MODE only: WeaponLimits (W),
 		// SirenSettings (I), PedProps (A), Resources (Q), one group per limit
-		// [weapon infos]
 		// WeaponLimits, the weapon infos (TweaksVWeaponInfos.cpp): the game's initializer of the weapon info blob array -
 		// the number of blobs allocated, the call that allocates them, the block's store and the capacity's (I1) - and
 		// the loader's head - the count read and written, the blob's size and the block (I2)
 		{ "W-E-I1", "C7 05 ? ? ? ? 00 00 00 00 BA ? ? ? ? E8 ? ? ? ? 48 89 05 ? ? ? ? 66 C7 05 ? ? ? ? ? ? 48 8D 0D" },
 		{ "W-E-I2", "0F B7 05 ? ? ? ? 8D 48 01 66 89 0D ? ? ? ? 4C 69 E8 ? ? ? ? 4C 03 2D ? ? ? ?" },
-		// [weapon components]
+
 		// WeaponLimits' weapon components (TweaksVWeaponComponents.cpp): the rebuild of the list of every weapon component
 		// definition - its count's reset, the files' count and its lea of the list (C1) - its sort, with its lea of the list
 		// and the entry size (C2), its update of the count (C3), and the pool's size call, with the pool's name and default (C4)
@@ -162,7 +161,7 @@ namespace TweaksV
 		{ "W-E-C2", "48 63 15 ? ? ? ? EB 02 31 D2 48 8D 0D ? ? ? ? 4C 8D 0D ? ? ? ? 41 B8 08 00 00 00" },
 		{ "W-E-C3", "48 63 15 ? ? ? ? 8D 4A 01 89 0D ? ? ? ? 4D 89 04 D2" },
 		{ "W-E-C4", "48 8B 0D ? ? ? ? BA CF 3C E3 BA 41 B8 ? ? ? ? E8 ? ? ? ? 89 C3" },
-		// [siren ids]
+
 		// SirenSettings, the siren setting IDs (TweaksVSirenIds.cpp): the parser registrations of the siren settings (P1) and the
 		// vehicle variations (P2), whose tables lead to the members that carry an ID, and the simple member's XML reader (P3); the
 		// loaders' four lea of the ID table with the ID's byte loads and stores and the free-ID searches' limits - the base
@@ -184,7 +183,7 @@ namespace TweaksV
 		{ "I-E-C3", "C7 40 40 00 00 00 00 C7 40 48 00 00 FF FF 48 83 C4 28 C3" },
 		{ "I-E-R1", "66 0F 7F 05 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? 80 3D" },
 		{ "I-E-M1", "0F B6 81 3B 05 00 00 48 85 C0 74 13 48 8B 0D ? ? ? ? 48 69 C0 E8 05 00 00 48 03 41 48 C3" },
-		// [siren count]
+
 		// SirenSettings, the siren count (TweaksVSirenCount.cpp): the vehicle lights' calls of the siren lights' renderer, which the
 		// measurement redirects, and of the siren settings getter (B1); the renderer's read of a siren's bone through the model info's
 		// bone structure (B2); a read of a siren's glass bone (B3); the start of find-bone-by-name, which tests the bone count first (B4)
@@ -192,7 +191,7 @@ namespace TweaksV
 		{ "I-E-B2", "48 8B 87 B0 00 00 00 48 85 C0 74 ? 48 8B 00 48 85 C0 74 ? 0F BE 84 28 99 00 00 00" },
 		{ "I-E-B3", "0F BE 94 18 AD 00 00 00 48 8B 8E C0 09 00 00" },
 		{ "I-E-B4", "41 57 41 56 41 55 41 54 56 57 53 48 83 EC 20 66 83 79 5E 00" },
-		// [ped props]
+
 		// PedProps (TweaksVPedProps.cpp): the eleven narrowings to 8 bits the part will widen - an anchor's total in the
 		// check the set-prop native asks (T1) and in the helmet code after its four calls of the per-anchor count
 		// (T2..T5), a worn prop's index before the metadata lookup (G1, which matches 2 times, G3..G6) - then, for the
@@ -211,7 +210,7 @@ namespace TweaksV
 		{ "A-E-C1", "56 57 48 8B 41 20 48 8B 88 40 02 00 00 44 0F B7 41 08 31 C0 4D 85 C0 74 ? 4C 8B 09 45 31 DB EB" },
 		{ "A-E-C2", "44 0F B7 54 39 08 41 0F B6 CA 01 C8 49 FF C3 4D 39 C3 74 ? 4B 8B 0C D9 0F B7 71 60 45 31 D2 48 85 F6 74 ? 48 8B 49 58 48 C1 E6 03 48 8D 34 76 31 FF" },
 		{ "A-E-S1", "3B 05 ? ? ? ? 0F 8D ? ? ? ? 48 8B 0D ? ? ? ? 89 C2 C1 EA 05 8B 0C 91 0F A3 C1 0F 83 ? ? ? ? 48 8B 0D ? ? ? ? 48 85 C9 74 ? 44 89 7C 24 34 48 98 48 0F AF 05 ? ? ? ? 4C 8B 3C 01 BB 02 00 00 00 4D 85 FF 74 ? 41 0F B6 87 9D 00 00 00 24 1F 3C 06" },
-		// [texture budget]
+
 		// Resources, the texture budget (TweaksVTextureBudget.cpp): the start-up's store of the most streamed objects and its
 		// load of budgets 0 and 1 (T1), its store of budgets 2 and 3 and the call after the stores (T2), the budget's getter
 		// and the index it reads (T3), a resource's placement and its loads of the counters (T4), the update check and its
@@ -221,7 +220,7 @@ namespace TweaksV
 		{ "Q-E-T3", "48 63 05 ? ? ? ? 48 8B 44 C1 28 C3" },
 		{ "Q-E-T4", "8B 05 ? ? ? ? 8B 0D ? ? ? ? 01 C1 3B 0D ? ? ? ? 73 ? 48 8B 05 ? ? ? ? 48 8B 35" },
 		{ "Q-E-T5", "83 3D ? ? ? ? 00 0F 84 ? ? ? ? 48 8D 0D ? ? ? ? 48 8B 3D ? ? ? ? 48 8B 35 ? ? ? ? E8" },
-		// [streaming memory]
+
 		// Resources, the streaming memory (TweaksVStreamingMemory.cpp), for its measurement: the start-up's lea of the
 		// resource heap, its page size, the region size asked and its constructor's call (H1); the streaming update's
 		// lea of the streaming allocator and its call of the budgets' reset (A1); the loader's call of timeGetTime and

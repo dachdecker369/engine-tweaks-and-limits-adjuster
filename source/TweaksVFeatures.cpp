@@ -16,22 +16,15 @@
 #include "TweaksVLog.h"
 #include "TweaksVModkitLimit.h"
 #include "TweaksVPackfileLimit.h"
-// [ped props]
 #include "TweaksVPedProps.h"
 #include "TweaksVRageOpenV.h"
-// [siren count]
 #include "TweaksVSirenCount.h"
-// [siren ids]
 #include "TweaksVSirenIds.h"
 #include "TweaksVStraightToStoryMode.h"
-// [streaming memory]
 #include "TweaksVStreamingMemory.h"
 #include "TweaksVSummary.h"
-// [texture budget]
 #include "TweaksVTextureBudget.h"
-// [weapon components]
 #include "TweaksVWeaponComponents.h"
-// [weapon infos]
 #include "TweaksVWeaponInfos.h"
 
 namespace TweaksV
@@ -95,19 +88,12 @@ namespace TweaksV
 		// The parts measured first, one entry per limit in the order of SPECIFICATIONS 11.10. A limit leaves the
 		// table when its part is built, or when it is not, so the table may be empty.
 		constexpr std::initializer_list<MeasuredFirst> kMeasuredFirst = {
-			// [weapon infos]
 			{ "WeaponLimits", MeasureWeaponInfos },
-			// [weapon components]
 			{ "WeaponLimits", MeasureWeaponComponents },
-			// [siren ids]
 			{ "SirenSettings", MeasureSirenIds },
-			// [siren count]
 			{ "SirenSettings", MeasureSirenCount },
-			// [ped props]
 			{ "PedProps", MeasurePedProps },
-			// [texture budget]
 			{ "Resources", MeasureTextureBudget },
-			// [streaming memory]
 			{ "Resources", MeasureStreamingMemory },
 		};
 	}
