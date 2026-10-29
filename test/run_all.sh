@@ -33,6 +33,7 @@ SUITES=(
 	# [siren count]
 	sirencount
 	# [ped props]
+	pedprops
 	# [texture budget]
 	# [streaming memory]
 	integration

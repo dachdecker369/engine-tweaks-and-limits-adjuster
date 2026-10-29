@@ -182,6 +182,32 @@
 //   scnotstart     find-bone-by-name's pattern lies 16 bytes into its function, not at its start
 //   scnounwind     find-bone-by-name's pattern lies in .fakesit, CC before it, where no unwind data names a function
 // [ped props]
+// Ped props (PedProps): the eleven narrowings with the calls in their matches, A-E-G1's two copies among them, the
+// per-anchor count's start and loop and the model info store's lookup are always there, with the calls no pattern
+// names - the per-anchor count's 7 callers and the metadata lookup's 17 in all - and two calls that lead elsewhere,
+// which the scans must not count. So is the store: 60,010 model indices, 16 bytes each, its models at the game's
+// offsets - 601 other models, every 100th index; mp_m_freemode_01 with 30 variation files, 212 props on anchor 0, 38 of
+// them in its first file, which also holds a second entry of anchor 0 with 99 and one of anchor 5 with none;
+// mp_f_freemode_01, its type byte 0x46, with 28 files, 175 props on anchor 0 and 86 on anchor 2; 40 more peds of one
+// file each; a ped without variation data; a null model info; a ped whose bit is clear and one past the count, with 500
+// and 600 props on anchor 0; a ped at the last index below the count.
+//   ppmany         15 more files of mp_m_freemode_01 (302 props on anchor 0) and a 29th of mp_f_freemode_01 with 270
+//                  props on anchor 2 (356 there): two anchors and one file past 255
+//   ppgrow         10.5 s after the actions once TweaksV has started, about 12 s in, 5 more files of mp_m_freemode_01
+//                  (242 props on anchor 0), as the game adds a pack's - after the measurement's first summary
+//   ppunknown      a third entry in mp_m_freemode_01's first file that names anchor 13
+//   ppflood        10,001 more peds, each with one file of 300 props on anchor 1: 20,002 lines past 255
+//   ppbadcount     the store's count holds 2,000,000
+//   ppbadstride    the store's stride holds 12
+//   ppunreadable   the 5th file of mp_f_freemode_01 lies in memory that cannot be read
+//   ppcountcall    an 8th call of the per-anchor count (a changed game)
+//   pplookupcall   an 18th call of the metadata lookup (a changed game)
+//   ppg1once       A-E-G1's second copy is gone
+//   ppg1thrice     a third copy of A-E-G1
+//   ppcountsplit   A-E-T3's call leads into the per-anchor count's loop, not to its start
+//   pplookupsplit  A-E-G4's call leads to the texture count, not to the metadata lookup
+//   pphooked       A-E-T1's call leads outside the game (another mod hooked it)
+//   ppstoreout     A-E-S1's reference to the store's array pointer leads outside the game
 // [texture budget]
 // [streaming memory]
 #include <windows.h>
@@ -542,6 +568,69 @@ volatile unsigned char g_sirenCountFindBoneCopy[] = { 0xCC, 0xCC, 0x57, 0x41, 0x
 	0x66, 0x83, 0x79, 0x5E, 0x00, 0xCC };
 static Site g_sirenCountFindBoneSite = SITE(g_sirenCountFindBoneCopy, 1);
 // [ped props]
+// Ped props: the eleven narrowings to 8 bits, each with the call in its match - an anchor's total in the check the
+// set-prop native asks (T1, its call to the texture count) and in the helmet code after its calls of the per-anchor
+// count (T2..T5; T5's match ends in the next call, one of the count's three unused ones), a worn prop's index before
+// the metadata lookup (G1 twice, G3..G6; G6 starts with a call of its own, its rel32 left 0); a third copy of G1, its
+// first byte 48 only with "ppg1thrice". The per-anchor count's start (C1) and its loop (C2), 0x30 bytes in; the model
+// info store's lookup and a ped's type (S1, its four disp32 at +2, +15, +39 and +59). The calls no pattern names: the
+// per-anchor count's two more unused ones, the metadata lookup's eleven (two more after G3's, five more after G6's, the
+// random props' builder, two in their picker, a thunk); two calls that lead elsewhere; one more call of each function,
+// its E8 only with "ppcountcall" or "pplookupcall". The stand-ins they lead to and the store are below.
+volatile unsigned char g_pedPropsT1[] = { 0x0F, 0xB6, 0xC3, 0x44, 0x39, 0xC0, 0x7E, 0x17, 0xE8, 0, 0, 0, 0, 0x0F, 0xB6, 0xC0, 0x44, 0x39,
+	0xF0, 0x0F, 0x9F, 0xC0, 0xCC };
+volatile unsigned char g_pedPropsT2[] = { 0x48, 0x8B, 0x0E, 0x31, 0xD2, 0xE8, 0, 0, 0, 0, 0x0F, 0xB6, 0xC0, 0x39, 0xC5, 0x0F, 0x4C, 0xC5,
+	0x83, 0xFD, 0xFF, 0xCC };
+volatile unsigned char g_pedPropsT3[] = { 0x48, 0x8B, 0x09, 0x31, 0xD2, 0xE8, 0, 0, 0, 0, 0x0F, 0xB6, 0xC0, 0x39, 0xC7, 0x0F, 0x4C, 0xC7,
+	0x83, 0xFF, 0xFF, 0xCC };
+volatile unsigned char g_pedPropsT4[] = { 0x48, 0x8B, 0x09, 0x31, 0xD2, 0xE8, 0, 0, 0, 0, 0x0F, 0xB6, 0xC0, 0x39, 0xF8, 0x76, 0x06, 0x89,
+	0x7E, 0x18, 0x88, 0x5E, 0x20, 0xCC };
+volatile unsigned char g_pedPropsT5[] = { 0x48, 0x8B, 0x09, 0x31, 0xD2, 0xE8, 0, 0, 0, 0, 0x0F, 0xB6, 0xC0, 0x39, 0xC7, 0x7C, 0x0A, 0x48,
+	0x8B, 0x0E, 0x31, 0xD2, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_pedPropsG1a[] = { 0x48, 0x8B, 0x84, 0x24, 0x90, 0x00, 0x00, 0x00, 0x48, 0x8B, 0x88, 0x40, 0x02, 0x00, 0x00, 0x44,
+	0x0F, 0xB6, 0xC6, 0x40, 0x0F, 0xB6, 0xD5, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_pedPropsG1b[] = { 0x48, 0x8B, 0x84, 0x24, 0xA0, 0x00, 0x00, 0x00, 0x48, 0x8B, 0x88, 0x40, 0x02, 0x00, 0x00, 0x44,
+	0x0F, 0xB6, 0xC6, 0x40, 0x0F, 0xB6, 0xD5, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_pedPropsG1c[] = { 0xCC, 0x8B, 0x84, 0x24, 0xB0, 0x00, 0x00, 0x00, 0x48, 0x8B, 0x88, 0x40, 0x02, 0x00, 0x00, 0x44,
+	0x0F, 0xB6, 0xC6, 0x40, 0x0F, 0xB6, 0xD5, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_pedPropsG3[] = { 0x41, 0x8B, 0x44, 0x04, 0x08, 0x83, 0xF8, 0xFF, 0x0F, 0x84, 0x20, 0x01, 0x00, 0x00, 0x0F, 0xB6,
+	0xE8, 0x48, 0x89, 0xF9, 0x89, 0xF2, 0x41, 0x89, 0xE8, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_pedPropsG4[] = { 0x8B, 0x44, 0x38, 0x08, 0x31, 0xFF, 0x83, 0xF8, 0xFF, 0x74, 0x2A, 0x48, 0x8B, 0x49, 0x20, 0x48,
+	0x8B, 0x89, 0x40, 0x02, 0x00, 0x00, 0x44, 0x0F, 0xB6, 0xC0, 0x0F, 0xB6, 0xD2, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_pedPropsG5[] = { 0x41, 0x8B, 0x44, 0x07, 0x08, 0x85, 0xC0, 0x0F, 0x88, 0x40, 0x01, 0x00, 0x00, 0x44, 0x0F, 0xB6,
+	0xC0, 0x48, 0x89, 0xF9, 0x44, 0x89, 0xF2, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_pedPropsG6[] = { 0xE8, 0, 0, 0, 0, 0x44, 0x0F, 0xB6, 0xF7, 0x45, 0x0F, 0xB6, 0xFF, 0x4C, 0x89, 0xE9, 0x44, 0x89,
+	0xFA, 0x45, 0x89, 0xF0, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_pedPropsCount[] = { 0x56, 0x57, 0x48, 0x8B, 0x41, 0x20, 0x48, 0x8B, 0x88, 0x40, 0x02, 0x00, 0x00, 0x44, 0x0F, 0xB7,
+	0x41, 0x08, 0x31, 0xC0, 0x4D, 0x85, 0xC0, 0x74, 0x48, 0x4C, 0x8B, 0x09, 0x45, 0x31, 0xDB, 0xEB,			// C1, the start
+	0x1A, 0x66, 0x66, 0x2E, 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x1F, 0x40, 0x00,			// to +0x30
+	0x44, 0x0F, 0xB7, 0x54, 0x39, 0x08, 0x41, 0x0F, 0xB6, 0xCA, 0x01, 0xC8, 0x49, 0xFF, 0xC3, 0x4D, 0x39, 0xC3,	// C2, the loop
+	0x74, 0x2C, 0x4B, 0x8B, 0x0C, 0xD9, 0x0F, 0xB7, 0x71, 0x60, 0x45, 0x31, 0xD2, 0x48, 0x85, 0xF6, 0x74, 0xE0, 0x48, 0x8B,
+	0x49, 0x58, 0x48, 0xC1, 0xE6, 0x03, 0x48, 0x8D, 0x34, 0x76, 0x31, 0xFF, 0xCC };
+volatile unsigned char g_pedPropsStore[] = { 0x3B, 0x05, 0, 0, 0, 0, 0x0F, 0x8D, 0x50, 0x01, 0x00, 0x00, 0x48, 0x8B, 0x0D, 0, 0, 0, 0, 0x89,
+	0xC2, 0xC1, 0xEA, 0x05, 0x8B, 0x0C, 0x91, 0x0F, 0xA3, 0xC1, 0x0F, 0x83, 0x3C, 0x01, 0x00, 0x00, 0x48, 0x8B, 0x0D, 0, 0, 0, 0, 0x48,
+	0x85, 0xC9, 0x74, 0x30, 0x44, 0x89, 0x7C, 0x24, 0x34, 0x48, 0x98, 0x48, 0x0F, 0xAF, 0x05, 0, 0, 0, 0, 0x4C, 0x8B, 0x3C, 0x01, 0xBB,
+	0x02, 0x00, 0x00, 0x00, 0x4D, 0x85, 0xFF, 0x74, 0x1E, 0x41, 0x0F, 0xB6, 0x87, 0x9D, 0x00, 0x00, 0x00, 0x24, 0x1F, 0x3C, 0x06, 0xCC };
+volatile unsigned char g_pedPropsCalls[13][6] = { { 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC },
+	{ 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC },
+	{ 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC } };
+volatile unsigned char g_pedPropsElsewhere[2][6] = { { 0xE8, 0, 0, 0, 0, 0xCC }, { 0xE8, 0, 0, 0, 0, 0xCC } };
+volatile unsigned char g_pedPropsExtra[2][6] = { { 0xCC, 0, 0, 0, 0, 0xCC }, { 0xCC, 0, 0, 0, 0, 0xCC } };
+static Site g_pedPropsTextureCall = SITE(g_pedPropsT1, 9);	// the rel32 of each call
+static Site g_pedPropsCountCalls[] = { SITE(g_pedPropsT2, 6), SITE(g_pedPropsT3, 6), SITE(g_pedPropsT4, 6), SITE(g_pedPropsT5, 6),
+	SITE(g_pedPropsT5, 23), SITE(g_pedPropsCalls[0], 1), SITE(g_pedPropsCalls[1], 1) };
+static Site g_pedPropsLookupCalls[] = { SITE(g_pedPropsG1a, 24), SITE(g_pedPropsG1b, 24), SITE(g_pedPropsG3, 26), SITE(g_pedPropsG4, 30),
+	SITE(g_pedPropsG5, 24), SITE(g_pedPropsG6, 23), SITE(g_pedPropsCalls[2], 1), SITE(g_pedPropsCalls[3], 1), SITE(g_pedPropsCalls[4], 1),
+	SITE(g_pedPropsCalls[5], 1), SITE(g_pedPropsCalls[6], 1), SITE(g_pedPropsCalls[7], 1), SITE(g_pedPropsCalls[8], 1),
+	SITE(g_pedPropsCalls[9], 1), SITE(g_pedPropsCalls[10], 1), SITE(g_pedPropsCalls[11], 1), SITE(g_pedPropsCalls[12], 1) };
+static Site g_pedPropsElsewhereCalls[] = { SITE(g_pedPropsElsewhere[0], 1), SITE(g_pedPropsElsewhere[1], 1) };
+static Site g_pedPropsExtraCalls[] = { SITE(g_pedPropsExtra[0], 1), SITE(g_pedPropsExtra[1], 1) };
+static Site g_pedPropsStoreRefs[] = { SITE(g_pedPropsStore, 2), SITE(g_pedPropsStore, 15), SITE(g_pedPropsStore, 39), SITE(g_pedPropsStore, 59) };
+static Site g_pedPropsSites[] = { SITE(g_pedPropsT1, 0), SITE(g_pedPropsT2, 0), SITE(g_pedPropsT3, 0), SITE(g_pedPropsT4, 0),
+	SITE(g_pedPropsT5, 0), SITE(g_pedPropsG1a, 0), SITE(g_pedPropsG1b, 0), SITE(g_pedPropsG1c, 0), SITE(g_pedPropsG3, 0), SITE(g_pedPropsG4, 0),
+	SITE(g_pedPropsG5, 0), SITE(g_pedPropsG6, 0), SITE(g_pedPropsCount, 0), SITE(g_pedPropsStore, 0),
+	{ &g_pedPropsCalls[0][0], 0, sizeof(g_pedPropsCalls) }, { &g_pedPropsElsewhere[0][0], 0, sizeof(g_pedPropsElsewhere) },
+	{ &g_pedPropsExtra[0][0], 0, sizeof(g_pedPropsExtra) } };
 // [texture budget]
 // [streaming memory]
 #pragma data_seg()
@@ -1379,6 +1468,203 @@ static void SirenCountReport()
 	wprintf(L"siren sites and data: %ls | ", SirenCountPlaced() == g_sirenCountPlacedHash ? L"as placed" : L"CHANGED");
 }
 // [ped props]
+// Ped props: the stand-ins for the game's texture count and metadata lookup, which the sites' calls lead to and nothing
+// calls - two different functions, so that the linker cannot fold them into one - and the model info store: its four
+// globals, where A-E-S1's references lead, and its data in memory of the fake's own, laid out at the game's offsets as
+// the game's heap holds it, a page of no access beside it. The bytes of the sites and the data are summed before
+// TweaksV loads, for the report.
+static __declspec(noinline) int PedPropsTextureCount(const unsigned char* props, int prop)
+{
+	return props ? props[prop] : 0;
+}
+static __declspec(noinline) const unsigned char* PedPropsMetadataLookup(const unsigned char* entries, int count, int prop)
+{
+	return entries && prop < count ? entries + prop * 0x38 : nullptr;
+}
+static int32_t g_pedPropsCountStorage = 0;				// the store's count of model indices, a dword
+static uint32_t* g_pedPropsBitmapStorage = nullptr;		// its bitmap: a bit per index, set for a model
+static unsigned char* g_pedPropsArrayStorage = nullptr;	// its array: an element per index, the model info's pointer its first 8 bytes
+static uint64_t g_pedPropsStrideStorage = 0;			// an element's bytes, a qword
+static int32_t* volatile g_pedPropsStoreCount = &g_pedPropsCountStorage;
+static uint32_t** volatile g_pedPropsStoreBitmap = &g_pedPropsBitmapStorage;
+static unsigned char** volatile g_pedPropsStoreArray = &g_pedPropsArrayStorage;
+static uint64_t* volatile g_pedPropsStoreStride = &g_pedPropsStrideStorage;
+constexpr int32_t kPedPropsIndices = 60010;		// not a multiple of 32: the bitmap's last dword holds bits past the count
+constexpr int32_t kPedPropsSlots = 60032;		// the array's elements, up to the bitmap's last bit
+constexpr uint64_t kPedPropsStride = 16;
+constexpr size_t kPedPropsModelSize = 0x250;	// a model info: its hash at +0x18, its type at +0x9D, its variation collection at +0x240
+constexpr size_t kPedPropsFileSize = 0x70;		// a variation file: its anchors at +0x58, their count (a word) at +0x60
+constexpr size_t kPedPropsEntrySize = 0x18;		// an anchor's entry: its props (a word) at +8, the anchor (a dword) at +0x10
+constexpr size_t kPedPropsHeapSize = 16 << 20;
+static unsigned char* g_pedPropsHeap = nullptr;
+static size_t g_pedPropsUsed = 0;
+static unsigned char* g_pedPropsNoAccess = nullptr;
+static unsigned char* g_pedPropsMale = nullptr;	// mp_m_freemode_01's variation collection, which "ppgrow" adds to
+static uint64_t g_pedPropsSitesSum = 0, g_pedPropsDataSum = 0;
+struct PedPropsEntry { uint32_t anchor; uint16_t props; };
+
+// size bytes of the fake's heap, zeroed, 16-byte aligned
+static unsigned char* PedPropsAlloc(size_t size)
+{
+	size = (size + 15) & ~static_cast<size_t>(15);
+	if (!g_pedPropsHeap || g_pedPropsUsed + size > kPedPropsHeapSize)
+	{
+		wprintf(L"pedprops: the fake's heap is too small\n");
+		ExitProcess(3);
+	}
+	unsigned char* const at = g_pedPropsHeap + g_pedPropsUsed;
+	g_pedPropsUsed += size;
+	return at;
+}
+
+// A model info at a model index, its bit set unless bit is false
+static void PedPropsModel(int32_t index, uint32_t hash, uint8_t type, const void* collection, bool bit = true)
+{
+	unsigned char* const info = PedPropsAlloc(kPedPropsModelSize);
+	memcpy(info + 0x18, &hash, sizeof(hash));
+	info[0x9D] = type;
+	memcpy(info + 0x240, &collection, sizeof(collection));
+	memcpy(g_pedPropsArrayStorage + index * kPedPropsStride, &info, sizeof(info));
+	if (bit)
+		g_pedPropsBitmapStorage[index / 32] |= 1u << (index % 32);
+}
+
+// A variation collection with room for room files, none of them yet: the files' pointers at +0, their count at +8
+static unsigned char* PedPropsCollection(size_t room)
+{
+	unsigned char* const collection = PedPropsAlloc(16);
+	unsigned char* const files = PedPropsAlloc(room * sizeof(void*));
+	memcpy(collection, &files, sizeof(files));
+	return collection;
+}
+
+// A variation file of these anchor entries added to a collection: the file whole, its pointer, then the count - as the
+// game adds a pack's while the measurement may be reading
+static void PedPropsAddFile(unsigned char* collection, const PedPropsEntry* entries, size_t count)
+{
+	unsigned char* const file = PedPropsAlloc(kPedPropsFileSize);
+	unsigned char* const anchors = PedPropsAlloc(count * kPedPropsEntrySize);
+	for (size_t i = 0; i < count; i++)
+	{
+		memcpy(anchors + i * kPedPropsEntrySize + 8, &entries[i].props, sizeof(entries[i].props));
+		memcpy(anchors + i * kPedPropsEntrySize + 0x10, &entries[i].anchor, sizeof(entries[i].anchor));
+	}
+	const uint16_t anchorCount = static_cast<uint16_t>(count);
+	memcpy(file + 0x58, &anchors, sizeof(anchors));
+	memcpy(file + 0x60, &anchorCount, sizeof(anchorCount));
+	unsigned char* files = nullptr;
+	uint16_t fileCount = 0;
+	memcpy(&files, collection, sizeof(files));
+	memcpy(&fileCount, collection + 8, sizeof(fileCount));
+	memcpy(files + fileCount * sizeof(void*), &file, sizeof(file));
+	MemoryBarrier();
+	*reinterpret_cast<volatile uint16_t*>(collection + 8) = static_cast<uint16_t>(fileCount + 1);
+}
+
+// A ped model of one variation file
+static void PedPropsPed(int32_t index, uint32_t hash, const PedPropsEntry* entries, size_t count, bool bit = true)
+{
+	unsigned char* const collection = PedPropsCollection(1);
+	PedPropsAddFile(collection, entries, count);
+	PedPropsModel(index, hash, 6, collection, bit);
+}
+
+// The store and its models, as the top of this file describes them
+static void PedPropsBuild(bool many, bool unknown, bool flood, bool unreadable)
+{
+	g_pedPropsHeap = static_cast<unsigned char*>(VirtualAlloc(nullptr, kPedPropsHeapSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+	g_pedPropsNoAccess = static_cast<unsigned char*>(VirtualAlloc(nullptr, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_NOACCESS));
+	g_pedPropsBitmapStorage = reinterpret_cast<uint32_t*>(PedPropsAlloc(kPedPropsSlots / 8));
+	g_pedPropsArrayStorage = PedPropsAlloc(kPedPropsSlots * kPedPropsStride);
+	*g_pedPropsStoreCount = kPedPropsIndices;
+	*g_pedPropsStoreStride = kPedPropsStride;
+	// other models every 100th index, never a ped - their +0x240 the page of no access, which a module that took one for
+	// a ped could not read
+	static const uint8_t kOtherTypes[] = { 1, 2, 3, 4, 5, 7, 0x25 };
+	for (int32_t index = 0; index < kPedPropsIndices; index += 100)
+		PedPropsModel(index, 0x3C000000u + index, kOtherTypes[(index / 100) % 7], g_pedPropsNoAccess);
+	// mp_m_freemode_01: its first file with 38 props on anchor 0, 20 on anchor 1 and 2 on anchor 6, then a second entry
+	// of anchor 0, which the game does not count, one of anchor 5 with none (and with "ppunknown" one of anchor 13); the
+	// others 6 on anchor 0, the 2nd to the 10th 3 on anchor 1 too
+	g_pedPropsMale = PedPropsCollection(50);
+	const PedPropsEntry maleFirst[] = { { 0, 38 }, { 1, 20 }, { 6, 2 }, { 0, 99 }, { 5, 0 }, { 13, 9 } };
+	PedPropsAddFile(g_pedPropsMale, maleFirst, unknown ? 6 : 5);
+	const PedPropsEntry maleOthers[] = { { 0, 6 }, { 1, 3 } };
+	for (int file = 2; file <= (many ? 45 : 30); file++)
+		PedPropsAddFile(g_pedPropsMale, maleOthers, file <= 10 ? 2 : 1);
+	PedPropsModel(30001, 0x705E61F2, 6, g_pedPropsMale);
+	// mp_f_freemode_01, its type byte 0x46 - flags above the low 5 bits: its first file with 40 props on anchor 0 and 5
+	// on anchor 2, the others 5 and 3 (with "ppmany" a 29th with 270 on anchor 2; with "ppunreadable" its 5th file's
+	// pointer leads to the page of no access)
+	unsigned char* const female = PedPropsCollection(30);
+	const PedPropsEntry femaleFirst[] = { { 0, 40 }, { 2, 5 } };
+	const PedPropsEntry femaleOthers[] = { { 0, 5 }, { 2, 3 } };
+	PedPropsAddFile(female, femaleFirst, 2);
+	for (int file = 2; file <= 28; file++)
+		PedPropsAddFile(female, femaleOthers, 2);
+	const PedPropsEntry femaleMany[] = { { 2, 270 } };
+	if (many)
+		PedPropsAddFile(female, femaleMany, 1);
+	if (unreadable)
+	{
+		unsigned char* files = nullptr;
+		memcpy(&files, female, sizeof(files));
+		memcpy(files + 4 * sizeof(void*), &g_pedPropsNoAccess, sizeof(g_pedPropsNoAccess));
+	}
+	PedPropsModel(30002, 0x9C9EFFD8, 0x46, female);
+	// 40 more peds of one file, 3 props on anchor 0 and 2 on anchor 1; a ped without variation data; a null model info;
+	// a ped whose bit is clear; the last index's ped; one past the count, its bit set
+	const PedPropsEntry oneFile[] = { { 0, 3 }, { 1, 2 } };
+	for (int32_t k = 1; k <= 40; k++)
+		PedPropsPed(30002 + k, 0x2A000000u + k, oneFile, 2);
+	PedPropsModel(30043, 0x2A0000FFu, 6, nullptr);
+	g_pedPropsBitmapStorage[30044 / 32] |= 1u << (30044 % 32);
+	const PedPropsEntry clear[] = { { 0, 500 } };
+	PedPropsPed(30045, 0x2A000100u, clear, 1, false);
+	const PedPropsEntry last[] = { { 3, 7 } };
+	PedPropsPed(kPedPropsIndices - 1, 0x2B000000u, last, 1);
+	const PedPropsEntry past[] = { { 0, 600 } };
+	PedPropsPed(kPedPropsIndices, 0x2B000001u, past, 1);
+	// with "ppflood" 10,001 more peds, each with one file of 300 props on anchor 1, between the other models
+	const PedPropsEntry flooding[] = { { 1, 300 } };
+	for (int32_t index = 40001, made = 0; flood && made < 10001; index++)
+		if (index % 100 != 0)
+			PedPropsPed(index, 0x2C000000u + made++, flooding, 1);
+}
+
+// FNV-1a over the ped props' sites, or over the store's data and its globals: the report compares both with the sums
+// taken before TweaksV loaded
+static uint64_t PedPropsSum(bool sites)
+{
+	uint64_t hash = 0xCBF29CE484222325ull;
+	const auto mix = [&hash](const volatile unsigned char* bytes, size_t size)
+	{
+		for (size_t i = 0; i < size; i++)
+			hash = (hash ^ bytes[i]) * 0x100000001B3ull;
+	};
+	if (sites)
+	{
+		for (const Site& site : g_pedPropsSites)
+			mix(site.bytes, site.size);
+		return hash;
+	}
+	mix(g_pedPropsHeap, g_pedPropsUsed);
+	mix(reinterpret_cast<const volatile unsigned char*>(&g_pedPropsCountStorage), sizeof(g_pedPropsCountStorage));
+	mix(reinterpret_cast<const volatile unsigned char*>(&g_pedPropsBitmapStorage), sizeof(g_pedPropsBitmapStorage));
+	mix(reinterpret_cast<const volatile unsigned char*>(&g_pedPropsArrayStorage), sizeof(g_pedPropsArrayStorage));
+	mix(reinterpret_cast<const volatile unsigned char*>(&g_pedPropsStrideStorage), sizeof(g_pedPropsStrideStorage));
+	return hash;
+}
+
+// "ppgrow": 5 more files of mp_m_freemode_01, 6 props on anchor 0 each, as the game adds a pack's; the data's sum taken
+// anew
+static void PedPropsGrow()
+{
+	const PedPropsEntry entries[] = { { 0, 6 } };
+	for (int i = 0; i < 5; i++)
+		PedPropsAddFile(g_pedPropsMale, entries, 1);
+	g_pedPropsDataSum = PedPropsSum(false);
+}
 // [texture budget]
 // [streaming memory]
 
@@ -1864,6 +2150,7 @@ static void ForEachSite(void (*fn)(const Site&))
 	fn(g_sirenCountGlassSite);
 	fn(g_sirenCountFindBoneSite);
 	// [ped props]
+	for (const Site& site : g_pedPropsSites) fn(site);
 	// [texture budget]
 	// [streaming memory]
 }
@@ -3177,6 +3464,50 @@ int wmain(int argc, wchar_t** argv)
 	SirenCountSetup(HasOption(argc, argv, L"schooked"), HasOption(argc, argv, L"scgetterhooked"), HasOption(argc, argv, L"scelsewhere"),
 		HasOption(argc, argv, L"scnotstart"), HasOption(argc, argv, L"scnounwind"));
 	// [ped props]
+	// The ped props' calls lead to the stand-ins: T1's to the texture count, the per-anchor count's 7 callers to its start,
+	// the metadata lookup's 17 to it, the two others elsewhere, the two more to them too (their E8 only with an option);
+	// A-E-S1's four references to the store's globals; then the store built and the sites' and data's bytes summed
+	{
+		const auto pedPropsCount = const_cast<const unsigned char*>(g_pedPropsCount);
+		const auto pedPropsLookup = reinterpret_cast<const void*>(&PedPropsMetadataLookup);
+		const auto pedPropsTexture = reinterpret_cast<const void*>(&PedPropsTextureCount);
+		SetRel32(g_pedPropsTextureCall, pedPropsTexture);
+		for (const Site& site : g_pedPropsCountCalls)
+			SetRel32(site, pedPropsCount);
+		for (const Site& site : g_pedPropsLookupCalls)
+			SetRel32(site, pedPropsLookup);
+		SetRel32(g_pedPropsElsewhereCalls[0], pedPropsCount + 0x30);	// into the count's loop
+		SetRel32(g_pedPropsElsewhereCalls[1], pedPropsTexture);
+		SetRel32(g_pedPropsExtraCalls[0], pedPropsCount);
+		SetRel32(g_pedPropsExtraCalls[1], pedPropsLookup);
+		if (HasOption(argc, argv, L"ppcountcall"))		// an 8th call of the per-anchor count
+			g_pedPropsExtra[0][0] = 0xE8;
+		if (HasOption(argc, argv, L"pplookupcall"))	// an 18th call of the metadata lookup
+			g_pedPropsExtra[1][0] = 0xE8;
+		if (HasOption(argc, argv, L"ppg1once"))		// A-E-G1's second copy gone
+			g_pedPropsG1b[0] = 0xCC;
+		if (HasOption(argc, argv, L"ppg1thrice"))		// a third copy of A-E-G1
+			g_pedPropsG1c[0] = 0x48;
+		if (HasOption(argc, argv, L"ppcountsplit"))	// A-E-T3's call into the count's loop
+			SetRel32(g_pedPropsCountCalls[1], pedPropsCount + 0x30);
+		if (HasOption(argc, argv, L"pplookupsplit"))	// A-E-G4's call to the texture count
+			SetRel32(g_pedPropsLookupCalls[3], pedPropsTexture);
+		if (HasOption(argc, argv, L"pphooked"))		// A-E-T1's call to another mod, outside the game
+			SetRel32(g_pedPropsTextureCall, ImageEnd() + 0x70000);
+		const void* const pedPropsGlobals[] = { g_pedPropsStoreCount, g_pedPropsStoreBitmap, g_pedPropsStoreArray, g_pedPropsStoreStride };
+		for (size_t i = 0; i < 4; i++)
+			SetRel32(g_pedPropsStoreRefs[i], pedPropsGlobals[i]);
+		if (HasOption(argc, argv, L"ppstoreout"))		// the reference to the array's pointer outside the game
+			SetRel32(g_pedPropsStoreRefs[2], ImageEnd() + 0x80000);
+		PedPropsBuild(HasOption(argc, argv, L"ppmany"), HasOption(argc, argv, L"ppunknown"), HasOption(argc, argv, L"ppflood"),
+			HasOption(argc, argv, L"ppunreadable"));
+		if (HasOption(argc, argv, L"ppbadcount"))
+			*g_pedPropsStoreCount = 2000000;
+		if (HasOption(argc, argv, L"ppbadstride"))
+			*g_pedPropsStoreStride = 12;
+		g_pedPropsSitesSum = PedPropsSum(true);
+		g_pedPropsDataSum = PedPropsSum(false);
+	}
 	// [texture budget]
 	// [streaming memory]
 
@@ -3263,6 +3594,11 @@ int wmain(int argc, wchar_t** argv)
 		SirenCountDrawAll(HasOption(argc, argv, L"scodd"), HasOption(argc, argv, L"scmore"), HasOption(argc, argv, L"scfull"),
 			HasOption(argc, argv, L"scfault"));
 	// [ped props]
+	if (HasOption(argc, argv, L"ppgrow"))	// the game loads another pack, after the ped props' first summary, 10 s in
+	{
+		Sleep(10500);
+		PedPropsGrow();
+	}
 	// [texture budget]
 	// [streaming memory]
 	if (HasOption(argc, argv, L"wait"))
@@ -3313,6 +3649,8 @@ int wmain(int argc, wchar_t** argv)
 	SirenCountReport();
 	CheckStub(Rel32Target(g_sirenCountRendererCall));
 	// [ped props]
+	wprintf(L"pedprops: sites %ls, data %ls | ", PedPropsSum(true) == g_pedPropsSitesSum ? L"as placed" : L"CHANGED",
+		PedPropsSum(false) == g_pedPropsDataSum ? L"as placed" : L"CHANGED");
 	// [texture budget]
 	// [streaming memory]
 	CheckStub(Rel32Target(g_packCallSite));

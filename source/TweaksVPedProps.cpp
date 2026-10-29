@@ -235,6 +235,8 @@ namespace TweaksV
 		{
 			bool counted = false;	// false: the pass ended early, and why says why
 			char why[256] = {};
+			int32_t indices = 0;	// the store's count of model indices, and its stride - the game's own, which the
+			uint64_t stride = 0;	// research could not read
 			uint32_t models = 0;	// ped models with variation data
 			uint64_t files = 0;		// their variation files
 			uint64_t unknown = 0;	// anchor entries that name no anchor of 0..12
@@ -412,6 +414,8 @@ namespace TweaksV
 		{
 			pass.counted = false;
 			pass.why[0] = '\0';
+			pass.indices = 0;
+			pass.stride = 0;
 			pass.models = 0;
 			pass.files = pass.unknown = pass.totalsPast = pass.filesPast = 0;
 			pass.unknownModel = pass.unknownAnchor = 0;
@@ -432,6 +436,8 @@ namespace TweaksV
 				Stop(pass, "the model info store's stride, " + std::to_string(stride) + ", is not plausible.");
 				return;
 			}
+			pass.indices = count;
+			pass.stride = count > 0 && bitmap && array ? stride : 0;	// checked only where it is used
 			uint64_t reads = 0;
 			for (int32_t first = 0; bitmap && array && first < count; first += 32)
 			{
@@ -493,7 +499,8 @@ namespace TweaksV
 			Mix(hash, pass.counted);
 			for (const char* c = pass.why; *c; c++)
 				Mix(hash, *c);
-			for (const uint64_t value : { uint64_t{ pass.models }, pass.files, pass.unknown, uint64_t{ pass.mostProps }, uint64_t{ pass.mostModel },
+			for (const uint64_t value : { static_cast<uint64_t>(pass.indices), pass.stride, uint64_t{ pass.models }, pass.files, pass.unknown,
+				uint64_t{ pass.mostProps }, uint64_t{ pass.mostModel },
 				uint64_t{ pass.mostAnchor }, uint64_t{ pass.mostFiles }, uint64_t{ pass.mostInOne }, pass.totalsPast, pass.filesPast })
 				Mix(hash, value);
 			for (size_t i = 0; i < pass.itemCount; i++)
@@ -526,13 +533,15 @@ namespace TweaksV
 				WriteLog(kTag, std::string("DIAGNOSTIC: the ped props are not counted: ") + pass.why);
 				return;
 			}
+			const std::string store = "the model info store's " + Count(static_cast<uint64_t>(pass.indices), "index", "indices") +
+				(pass.stride ? ", its stride " + std::to_string(pass.stride) : std::string());
 			if (!pass.models)
 			{
-				WriteLog(kTag, "DIAGNOSTIC: ped props: no ped model with variation data yet.");
+				WriteLog(kTag, "DIAGNOSTIC: ped props: no ped model with variation data yet (" + store + ").");
 				return;
 			}
 			std::string line = "DIAGNOSTIC: ped props: " + Count(pass.models, "ped model", "ped models") + " with variation data in " +
-				Count(pass.files, "file", "files");
+				Count(pass.files, "file", "files") + " (" + store + ")";
 			if (pass.mostProps)
 				line += "; the most props on one anchor: " + std::to_string(pass.mostProps) + " (" + ModelName(pass.mostModel) + ", anchor " +
 					std::to_string(pass.mostAnchor) + ", from " + Count(pass.mostFiles, "file", "files") + ", at most " + std::to_string(pass.mostInOne) + " in one)";
@@ -552,15 +561,21 @@ namespace TweaksV
 				WriteLog(kTag, "DIAGNOSTIC: ped props: an anchor entry of " + ModelName(pass.unknownModel) + " names anchor " +
 					std::to_string(pass.unknownAnchor) + ", not one of 0.." + std::to_string(kAnchorCount - 1) + " - such entries are counted apart (logged once).");
 			}
-			for (size_t i = 0; i < pass.itemCount; i++)
+			// a line per item, every one the pass found - the kept ones, and past them the cap's line, once a session
+			const uint64_t items = pass.totalsPast + pass.filesPast;
+			for (uint64_t i = 0; i < items; i++)
 			{
-				if (g_itemLines == kMaxLinesPerKind)
-				{
-					g_itemLines++;	// the cap's line once
-					WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(kMaxLinesPerKind) + " lines of ped props past " + std::to_string(kGameLimit) +
-						" written - from now on they are only counted; the summary every minute has the numbers.");
-				}
 				if (g_itemLines >= kMaxLinesPerKind)
+				{
+					if (g_itemLines == kMaxLinesPerKind)
+					{
+						g_itemLines++;
+						WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(kMaxLinesPerKind) + " lines of ped props past " + std::to_string(kGameLimit) +
+							" written - from now on they are only counted; the summary every minute has the numbers.");
+					}
+					break;
+				}
+				if (i >= pass.itemCount)	// past the items kept, which are as many as the cap: never while lines are left
 					break;
 				g_itemLines++;
 				LogItem(pass.items[i]);

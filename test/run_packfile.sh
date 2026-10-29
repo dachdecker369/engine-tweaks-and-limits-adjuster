@@ -55,14 +55,14 @@ check "33 references logged, and the scan finds the same 33 and no other" "[ \$(
 check "direct size, indirect variable, array and call logged" "log_has 'PackfileLimit\] DIAGNOSTIC: limit at RVA .* holds 4500 (N, P-E-D3) -> game size 4500' && log_has 'PackfileLimit\] DIAGNOSTIC: limit variable at RVA .* holds 4496 (N-4, P-E-I1) -> game size 4500' && log_has 'DIAGNOSTIC: the packfile array is at RVA .* - 4500 entries of 8 bytes' && log_has 'PackfileLimit\] DIAGNOSTIC: streaming configuration call at RVA .* -> RVA'"
 check "the 36 writes logged" "[ \$(count 'PackfileLimit\] DIAGNOSTIC: packfile array reference at RVA') -eq 33 ] && [ \$(count 'PackfileLimit\] DIAGNOSTIC: packfile array limit at RVA') -eq 2 ] && [ \$(count 'PackfileLimit\] DIAGNOSTIC: streaming configuration call at RVA .*: E8 .* -> E8') -eq 1 ]"
 check "still applied" "has 'D3=12000 D2=4500 D1=4500 I=11996 |'"
-check "patterns found once get no per-match lines (only D-E-L12, which matches 7 times, gets them)" "[ \$(count ' match 1 of ') -eq 1 ] && log_has 'D-E-L12 match 1 of 7 at RVA'"
+check "patterns found once get no per-match lines (only D-E-L12, which matches 7 times, and A-E-G1, which matches twice, get them)" "[ \$(count ' match 1 of ') -eq 2 ] && log_has 'D-E-L12 match 1 of 7 at RVA' && log_has 'A-E-G1 match 1 of 2 at RVA'"
 
 echo "== P7b DIAGNOSTIC_MODE=1, a second identical copy of the 1158.13+ reference: each match logged with its bytes, nothing written"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe twor31a)
 check "its line counts 2 matches" "log_has 'Pattern P-E-R31a found: BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 -> RVA 0x[0-9A-F]*, 2 matches, bytes: BF '"
 check "one line per match, naming the pattern: 16 bytes before it, | at its start, 48 bytes from it" "[ \$(tr -d '\r' < TweaksV.log | grep -c -E '\[Scanner\]   P-E-R31a match [12] of 2 at RVA 0x[0-9A-F]+:( [0-9A-F]{2}){16} \| BF( [0-9A-F]{2}){47}\$') -eq 2 ]"
 check "both copies' bytes shown" "[ \$(count '| BF 08 00 00 00 BE 10 00 00 00 4C 8D 05 ') -eq 2 ]"
-check "no other pattern gets per-match lines (but D-E-L12, which matches 7 times)" "[ \$(count ' match 1 of ') -eq 2 ] && log_has 'D-E-L12 match 1 of 7 at RVA'"
+check "no other pattern gets per-match lines (but D-E-L12, which matches 7 times, and A-E-G1, which matches twice)" "[ \$(count ' match 1 of ') -eq 3 ] && log_has 'D-E-L12 match 1 of 7 at RVA' && log_has 'A-E-G1 match 1 of 2 at RVA'"
 check "a reference pattern that matches twice is not used: nothing written, reported" "has '$UNMOVED' && has '$GAME_SIZES' && has '$NO_HOOK' && log_has 'the game code holds P-E-R31a 2 or more times, not the expected 1.' && log_has 'PROBLEM: The packfile limit is not changed'"
 
 echo "== P7c the game's obfuscated code that the old 1158.13+ pattern also matched (RVA 0x582A227): not matched now"
