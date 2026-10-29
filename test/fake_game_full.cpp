@@ -209,6 +209,19 @@
 //   pphooked       A-E-T1's call leads outside the game (another mod hooked it)
 //   ppstoreout     A-E-S1's reference to the store's array pointer leads outside the game
 // [texture budget]
+// The texture budget's sites (the Resources part's measurement) are always there: the start-up's stores of the most streamed
+// objects and of the four budgets and the call after them, the budget's getter, a resource's placement and the update check,
+// leading to the counters as the game's start-up leaves them - textures 2456 MB and buffers 389 MB in 22222 and 1234 objects,
+// the game's high-water mark at 2900 MB, 98304 objects allowed, the budgets 1500, 1500, 3000 and 3000 MB - to the texture
+// quality's index 2, the update check's flag down and its switch on with its factors 0.9, 0.8 and 0.95.
+//   tbgrow         once TweaksV's first texture budget summary is in TweaksV.log, the textures grow by 200 MB and 800 objects,
+//                  past the budget, the game's mark with them, and the update check's flag goes up; then it waits for the
+//                  next summary (TWEAKSV_TEST_SUMMARY_MS), 10 seconds at most
+//   tbshift        the shift between the two stores of the budgets is psllq 21, not 20
+//   tbcallhooked   the call after the budgets' stores already leads outside the game (another mod's hook)
+//   tbindexout     the getter's index lies outside the game
+//   tbcounters     the update check's lea of the counters leads 8 bytes past them
+//   tbfactor       the update check's multiplication by its raise factor is an addition (addss)
 // [streaming memory]
 #include <windows.h>
 #include <winternl.h>
@@ -632,6 +645,38 @@ static Site g_pedPropsSites[] = { SITE(g_pedPropsT1, 0), SITE(g_pedPropsT2, 0), 
 	{ &g_pedPropsCalls[0][0], 0, sizeof(g_pedPropsCalls) }, { &g_pedPropsElsewhere[0][0], 0, sizeof(g_pedPropsElsewhere) },
 	{ &g_pedPropsExtra[0][0], 0, sizeof(g_pedPropsExtra) } };
 // [texture budget]
+// The texture budget (the Resources part's measurement): the start-up's store of the most streamed objects - "mov ecx,
+// [rax+0x54C]", "mov [rip+disp32], ecx" with the rel32 at +8 - and its load, shift and store of budgets 0 and 1 (the rel32 at
+// +30), then right after them, at +34, those of budgets 2 and 3 (+52), "lea r14", "mov [rip+disp32], r14", "sub rsp, 0x20"
+// and the call after the stores (+75); the budget's getter, "movsxd rax, [rip+disp32]" (the index's rel32 at +3) and "mov
+// rax, [rcx+rax*8+0x28]"; a resource's placement and its loads of the counters (the rel32 at +2, +8, +16, +25 and +32); the
+// update check: the compare of its switch (the disp32 at +2, an imm8 after it), its loads of the counters (+16, +23, +30), the
+// getter's call (+35) and, laid in main, NOPs, the compare of its flag at +0x4B (+0x4D) and its multiplications by its lower
+// factor at +0x54 (+0x58) and, with a REX, by its raise factor at +0xA0 (+0xA5). What they lead to is below, outside this
+// section, as the game's is.
+volatile unsigned char g_textureBudgetStores[] = {
+	0x8B, 0x88, 0x4C, 0x05, 0x00, 0x00, 0x89, 0x0D, 0, 0, 0, 0, 0x66, 0x0F, 0x38, 0x25, 0x80, 0x50, 0x05, 0x00, 0x00,
+	0x66, 0x0F, 0x73, 0xF0, 0x14, 0xF3, 0x0F, 0x7F, 0x05, 0, 0, 0, 0,
+	0x66, 0x0F, 0x38, 0x25, 0x80, 0x58, 0x05, 0x00, 0x00, 0x66, 0x0F, 0x73, 0xF0, 0x14, 0xF3, 0x0F, 0x7F, 0x05, 0, 0, 0, 0,
+	0x4C, 0x8D, 0x35, 0, 0, 0, 0, 0x4C, 0x89, 0x35, 0, 0, 0, 0, 0x48, 0x83, 0xEC, 0x20, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_textureBudgetGetter[] = { 0x48, 0x63, 0x05, 0, 0, 0, 0, 0x48, 0x8B, 0x44, 0xC1, 0x28, 0xC3, 0xCC };
+volatile unsigned char g_textureBudgetPlacement[] = { 0x8B, 0x05, 0, 0, 0, 0, 0x8B, 0x0D, 0, 0, 0, 0, 0x01, 0xC1, 0x3B, 0x0D, 0, 0, 0, 0,
+	0x73, 0x3A, 0x48, 0x8B, 0x05, 0, 0, 0, 0, 0x48, 0x8B, 0x35, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_textureBudgetUpdate[0xAA] = { 0x83, 0x3D, 0, 0, 0, 0, 0x00, 0x0F, 0x84, 0, 0, 0, 0, 0x48, 0x8D, 0x0D, 0, 0, 0, 0,
+	0x48, 0x8B, 0x3D, 0, 0, 0, 0, 0x48, 0x8B, 0x35, 0, 0, 0, 0, 0xE8, 0, 0, 0, 0 };
+static Site g_textureBudgetMostRef = SITE(g_textureBudgetStores, 8);
+static Site g_textureBudgetBudgetRefs[] = { SITE(g_textureBudgetStores, 30), SITE(g_textureBudgetStores, 52) };
+static Site g_textureBudgetCall = SITE(g_textureBudgetStores, 75);
+static Site g_textureBudgetIndexRef = SITE(g_textureBudgetGetter, 3);
+// the placement's loads and the field of the counters each leads to
+struct TextureBudgetLoad { Site site; size_t field; };
+static TextureBudgetLoad g_textureBudgetLoads[] = { { SITE(g_textureBudgetPlacement, 2), 0x10 }, { SITE(g_textureBudgetPlacement, 8), 0x14 },
+	{ SITE(g_textureBudgetPlacement, 16), 0x20 }, { SITE(g_textureBudgetPlacement, 25), 0x00 }, { SITE(g_textureBudgetPlacement, 32), 0x08 },
+	{ SITE(g_textureBudgetUpdate, 16), 0x00 }, { SITE(g_textureBudgetUpdate, 23), 0x00 }, { SITE(g_textureBudgetUpdate, 30), 0x08 } };
+static Site g_textureBudgetSwitchRef = SITE(g_textureBudgetUpdate, 2);
+static Site g_textureBudgetGetterCall = SITE(g_textureBudgetUpdate, 35);
+static Site g_textureBudgetFlagRef = SITE(g_textureBudgetUpdate, 0x4D);
+static Site g_textureBudgetFactorRefs[] = { SITE(g_textureBudgetUpdate, 0x58), SITE(g_textureBudgetUpdate, 0xA5) };	// the lower, the raise
 // [streaming memory]
 #pragma data_seg()
 
@@ -1666,6 +1711,87 @@ static void PedPropsGrow()
 	g_pedPropsDataSum = PedPropsSum(false);
 }
 // [texture budget]
+// The texture budget's data, laid out as the game's: the counters - the buffers' and the textures' bytes and numbers, the game's
+// high-water mark of both, the most objects allowed and the four budgets in bytes - the index of the budget in use, the update
+// check's flag and its switch with its three factors; and the function of the game's the call after the budgets' stores leads
+// to, which the harness never calls. The harness reaches the data only through this pointer, as it does the arrays above, and
+// keeps what it set, to tell afterwards that TweaksV wrote nothing, with what the sites held before TweaksV loaded.
+struct TextureBudgetCounters { uint64_t buffers, textures; uint32_t buffersNumber, texturesNumber; uint64_t highest; uint32_t most, unused;
+	uint64_t budgets[4]; };
+static_assert(sizeof(TextureBudgetCounters) == 0x48 && offsetof(TextureBudgetCounters, highest) == 0x18 &&
+	offsetof(TextureBudgetCounters, most) == 0x20 && offsetof(TextureBudgetCounters, budgets) == 0x28, "the counters as the game lays them out");
+struct TextureBudgetSwitch { int32_t on; float raise, lower, windows; };
+struct TextureBudgetData { TextureBudgetCounters counters; int32_t index; uint8_t flag; TextureBudgetSwitch updateCheck; };
+alignas(16) static TextureBudgetData g_textureBudgetDataStorage;
+static TextureBudgetData* volatile g_textureBudgetData = &g_textureBudgetDataStorage;
+static TextureBudgetData g_textureBudgetDataAsSet;
+static unsigned char g_textureBudgetSitesAsPlaced[sizeof(g_textureBudgetStores) + sizeof(g_textureBudgetGetter) +
+	sizeof(g_textureBudgetPlacement) + sizeof(g_textureBudgetUpdate)];
+static volatile int g_textureBudgetNextSteps = 0;
+static void TextureBudgetNextStep()
+{
+	g_textureBudgetNextSteps = g_textureBudgetNextSteps + 1;
+}
+
+// The four sites' bytes in a row, to keep them as placed or to compare them with that
+static void TextureBudgetSites(unsigned char* to, bool compare, int& asPlaced)
+{
+	const volatile unsigned char* const sites[] = { g_textureBudgetStores, g_textureBudgetGetter, g_textureBudgetPlacement, g_textureBudgetUpdate };
+	const size_t sizes[] = { sizeof(g_textureBudgetStores), sizeof(g_textureBudgetGetter), sizeof(g_textureBudgetPlacement), sizeof(g_textureBudgetUpdate) };
+	asPlaced = 0;
+	for (int i = 0; i < 4; i++)
+	{
+		bool same = true;
+		for (size_t j = 0; j < sizes[i]; j++, to++)
+			if (!compare)
+				*to = sites[i][j];
+			else if (*to != sites[i][j])
+				same = false;
+		asPlaced += same ? 1 : 0;
+	}
+}
+
+// How many texture budget summaries TweaksV.log holds - read as the game reads its other files, shared
+static int TextureBudgetSummaries()
+{
+	static char text[4 << 20];
+	const HANDLE file = CreateFileW(L"TweaksV.log", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+		return 0;
+	DWORD read = 0;
+	if (!ReadFile(file, text, sizeof(text) - 1, &read, nullptr))
+		read = 0;
+	CloseHandle(file);
+	text[read] = '\0';
+	int summaries = 0;
+	for (const char* at = text; (at = strstr(at, " objects allowed (MaxStreamingResources)")) != nullptr; at++)
+		summaries++;
+	return summaries;
+}
+
+// tbgrow: once TweaksV's first summary is in its log, the textures grow by 200 MB and 800 objects, past the budget, the game's mark
+// with them, and the update check's flag goes up, as the game's streaming would have it; then the next summary is waited for
+static wchar_t g_textureBudgetGrown[64] = L"";
+static void TextureBudgetGrow()
+{
+	for (int waited = 0; TextureBudgetSummaries() < 1 && waited < 25000; waited += 250)
+		Sleep(250);
+	if (TextureBudgetSummaries() < 1)
+	{
+		swprintf(g_textureBudgetGrown, sizeof(g_textureBudgetGrown) / sizeof(g_textureBudgetGrown[0]), L", not grown: no first summary");
+		return;
+	}
+	TextureBudgetData& data = *g_textureBudgetData;
+	data.counters.textures += 200ull << 20;
+	data.counters.texturesNumber += 800;
+	data.counters.highest = data.counters.buffers + data.counters.textures;
+	data.flag = 1;
+	g_textureBudgetDataAsSet = data;
+	for (int waited = 0; TextureBudgetSummaries() < 2 && waited < 10000; waited += 250)
+		Sleep(250);
+	swprintf(g_textureBudgetGrown, sizeof(g_textureBudgetGrown) / sizeof(g_textureBudgetGrown[0]), L", grown after the first summary");
+}
 // [streaming memory]
 
 // The game's two tree searches behind the box streamer's four calls: the first and the third call lead
@@ -2152,6 +2278,9 @@ static void ForEachSite(void (*fn)(const Site&))
 	// [ped props]
 	for (const Site& site : g_pedPropsSites) fn(site);
 	// [texture budget]
+	static Site textureBudgetSites[] = { SITE(g_textureBudgetStores, 0), SITE(g_textureBudgetGetter, 0), SITE(g_textureBudgetPlacement, 0),
+		SITE(g_textureBudgetUpdate, 0) };
+	for (const Site& site : textureBudgetSites) fn(site);
 	// [streaming memory]
 }
 
@@ -3509,6 +3638,61 @@ int wmain(int argc, wchar_t** argv)
 		g_pedPropsDataSum = PedPropsSum(false);
 	}
 	// [texture budget]
+	// The texture budget: the counters as the game's start-up leaves them, at the game's own sizes, the texture quality's index 2,
+	// the update check's flag down and its switch on; every site leads to them as the game's do, but where an option asks otherwise
+	{
+		TextureBudgetData& data = *g_textureBudgetData;
+		data.counters.buffers = (389ull << 20) + 12345;
+		data.counters.textures = (2456ull << 20) + 54321;
+		data.counters.buffersNumber = 1234;
+		data.counters.texturesNumber = 22222;
+		data.counters.highest = 2900ull << 20;
+		data.counters.most = 98304;
+		const uint64_t budgetsMb[] = { 1500, 1500, 3000, 3000 };
+		for (int i = 0; i < 4; i++)
+			data.counters.budgets[i] = budgetsMb[i] << 20;
+		data.index = 2;
+		data.flag = 0;
+		data.updateCheck = { 1, 0.9f, 0.8f, 0.95f };
+		const auto counters = reinterpret_cast<const unsigned char*>(&data.counters);
+		SetRel32(g_textureBudgetMostRef, counters + 0x20);
+		SetRel32(g_textureBudgetBudgetRefs[0], counters + 0x28);
+		SetRel32(g_textureBudgetBudgetRefs[1], counters + 0x38);
+		SetRel32(g_textureBudgetCall, reinterpret_cast<const void*>(&TextureBudgetNextStep));
+		SetRel32(g_textureBudgetIndexRef, &data.index);
+		for (const TextureBudgetLoad& load : g_textureBudgetLoads)
+			SetRel32(load.site, counters + load.field);
+		// the update check's code past its pattern: NOPs, "cmp byte [rip+disp32], 0" of its flag and a "jz" at +0x4B, "mulss xmm0,
+		// [rip+disp32]" by its lower factor at +0x54 and "mulss xmm9, [rip+disp32]" by its raise factor at +0xA0; the disp32 of its
+		// switch and of its flag each one byte short of what it leads to, since an imm8 ends their instructions
+		const auto update = const_cast<unsigned char*>(g_textureBudgetUpdate);
+		memset(update + 0x27, 0x90, sizeof(g_textureBudgetUpdate) - 0x27 - 1);
+		const unsigned char flagCompare[] = { 0x80, 0x3D, 0, 0, 0, 0, 0x00, 0x74, 0x08 };
+		const unsigned char lowerFactor[] = { 0xF3, 0x0F, 0x59, 0x05 };
+		const unsigned char raiseFactor[] = { 0xF3, 0x44, 0x0F, 0x59, 0x0D };
+		memcpy(update + 0x4B, flagCompare, sizeof(flagCompare));
+		memcpy(update + 0x54, lowerFactor, sizeof(lowerFactor));
+		memcpy(update + 0xA0, raiseFactor, sizeof(raiseFactor));
+		update[sizeof(g_textureBudgetUpdate) - 1] = 0xCC;
+		SetRel32(g_textureBudgetSwitchRef, reinterpret_cast<const unsigned char*>(&data.updateCheck.on) - 1);
+		SetRel32(g_textureBudgetFlagRef, &data.flag - 1);
+		SetRel32(g_textureBudgetFactorRefs[0], &data.updateCheck.lower);
+		SetRel32(g_textureBudgetFactorRefs[1], &data.updateCheck.raise);
+		SetRel32(g_textureBudgetGetterCall, const_cast<const unsigned char*>(g_textureBudgetGetter));
+		if (HasOption(argc, argv, L"tbshift"))		// the shift between the two stores of the budgets by 21, not 20
+			g_textureBudgetStores[25] = 0x15;
+		if (HasOption(argc, argv, L"tbcallhooked"))	// another mod hooked the call after the stores already
+			SetRel32(g_textureBudgetCall, ImageEnd() + 0x70000);
+		if (HasOption(argc, argv, L"tbindexout"))	// the index outside the game
+			SetRel32(g_textureBudgetIndexRef, ImageEnd() + 0x78000);
+		if (HasOption(argc, argv, L"tbcounters"))	// the update check's lea of the counters 8 bytes past them
+			SetRel32(g_textureBudgetLoads[5].site, counters + 8);
+		if (HasOption(argc, argv, L"tbfactor"))	// "addss" in the place of the multiplication by the raise factor
+			g_textureBudgetUpdate[0xA3] = 0x58;
+		g_textureBudgetDataAsSet = data;
+		int asPlaced = 0;
+		TextureBudgetSites(g_textureBudgetSitesAsPlaced, false, asPlaced);
+	}
 	// [streaming memory]
 
 	RovSetup(argc, argv);
@@ -3600,6 +3784,8 @@ int wmain(int argc, wchar_t** argv)
 		PedPropsGrow();
 	}
 	// [texture budget]
+	if (HasOption(argc, argv, L"tbgrow"))
+		TextureBudgetGrow();
 	// [streaming memory]
 	if (HasOption(argc, argv, L"wait"))
 		Sleep(11000);	// TweaksV's UNLOCK_FILES summary comes 10 s after the first open it counts, the OpenFile summary 10 s
@@ -3652,6 +3838,21 @@ int wmain(int argc, wchar_t** argv)
 	wprintf(L"pedprops: sites %ls, data %ls | ", PedPropsSum(true) == g_pedPropsSitesSum ? L"as placed" : L"CHANGED",
 		PedPropsSum(false) == g_pedPropsDataSum ? L"as placed" : L"CHANGED");
 	// [texture budget]
+	{
+		// "texture budget: sites as placed 4 of 4, data as set, its page RW; stores RVA 0x..., ... | " - the sites as they were before
+		// TweaksV loaded, the data as the harness set it, and where each lies, for the suite to compare with the log's lines
+		int asPlaced = 0;
+		TextureBudgetSites(g_textureBudgetSitesAsPlaced, true, asPlaced);
+		const TextureBudgetData& data = *g_textureBudgetData;
+		const auto rva = [](const volatile void* p) {
+			return static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(const_cast<const void*>(p)) - reinterpret_cast<uintptr_t>(ImageBase()));
+		};
+		wprintf(L"texture budget: sites as placed %d of 4, data %ls, its page %ls%ls; stores RVA 0x%llX, getter RVA 0x%llX, placement RVA 0x%llX, "
+			L"update RVA 0x%llX, next step RVA 0x%llX, counters RVA 0x%llX, index RVA 0x%llX, flag RVA 0x%llX, switch RVA 0x%llX | ", asPlaced,
+			memcmp(&data, &g_textureBudgetDataAsSet, sizeof(data)) == 0 ? L"as set" : L"CHANGED", ProtectionOf(&data) == PAGE_READWRITE ? L"RW" : L"not RW",
+			g_textureBudgetGrown, rva(g_textureBudgetStores), rva(g_textureBudgetGetter), rva(g_textureBudgetPlacement), rva(g_textureBudgetUpdate),
+			rva(reinterpret_cast<const void*>(&TextureBudgetNextStep)), rva(&data.counters), rva(&data.index), rva(&data.flag), rva(&data.updateCheck));
+	}
 	// [streaming memory]
 	CheckStub(Rel32Target(g_packCallSite));
 	CheckStub(Rel32Target(g_scriptCallSite));

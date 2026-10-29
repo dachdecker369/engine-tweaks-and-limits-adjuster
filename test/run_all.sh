@@ -35,6 +35,7 @@ SUITES=(
 	# [ped props]
 	pedprops
 	# [texture budget]
+	texturebudget
 	# [streaming memory]
 	integration
 )
