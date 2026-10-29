@@ -146,6 +146,7 @@
     <ClCompile Include="TweaksVScripts.cpp" />
     <ClCompile Include="TweaksVSettings.cpp" />
     <!-- [siren count] -->
+    <ClCompile Include="TweaksVSirenCount.cpp" />
     <!-- [siren ids] -->
     <ClCompile Include="TweaksVSirenIds.cpp" />
     <ClCompile Include="TweaksVStraightToStoryMode.cpp" />
@@ -198,6 +199,7 @@
     <ClInclude Include="TweaksVScripts.h" />
     <ClInclude Include="TweaksVSettings.h" />
     <!-- [siren count] -->
+    <ClInclude Include="TweaksVSirenCount.h" />
     <!-- [siren ids] -->
     <ClInclude Include="TweaksVSirenIds.h" />
     <ClInclude Include="TweaksVStraightToStoryMode.h" />

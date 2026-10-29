@@ -185,6 +185,13 @@ namespace TweaksV
 		{ "I-E-R1", "66 0F 7F 05 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? 80 3D" },
 		{ "I-E-M1", "0F B6 81 3B 05 00 00 48 85 C0 74 13 48 8B 0D ? ? ? ? 48 69 C0 E8 05 00 00 48 03 41 48 C3" },
 		// [siren count]
+		// SirenSettings, the siren count (TweaksVSirenCount.cpp): the vehicle lights' calls of the siren lights' renderer, which the
+		// measurement redirects, and of the siren settings getter (B1); the renderer's read of a siren's bone through the model info's
+		// bone structure (B2); a read of a siren's glass bone (B3); the start of find-bone-by-name, which tests the bone count first (B4)
+		{ "I-E-B1", "48 89 6C 24 28 0F 95 44 24 20 4C 89 E1 E8 ? ? ? ? 49 89 EE 48 89 E9 E8" },
+		{ "I-E-B2", "48 8B 87 B0 00 00 00 48 85 C0 74 ? 48 8B 00 48 85 C0 74 ? 0F BE 84 28 99 00 00 00" },
+		{ "I-E-B3", "0F BE 94 18 AD 00 00 00 48 8B 8E C0 09 00 00" },
+		{ "I-E-B4", "41 57 41 56 41 55 41 54 56 57 53 48 83 EC 20 66 83 79 5E 00" },
 		// [ped props]
 		// [texture budget]
 		// [streaming memory]

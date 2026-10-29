@@ -19,6 +19,7 @@
 // [ped props]
 #include "TweaksVRageOpenV.h"
 // [siren count]
+#include "TweaksVSirenCount.h"
 // [siren ids]
 #include "TweaksVSirenIds.h"
 #include "TweaksVStraightToStoryMode.h"
@@ -98,6 +99,7 @@ namespace TweaksV
 			// [siren ids]
 			{ "SirenSettings", MeasureSirenIds },
 			// [siren count]
+			{ "SirenSettings", MeasureSirenCount },
 			// [ped props]
 			// [texture budget]
 			// [streaming memory]
