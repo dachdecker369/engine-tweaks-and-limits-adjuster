@@ -77,6 +77,8 @@ Four parts to come ([ROADMAP.md](ROADMAP.md)) lift seven more limits of the game
 
 <!-- [siren count] -->
 
+**Siren count** (SirenSettings): the game lights 20 sirens of a vehicle, `siren1` to `siren20`. An emergency vehicle made for 32 sirens, as some packs ship them, loads all the same, and its lights past the 20th stay dark without an error; and a siren whose bone lies past the model's 128th bone stays dark too, because the game cannot name it. With `DIAGNOSTIC_MODE=1` TweaksV looks once at each vehicle model whose sirens the game draws, and 10 seconds after the first logs how many such models it has seen, the most sirens one of them has, how many carry siren bones past `siren20` that the game never lights and how many lose siren bones past bone 127 - with a line for each model concerned, named by the hash of its name, saying how many of its siren and glass bones are lost. The game draws sirens only while they are on: drive an emergency vehicle with its sirens on, or let the police chase you. This is the one measurement that changes something in the game: the game's call that draws a vehicle's sirens passes through TweaksV, which has the game draw them unchanged first; with `DRY_RUN=1` the call stays as it is and nothing is counted.
+
 <!-- [ped props] -->
 
 <!-- [texture budget] -->
