@@ -81,6 +81,8 @@ Four parts to come ([ROADMAP.md](ROADMAP.md)) lift seven more limits of the game
 
 <!-- [ped props] -->
 
+**Ped props** (PedProps): a ped model - above all GTA Online's freemode characters, `mp_m_freemode_01` and `mp_f_freemode_01`, which clothing packs dress - carries its props, the hats, helmets, glasses, earrings and watches, on 13 anchors (anchor 0 is the head), and each pack adds a file of them per model. The game's checks take the props of one anchor, all files together, as 8 bits: with 300 props on an anchor, only the first 44 can be put on, and the game takes a worn prop past the 255th for another one. 10 seconds in and then every minute while the numbers change, the log says how many ped models it found and the most props on one anchor - `the most props on one anchor: 212 (mp_m_freemode_01, anchor 0, from 30 files, at most 38 in one)` - and gives every anchor past 255, and every file with more than 255 props on one anchor, a line of its own. An anchor past 255 is what the PedProps part will lift; a file past 255 is its pack's to split, which no part can do. The first summary can come before the game has loaded its peds; the next ones count them.
+
 <!-- [texture budget] -->
 
 <!-- [streaming memory] -->
