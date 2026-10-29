@@ -161,6 +161,23 @@
 //   sicallhooked  the base loader call leads outside the game (another mod redirected it)
 //   sicarcols     the getter reads another carcols pointer than a pack's builder
 // [siren count]
+// The siren count (SirenSettings): its sites in .fakesit - the vehicle lights' calls of the siren lights' renderer and of the
+// siren settings getter (I-E-B1), a read of a siren's glass bone (I-E-B3) - and the renderer, with its read of a siren's bone
+// (I-E-B2), and find-bone-by-name (I-E-B4) as code the fake's unwind data names; nine vehicle models at the game's offsets, of
+// which scdraw draws four: the police car (0x79FBB0C5) with 20 sirens and 20 glass bones, one made for 32 (0xA1B2C3D4), one
+// whose siren9 and siren10 are bones 128 and 129 (0x0C0FFEE0), past what a signed byte names, one with 8 sirens (0x2C3D4E5F).
+//   scdraw         once TweaksV has started, draws their sirens through the call at the site - TweaksV's stub when it is
+//                  redirected, the fake's renderer when it is not - 100 passes of each model from each of two threads at once
+//   scodd          with scdraw: three more models among them - one whose bone structure cannot be read (0x0BAD0001), one drawn
+//                  without a skeleton (0x0BAD0002), one whose bone structure names siren1 at another bone than its name has and
+//                  a glass bone it has no name for (0x0DD0DD00)
+//   scmore         with scdraw: 11 seconds after the first passes, two more models, 10 passes each - one more made for 32 sirens
+//                  (0xB2C3D4E5) and one with 16 (0x16161616) - then 3 seconds more
+//   scfull         with scdraw: 1,100 more models after the four, one pass each - more than TweaksV's table of 1,024 holds
+//   schooked       the call of the renderer already leads outside the game (another mod redirected it)
+//   scgetterhooked the call of the getter already leads outside the game
+//   scelsewhere    the call of the renderer leads to another function of the game than the one the bone read lies in
+//   scnotstart     find-bone-by-name's pattern lies 16 bytes into its function, not at its start
 // [ped props]
 // [texture budget]
 // [streaming memory]
@@ -507,6 +524,16 @@ volatile unsigned char g_sirenIdsR1[21] = { 0xCC };
 volatile unsigned char g_sirenIdsM1[32] = { 0xCC };
 volatile unsigned char g_sirenIdsLeaExtra[8] = { 0xCC };
 // [siren count]
+// The siren count: the vehicle lights' calls of the siren lights' renderer - the E8 at +13 - and of the siren settings getter -
+// the E8 at +24, its rel32 past the pattern (I-E-B1); a read of a siren's glass bone, siren_glass1's byte at +4 (I-E-B3). The
+// renderer, with its read of a siren's bone, and find-bone-by-name are below, outside this section: code the fake's unwind data
+// names, as the game's does.
+volatile unsigned char g_sirenCountCallSite[] = { 0x48, 0x89, 0x6C, 0x24, 0x28, 0x0F, 0x95, 0x44, 0x24, 0x20, 0x4C, 0x89, 0xE1, 0xE8, 0, 0, 0, 0,
+	0x49, 0x89, 0xEE, 0x48, 0x89, 0xE9, 0xE8, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_sirenCountGlassRead[] = { 0x0F, 0xBE, 0x94, 0x18, 0xAD, 0x00, 0x00, 0x00, 0x48, 0x8B, 0x8E, 0xC0, 0x09, 0x00, 0x00, 0xCC };
+static Site g_sirenCountRendererCall = SITE(g_sirenCountCallSite, 14);	// the rel32 of the E8 at +13
+static Site g_sirenCountGetterCall = SITE(g_sirenCountCallSite, 25);		// the rel32 of the E8 at +24
+static Site g_sirenCountGlassSite = SITE(g_sirenCountGlassRead, 4);		// the disp32 of siren_glass1's byte
 // [ped props]
 // [texture budget]
 // [streaming memory]
@@ -953,6 +980,381 @@ static void SirenIdsReport()
 		SirenIdsData() == g_sirenIdsDataPlaced ? L"as placed" : L"NOT as placed");
 }
 // [siren count]
+// The siren count: the game's siren lights' renderer and find-bone-by-name, and the vehicle models the fake draws. The two
+// functions are carriers - compiled functions of the fake's own, which its unwind data names - that SirenCountSetup rewrites
+// before TweaksV loads: the renderer into a jump on to SirenCountRenderer with its read of a siren's bone (I-E-B2) behind it,
+// find-bone-by-name into the game's prologue with its test of the bone count (I-E-B4), undone at once, and a jump on to
+// SirenCountFindBone - so that TweaksV checks both by the unwind data, as it does the game's, and neither is on the stack while
+// the fake's own code runs. The models lie at the game's offsets: the hash of a model's name at +0x18, the holder of its bone
+// structure at +0xB0, the bone structure's signed byte at 0x10 + a hierarchy ID, the skeleton data at the skeleton's +0x00, its
+// bone count at +0x5E, and a bone's index at +0x42.
+static void SetRel32(const Site& site, const void* target);
+static const unsigned char* Rel32Target(const Site& site);
+static const unsigned char* ImageEnd();
+static bool InImage(const void* p);
+
+struct SirenCountModel
+{
+	unsigned char head[0x18];
+	uint32_t hash;							// +0x18: the hash of the model's name
+	unsigned char middle[0xB0 - 0x1C];
+	const void* const* bones;				// +0xB0: the holder of its bone structure
+	unsigned char tail[0x10];
+};
+struct SirenCountBones
+{
+	signed char ids[0x10 + 0x284];			// at 0x10 + a hierarchy ID, the index of its bone; -1 for none
+};
+struct SirenCountBone
+{
+	char name[0x42];
+	uint16_t index;							// +0x42
+};
+struct SirenCountSkeletonData
+{
+	unsigned char head[0x5E];
+	uint16_t bones;							// +0x5E: the bone count
+	uint32_t named;							// the fake's own from here on: its bones with a name it looks up
+	const SirenCountBone* list;
+};
+struct SirenCountSkeleton
+{
+	const SirenCountSkeletonData* data;		// +0x00: the skeleton data
+	unsigned char rest[0x18];
+};
+static_assert(offsetof(SirenCountModel, hash) == 0x18 && offsetof(SirenCountModel, bones) == 0xB0 && offsetof(SirenCountBone, index) == 0x42 &&
+	offsetof(SirenCountSkeletonData, bones) == 0x5E && offsetof(SirenCountSkeleton, data) == 0, "the siren count's models lie at the game's offsets");
+
+// A vehicle model of the fake's, with what TweaksV reaches from it.
+struct SirenCountVehicle
+{
+	SirenCountModel model;
+	const void* holder;
+	SirenCountBones structure;
+	SirenCountSkeletonData data;
+	SirenCountSkeleton skeleton;
+	SirenCountBone list[64];
+};
+enum
+{
+	kSirenCountPolice, kSirenCount32, kSirenCountLost, kSirenCount8,	// what scdraw draws
+	kSirenCountNoStructure, kSirenCountNoSkeleton, kSirenCountOdd,		// and with scodd
+	kSirenCountMore32, kSirenCountMore16,								// scmore, later
+	kSirenCountVehicles
+};
+constexpr int kSirenCountMany = 1100;		// scfull: models past what TweaksV's table of 1,024 holds, each the police car's but its hash
+static SirenCountVehicle g_sirenCountVehicleStorage[kSirenCountVehicles];
+static SirenCountVehicle* volatile g_sirenCountVehicles = g_sirenCountVehicleStorage;
+static SirenCountModel g_sirenCountManyStorage[kSirenCountMany];
+static SirenCountModel* volatile g_sirenCountMany = g_sirenCountManyStorage;
+
+// A model: the hash of its name, its skeleton's bones, and its siren and glass bones by name - siren1 to siren<sirens> at the
+// bones from firstSiren on, siren_glass1 to siren_glass<glass> from firstGlass on. Its bone structure names those of siren1 to
+// siren20 - hierarchy IDs 0x89 to 0x9C, their glass 0x9D to 0xB0 - whose index a signed byte holds, as the game's does.
+static void SirenCountMake(SirenCountVehicle& v, uint32_t hash, uint16_t bones, int sirens, int firstSiren, int glass, int firstGlass)
+{
+	memset(&v, 0, sizeof(v));
+	memset(v.structure.ids, 0xFF, sizeof(v.structure.ids));
+	v.model.hash = hash;
+	v.holder = &v.structure;
+	v.model.bones = &v.holder;
+	v.data.bones = bones;
+	v.data.list = v.list;
+	v.skeleton.data = &v.data;
+	const struct { const char* name; int count; int first; int id; } kinds[2] = { { "siren", sirens, firstSiren, 0x88 },
+		{ "siren_glass", glass, firstGlass, 0x9C } };
+	for (const auto& kind : kinds)
+		for (int n = 1; n <= kind.count; n++)
+		{
+			SirenCountBone& bone = v.list[v.data.named++];
+			snprintf(bone.name, sizeof(bone.name), "%s%d", kind.name, n);
+			bone.index = static_cast<uint16_t>(kind.first + n - 1);
+			if (n <= 20 && bone.index < 128)
+				v.structure.ids[0x10 + kind.id + n] = static_cast<signed char>(bone.index);
+		}
+}
+
+// What the fake hands the call of the renderer, and the result and last error the renderer leaves; each thread draws on its own,
+// so what it handed the call is its own.
+using SirenCountLights = uint64_t (*)(void* vehicle, float a, float b, float c, uint64_t flag, const unsigned char* model,
+	const unsigned char* skeleton, uint64_t value, void* coronas);
+constexpr float kSirenCountFloats[3] = { 1.25f, 2.5f, 3.75f };
+constexpr uint64_t kSirenCountFlag = 0xA5A5A5A5A5A5A501ull;		// a flag byte, and the rest of its slot as the game leaves it
+constexpr uint64_t kSirenCountValue = 0x0123456789ABCDEFull;
+constexpr uint64_t kSirenCountResult = 0x51E7C0DE0000F00Dull;
+constexpr DWORD kSirenCountLastError = 0x5157;
+static unsigned char g_sirenCountCoronas[0x30];
+static thread_local const void* g_sirenCountExpectedVehicle = nullptr;
+static thread_local const void* g_sirenCountExpectedModel = nullptr;
+static thread_local const void* g_sirenCountExpectedSkeleton = nullptr;
+static thread_local const void* g_sirenCountDrawnData = nullptr;	// the skeleton data of the vehicle the renderer drew last
+static volatile LONG g_sirenCountDrawn = 0, g_sirenCountKept = 0, g_sirenCountRendered = 0, g_sirenCountArgsBad = 0, g_sirenCountLookups = 0,
+	g_sirenCountOutOfTurn = 0;
+
+// The game's renderer, behind the jump in its carrier: it checks that it got what the fake handed the call, notes the vehicle it
+// drew for the lookups that follow, and leaves a result and a last error of its own.
+static uint64_t SirenCountRenderer(void* vehicle, float a, float b, float c, uint64_t flag, const unsigned char* model,
+	const unsigned char* skeleton, uint64_t value, void* coronas)
+{
+	InterlockedIncrement(&g_sirenCountRendered);
+	if (vehicle != g_sirenCountExpectedVehicle || a != kSirenCountFloats[0] || b != kSirenCountFloats[1] || c != kSirenCountFloats[2] ||
+		flag != kSirenCountFlag || model != g_sirenCountExpectedModel || skeleton != g_sirenCountExpectedSkeleton || value != kSirenCountValue ||
+		coronas != g_sirenCountCoronas)
+		InterlockedIncrement(&g_sirenCountArgsBad);
+	g_sirenCountDrawnData = skeleton ? reinterpret_cast<const SirenCountSkeleton*>(skeleton)->data : nullptr;
+	SetLastError(kSirenCountLastError);
+	return kSirenCountResult;
+}
+
+// find-bone-by-name, behind the jump in its carrier: the bone of that name among the model's, or null - asked, in turn, about the
+// vehicle the renderer drew last on this thread.
+static const unsigned char* SirenCountFindBone(const SirenCountSkeletonData* data, const char* name)
+{
+	InterlockedIncrement(&g_sirenCountLookups);
+	if (data != g_sirenCountDrawnData)
+		InterlockedIncrement(&g_sirenCountOutOfTurn);
+	for (uint32_t i = 0; i < data->named; i++)
+		if (strcmp(data->list[i].name, name) == 0)
+			return reinterpret_cast<const unsigned char*>(&data->list[i]);
+	return nullptr;
+}
+
+// The siren settings getter the vehicle lights' second call leads to: never called.
+static __declspec(noinline) const void* SirenCountGetter(const void* model)
+{
+	return model;
+}
+
+// The carriers: functions with frames of their own, so that the fake's unwind data names them, and room for their stand-ins.
+static volatile int g_sirenCountSink = 0;
+static __declspec(noinline) void SirenCountRendererCarrier()
+{
+	volatile int frame[16];
+	for (int i = 0; i < 16; i++)
+		frame[i] = g_sirenCountSink + 3 * i;
+	for (int i = 1; i < 16; i++)
+		frame[i] = frame[i] + (frame[i - 1] ^ 0x5157);
+	g_sirenCountSink = frame[5] + frame[10] + frame[15];
+}
+static __declspec(noinline) void SirenCountFindBoneCarrier()
+{
+	volatile int frame[16];
+	for (int i = 0; i < 16; i++)
+		frame[i] = g_sirenCountSink - 5 * i;
+	for (int i = 1; i < 16; i++)
+		frame[i] = frame[i] + (frame[i - 1] ^ 0xB0E5);
+	g_sirenCountSink = frame[4] + frame[9] + frame[14];
+}
+static unsigned char* SirenCountCode(void (*carrier)())
+{
+	return reinterpret_cast<unsigned char*>(carrier);
+}
+
+// The renderer's read of a siren's bone (I-E-B2), its two jumps' rel8 the fake's own; find-bone-by-name's prologue and test of the
+// bone count (I-E-B4), then the epilogue that undoes the prologue: add rsp, 20h, pop rbx ... pop r15.
+static const unsigned char kSirenCountBoneRead[] = { 0x48, 0x8B, 0x87, 0xB0, 0x00, 0x00, 0x00, 0x48, 0x85, 0xC0, 0x74, 0x1C, 0x48, 0x8B, 0x00,
+	0x48, 0x85, 0xC0, 0x74, 0x14, 0x0F, 0xBE, 0x84, 0x28, 0x99, 0x00, 0x00, 0x00 };
+static const unsigned char kSirenCountFindBoneStart[] = { 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x20,
+	0x66, 0x83, 0x79, 0x5E, 0x00, 0x48, 0x83, 0xC4, 0x20, 0x5B, 0x5F, 0x5E, 0x41, 0x5C, 0x41, 0x5D, 0x41, 0x5E, 0x41, 0x5F };
+constexpr size_t kSirenCountBoneReadAt = 0x20;	// in the renderer: its read of a siren's bone, after the jump
+constexpr size_t kSirenCountNotStartAt = 16;	// scnotstart: find-bone-by-name's pattern this far into its function
+constexpr size_t kSirenCountJumpSize = 6;		// jmp [rip+disp32]
+static const void* volatile g_sirenCountRendererTarget = nullptr;		// what the carriers' jumps read
+static const void* volatile g_sirenCountFindBoneTarget = nullptr;
+static size_t g_sirenCountRendererRoom = 0, g_sirenCountFindBoneRoom = 0;
+static bool g_sirenCountBuilt = false;
+static uint64_t g_sirenCountPlacedHash = 0;
+
+// The bytes of a carrier's range in the fake's unwind data, if the carrier starts a function there with room for size bytes; else 0.
+static size_t SirenCountRoom(const unsigned char* carrier, size_t size)
+{
+	DWORD64 base = 0;
+	const PRUNTIME_FUNCTION entry = RtlLookupFunctionEntry(reinterpret_cast<DWORD64>(carrier), &base, nullptr);
+	if (!entry || base + entry->BeginAddress != reinterpret_cast<DWORD64>(carrier) || entry->EndAddress - entry->BeginAddress < size)
+		return 0;
+	return entry->EndAddress - entry->BeginAddress;
+}
+
+// "jmp [rip+disp32]" at code, to the address target holds.
+static void SirenCountJump(unsigned char* code, const void* const volatile* target)
+{
+	code[0] = 0xFF;
+	code[1] = 0x25;
+	const int32_t disp = static_cast<int32_t>(reinterpret_cast<intptr_t>(target) - reinterpret_cast<intptr_t>(code + kSirenCountJumpSize));
+	memcpy(code + 2, &disp, sizeof(disp));
+}
+
+static uint64_t SirenCountHash(uint64_t hash, const volatile void* bytes, size_t size)
+{
+	const volatile unsigned char* const p = static_cast<const volatile unsigned char*>(bytes);
+	for (size_t i = 0; i < size; i++)
+		hash = (hash ^ p[i]) * 0x100000001B3ull;
+	return hash;
+}
+
+// What TweaksV may not change: the sites but the rel32 of the renderer's call, the stand-ins, the models and what they lead to.
+static uint64_t SirenCountPlaced()
+{
+	constexpr size_t kRel32At = 14;
+	uint64_t hash = 0xCBF29CE484222325ull;
+	hash = SirenCountHash(hash, g_sirenCountCallSite, kRel32At);
+	hash = SirenCountHash(hash, g_sirenCountCallSite + kRel32At + 4, sizeof(g_sirenCountCallSite) - kRel32At - 4);
+	hash = SirenCountHash(hash, g_sirenCountGlassRead, sizeof(g_sirenCountGlassRead));
+	hash = SirenCountHash(hash, SirenCountCode(&SirenCountRendererCarrier), g_sirenCountRendererRoom);
+	hash = SirenCountHash(hash, SirenCountCode(&SirenCountFindBoneCarrier), g_sirenCountFindBoneRoom);
+	hash = SirenCountHash(hash, g_sirenCountVehicles, sizeof(g_sirenCountVehicleStorage));
+	return SirenCountHash(hash, g_sirenCountMany, sizeof(g_sirenCountManyStorage));
+}
+
+// Before TweaksV loads: the stand-ins written over their carriers, the vehicle lights' two calls pointed at the renderer and the
+// getter - or where an option asks - and the models made.
+static void SirenCountSetup(bool hooked, bool getterHooked, bool elsewhere, bool notStart)
+{
+	unsigned char* const renderer = SirenCountCode(&SirenCountRendererCarrier);
+	unsigned char* const findBone = SirenCountCode(&SirenCountFindBoneCarrier);
+	const size_t findBoneAt = notStart ? kSirenCountNotStartAt : 0;
+	g_sirenCountRendererRoom = SirenCountRoom(renderer, kSirenCountBoneReadAt + sizeof(kSirenCountBoneRead) + 1);
+	g_sirenCountFindBoneRoom = SirenCountRoom(findBone, findBoneAt + sizeof(kSirenCountFindBoneStart) + kSirenCountJumpSize + 1);
+	g_sirenCountBuilt = g_sirenCountRendererRoom != 0 && g_sirenCountFindBoneRoom != 0;
+	if (g_sirenCountBuilt)
+	{
+		g_sirenCountRendererTarget = reinterpret_cast<const void*>(&SirenCountRenderer);
+		g_sirenCountFindBoneTarget = reinterpret_cast<const void*>(&SirenCountFindBone);
+		DWORD old = 0, unused = 0;
+		VirtualProtect(renderer, g_sirenCountRendererRoom, PAGE_EXECUTE_READWRITE, &old);
+		memset(renderer, 0xCC, g_sirenCountRendererRoom);
+		SirenCountJump(renderer, &g_sirenCountRendererTarget);
+		memcpy(renderer + kSirenCountBoneReadAt, kSirenCountBoneRead, sizeof(kSirenCountBoneRead));
+		VirtualProtect(renderer, g_sirenCountRendererRoom, old, &unused);
+		FlushInstructionCache(GetCurrentProcess(), renderer, g_sirenCountRendererRoom);
+		VirtualProtect(findBone, g_sirenCountFindBoneRoom, PAGE_EXECUTE_READWRITE, &old);
+		memset(findBone, 0xCC, g_sirenCountFindBoneRoom);
+		memcpy(findBone + findBoneAt, kSirenCountFindBoneStart, sizeof(kSirenCountFindBoneStart));
+		SirenCountJump(findBone + findBoneAt + sizeof(kSirenCountFindBoneStart), &g_sirenCountFindBoneTarget);
+		VirtualProtect(findBone, g_sirenCountFindBoneRoom, old, &unused);
+		FlushInstructionCache(GetCurrentProcess(), findBone, g_sirenCountFindBoneRoom);
+	}
+	SetRel32(g_sirenCountRendererCall, hooked ? static_cast<const void*>(ImageEnd() + 0x71000) :
+		elsewhere ? reinterpret_cast<const void*>(&SirenCountGetter) : static_cast<const void*>(renderer));
+	SetRel32(g_sirenCountGetterCall, getterHooked ? static_cast<const void*>(ImageEnd() + 0x72000) : reinterpret_cast<const void*>(&SirenCountGetter));
+
+	SirenCountVehicle* const v = g_sirenCountVehicles;
+	SirenCountMake(v[kSirenCountPolice], 0x79FBB0C5, 90, 20, 40, 20, 60);
+	SirenCountMake(v[kSirenCount32], 0xA1B2C3D4, 100, 32, 10, 32, 42);
+	SirenCountMake(v[kSirenCountLost], 0x0C0FFEE0, 150, 10, 120, 10, 100);
+	SirenCountMake(v[kSirenCount8], 0x2C3D4E5F, 40, 8, 20, 0, 0);
+	SirenCountMake(v[kSirenCountNoStructure], 0x0BAD0001, 50, 4, 10, 0, 0);
+	v[kSirenCountNoStructure].model.bones = nullptr;
+	SirenCountMake(v[kSirenCountNoSkeleton], 0x0BAD0002, 50, 4, 10, 0, 0);
+	SirenCountMake(v[kSirenCountOdd], 0x0DD0DD00, 50, 4, 10, 0, 0);
+	v[kSirenCountOdd].structure.ids[0x10 + 0x89] = 50;		// siren1 at another bone than its name has
+	v[kSirenCountOdd].structure.ids[0x10 + 0x9D] = 20;		// and a glass bone it has no name for
+	SirenCountMake(v[kSirenCountMore32], 0xB2C3D4E5, 110, 32, 0, 32, 32);
+	SirenCountMake(v[kSirenCountMore16], 0x16161616, 60, 16, 30, 16, 46);
+	for (int i = 0; i < kSirenCountMany; i++)
+	{
+		g_sirenCountMany[i] = v[kSirenCountPolice].model;
+		g_sirenCountMany[i].hash = 0x5C000000u + static_cast<uint32_t>(i);
+	}
+	g_sirenCountPlacedHash = SirenCountPlaced();
+}
+
+// Where the call of the renderer leads now: the fake's renderer, TweaksV's call stub, another mod or another function of the game.
+static const wchar_t* SirenCountWhere()
+{
+	const unsigned char* const target = Rel32Target(g_sirenCountRendererCall);
+	if (target == SirenCountCode(&SirenCountRendererCarrier))
+		return L"the renderer";
+	if (InImage(target))
+		return L"another function of the game";
+	MEMORY_BASIC_INFORMATION info{};
+	if (VirtualQuery(target, &info, sizeof(info)) == sizeof(info) && info.State == MEM_COMMIT && memcmp(target, "\xFF\x25\x00\x00\x00\x00", 6) == 0)
+		return L"a TweaksV stub";
+	return L"another mod";
+}
+
+// One pass of a vehicle's sirens, as the game's vehicle lights make it: through the call at the site, to wherever it leads.
+static void SirenCountDraw(const unsigned char* lights, const void* vehicle, const SirenCountModel* model, const SirenCountSkeleton* skeleton)
+{
+	g_sirenCountExpectedVehicle = vehicle;
+	g_sirenCountExpectedModel = model;
+	g_sirenCountExpectedSkeleton = skeleton;
+	SetLastError(0);
+	const uint64_t result = reinterpret_cast<SirenCountLights>(const_cast<unsigned char*>(lights))(const_cast<void*>(vehicle), kSirenCountFloats[0],
+		kSirenCountFloats[1], kSirenCountFloats[2], kSirenCountFlag, reinterpret_cast<const unsigned char*>(model),
+		reinterpret_cast<const unsigned char*>(skeleton), kSirenCountValue, g_sirenCountCoronas);
+	const DWORD error = GetLastError();
+	InterlockedIncrement(&g_sirenCountDrawn);
+	if (result == kSirenCountResult && error == kSirenCountLastError)
+		InterlockedIncrement(&g_sirenCountKept);
+}
+
+// passes passes of the models first to first + count - 1, each the vehicle it is drawn as, the one without a skeleton without one.
+struct SirenCountRun
+{
+	const unsigned char* lights;
+	int first, count, passes;
+};
+static DWORD WINAPI SirenCountRunPasses(LPVOID parameter)
+{
+	const SirenCountRun& run = *static_cast<const SirenCountRun*>(parameter);
+	for (int pass = 0; pass < run.passes; pass++)
+		for (int i = run.first; i < run.first + run.count; i++)
+		{
+			SirenCountVehicle& v = g_sirenCountVehicles[i];
+			SirenCountDraw(run.lights, &v, &v.model, i == kSirenCountNoSkeleton ? nullptr : &v.skeleton);
+		}
+	return 0;
+}
+
+// Once TweaksV has started (scdraw), when the call leads to the fake's renderer or to TweaksV's stub: 100 passes of the four
+// models - seven with scodd - from each of two threads at once; with scmore 11 seconds later 10 passes of two more, then 3 seconds
+// more; with scfull 1,100 more models, one pass each.
+static void SirenCountDrawAll(bool odd, bool more, bool full)
+{
+	const wchar_t* const where = SirenCountWhere();
+	if (!g_sirenCountBuilt || (wcscmp(where, L"the renderer") != 0 && wcscmp(where, L"a TweaksV stub") != 0))
+		return;
+	const unsigned char* const lights = Rel32Target(g_sirenCountRendererCall);
+	SirenCountRun runs[2] = { { lights, 0, odd ? kSirenCountMore32 : kSirenCountNoStructure, 100 },
+		{ lights, 0, odd ? kSirenCountMore32 : kSirenCountNoStructure, 100 } };
+	HANDLE threads[2] = {};
+	DWORD started = 0;
+	for (SirenCountRun& run : runs)
+		if (const HANDLE thread = CreateThread(nullptr, 0, SirenCountRunPasses, &run, 0, nullptr))
+			threads[started++] = thread;
+		else
+			SirenCountRunPasses(&run);
+	if (started)
+		WaitForMultipleObjects(started, threads, TRUE, INFINITE);
+	for (DWORD i = 0; i < started; i++)
+		CloseHandle(threads[i]);
+	if (more)
+	{
+		Sleep(11000);
+		SirenCountRun later = { lights, kSirenCountMore32, 2, 10 };
+		SirenCountRunPasses(&later);
+		Sleep(3000);
+	}
+	if (full)
+		for (int i = 0; i < kSirenCountMany; i++)
+			SirenCountDraw(lights, &g_sirenCountMany[i], &g_sirenCountMany[i], &g_sirenCountVehicles[kSirenCountPolice].skeleton);
+}
+
+// "siren count: stand-ins built | siren draws: 800 through a TweaksV stub, the renderer 800 times, args ok, result and last error
+// kept 800 of 800, 256 lookups in turn | siren sites and data: as placed | " - "siren draws: none, the call leads to ..." when it
+// drew nothing.
+static void SirenCountReport()
+{
+	wprintf(L"siren count: stand-ins %ls | ", g_sirenCountBuilt ? L"built" : L"NOT built");
+	if (g_sirenCountDrawn == 0)
+		wprintf(L"siren draws: none, the call leads to %ls | ", SirenCountWhere());
+	else
+		wprintf(L"siren draws: %ld through %ls, the renderer %ld times, args %ls, result and last error kept %ld of %ld, %ld lookups %ls | ",
+			g_sirenCountDrawn, SirenCountWhere(), g_sirenCountRendered, g_sirenCountArgsBad == 0 ? L"ok" : L"BAD", g_sirenCountKept,
+			g_sirenCountDrawn, g_sirenCountLookups, g_sirenCountOutOfTurn == 0 ? L"in turn" : L"OUT OF TURN");
+	wprintf(L"siren sites and data: %ls | ", SirenCountPlaced() == g_sirenCountPlacedHash ? L"as placed" : L"CHANGED");
+}
 // [ped props]
 // [texture budget]
 // [streaming memory]
@@ -1435,6 +1837,8 @@ static void ForEachSite(void (*fn)(const Site&))
 		fn(site);
 	}
 	// [siren count]
+	fn(g_sirenCountRendererCall);
+	fn(g_sirenCountGlassSite);
 	// [ped props]
 	// [texture budget]
 	// [streaming memory]
@@ -2746,6 +3150,8 @@ int wmain(int argc, wchar_t** argv)
 	// [siren ids]
 	SirenIdsSetup(argc, argv);
 	// [siren count]
+	SirenCountSetup(HasOption(argc, argv, L"schooked"), HasOption(argc, argv, L"scgetterhooked"), HasOption(argc, argv, L"scelsewhere"),
+		HasOption(argc, argv, L"scnotstart"));
 	// [ped props]
 	// [texture budget]
 	// [streaming memory]
@@ -2829,6 +3235,8 @@ int wmain(int argc, wchar_t** argv)
 	// [siren ids]
 	SirenIdsLater();
 	// [siren count]
+	if (HasOption(argc, argv, L"scdraw"))
+		SirenCountDrawAll(HasOption(argc, argv, L"scodd"), HasOption(argc, argv, L"scmore"), HasOption(argc, argv, L"scfull"));
 	// [ped props]
 	// [texture budget]
 	// [streaming memory]
@@ -2877,6 +3285,8 @@ int wmain(int argc, wchar_t** argv)
 	// [siren ids]
 	SirenIdsReport();
 	// [siren count]
+	SirenCountReport();
+	CheckStub(Rel32Target(g_sirenCountRendererCall));
 	// [ped props]
 	// [texture budget]
 	// [streaming memory]

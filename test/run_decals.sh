@@ -105,7 +105,7 @@ check "reported" "log_has '$NOT_RAISED: D-E-L1 was not found.'"
 
 echo "== D17 DIAGNOSTIC_MODE=1 with 300 definitions registered: the count is read and summed up 10 s in, nothing hooked for it"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe decalmany wait); echo "      $out"
-check "array moved and limit raised as before; no call stub added for it (the 11 are the other parts': the packfile hook, RageOpenV's 5 calls, the script programs' hook, the box streamer's 4 counted calls)" "has '$MOVED' && has '$NEW_LIMITS' && has 'stubs: 11, all RX'"
+check "array moved and limit raised as before; no call stub added for it (the 12 are the other parts': the packfile hook, RageOpenV's 5 calls, the script programs' hook, the box streamer's 4 counted calls, the siren count's call)" "has '$MOVED' && has '$NEW_LIMITS' && has 'stubs: 12, all RX'"
 check "the log says what is logged" "log_has '$ANNOUNCED.'"
 check "the summary: 300 registered, 40 more than the game's own array holds" "log_has 'DIAGNOSTIC: 300 decal definitions registered (the game.s own array holds 260, this one 2048) - the game.s own array would have dropped 40 of them.'"
 check "no problems" "log_lacks 'PROBLEM'"

@@ -336,7 +336,7 @@ namespace TweaksV
 		void LogSummary(uint64_t)
 		{
 			size_t seen = 0, past = 0, lost = 0, unreadable = 0;
-			const ModelSlot* most = nullptr;	// the model whose bone structure names the most sirens
+			const ModelSlot* most = nullptr;	// the model whose bone structure names the most sirens - of two, the lower hash
 			std::vector<ModelSlot*> lines;
 			for (ModelSlot& slot : g_models)
 			{
@@ -351,7 +351,7 @@ namespace TweaksV
 						past++;
 					if (slot.lost[0] || slot.lost[1])
 						lost++;
-					if (!most || slot.inTable[0] > most->inTable[0])
+					if (!most || slot.inTable[0] > most->inTable[0] || (slot.inTable[0] == most->inTable[0] && slot.hash < most->hash))
 						most = &slot;
 				}
 				if (!slot.written && WorthALine(slot))
