@@ -563,10 +563,10 @@ namespace TweaksV
 			{
 				const uint64_t settings = numbers & 0xFFFF;
 				const uint64_t past = settings > kPositions ? settings - kPositions : 0;
-				WriteLog(kTag, "DIAGNOSTIC: " + std::to_string(settings) + " siren settings loaded (vehicles can use " + std::to_string(kUsable) + " at most), " +
-					std::to_string(numbers >> 16 & 0x1FF) + " of the " + std::to_string(kIds) + " siren setting IDs in use; " + std::to_string(past) +
-					" settings past position " + std::to_string(kPositions - 1) + ", which no vehicle can reach; " + std::to_string(numbers >> 25 & 0xFFFF) +
-					" IDs given to more than one setting.");
+				WriteLog(kTag, "DIAGNOSTIC: siren settings loaded: " + std::to_string(settings) + " (vehicles can use " + std::to_string(kUsable) + " at most); "
+					"siren setting IDs in use: " + std::to_string(numbers >> 16 & 0x1FF) + " of " + std::to_string(kIds) + "; settings past position " +
+					std::to_string(kPositions - 1) + ", which no vehicle can reach: " + std::to_string(past) + "; IDs given to more than one setting: " +
+					std::to_string(numbers >> 25 & 0xFFFF) + ".");
 			}
 		}
 

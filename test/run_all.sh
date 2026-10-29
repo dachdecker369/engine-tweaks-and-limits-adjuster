@@ -29,6 +29,7 @@ SUITES=(
 	# [weapon components]
 	weaponcomponents
 	# [siren ids]
+	sirenids
 	# [siren count]
 	# [ped props]
 	# [texture budget]
