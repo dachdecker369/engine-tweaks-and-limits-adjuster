@@ -113,17 +113,22 @@ fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe tbcounters)
 check "the reason, word for word, the placement's check logged before it" "log_line '${NOT_MEASURED}the update check at $(rva update) does not read the counters at $(rva counters) (Q-E-T5).\$' && log_has 'DIAGNOSTIC: placement check at'"
 check "no problem, no announcement; nothing written" "log_lacks 'PROBLEM' && nothing_measured && untouched"
 
-echo "== TB10 the update check's multiplication by its raise factor turned into an addition"
+echo "== TB10 the sites disagree on the counters: the placement's check loads the most from 4 bytes past them"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe tbmost)
+check "the reason, word for word" "log_line '${NOT_MEASURED}the placement.s check loads the most objects from $(rva counters 0x24), not from +0x20 of the counters at $(rva counters) (Q-E-T4).\$'"
+check "no problem, no announcement; nothing written" "log_lacks 'PROBLEM' && nothing_measured && untouched"
+
+echo "== TB11 the update check's multiplication by its raise factor turned into an addition"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe tbfactor)
 check "the reason with the bytes found, word for word" "log_line '${NOT_MEASURED}the update check.s code at $(rva update 0xA0) is not the multiplication by its factor at $(rva switch 4): F3 44 0F 58 0D [0-9A-F ]* (Q-E-T5).\$'"
 check "no problem, no announcement; nothing written" "log_lacks 'PROBLEM' && nothing_measured && untouched"
 
-echo "== TB11 the plain game, DIAGNOSTIC_MODE=1: every pattern missing - logged, not the module's problem"
+echo "== TB12 the plain game, DIAGNOSTIC_MODE=1: every pattern missing - logged, not the module's problem"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game plain_game.exe)
 check "the scanner's five lines and the module's, word for word" "[ \$(grep -c -E 'Pattern Q-E-T[1-5] not found: ' TweaksV.log) -eq 5 ] && log_line '${NOT_MEASURED}Q-E-T1 was not found.\$'"
 check "no problem of the module's, no announcement" "log_lacks '\[Resources\] PROBLEM' && nothing_measured"
 
-echo "== TB12 DRY_RUN=1 with DIAGNOSTIC_MODE=1: the same lines and the same summary; nothing written"
+echo "== TB13 DRY_RUN=1 with DIAGNOSTIC_MODE=1: the same lines and the same summary; nothing written"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; setkey DRY_RUN 1; out=$(game full_game.exe wait)
 check "the five patterns, the eight lines of the sites, the announcement and the summary 10 s in, word for word" "patterns_found && sites_logged && announced && log_line '$SUMMARY1' && first_after_10s"
 check "no problem; nothing written" "log_lacks 'PROBLEM' && untouched"

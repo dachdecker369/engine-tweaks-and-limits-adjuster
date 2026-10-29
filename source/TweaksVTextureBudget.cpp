@@ -253,8 +253,8 @@ namespace TweaksV
 					" cannot be read");
 			for (const PlacementLoad& load : kPlacementLoads)
 				if (Rel32Target(placement + load.at) != counters + load.field)
-					return NotMeasured(std::string("the ") + load.what + " the placement's check reads at " + DescribeAddress(Rel32Target(placement + load.at)) +
-						" is not at +" + Hex(load.field) + " of the counters at " + DescribeAddress(counters) + At(kPlacement));
+					return NotMeasured(std::string("the placement's check loads the ") + load.what + " from " + DescribeAddress(Rel32Target(placement + load.at)) +
+						", not from +" + Hex(load.field) + " of the counters at " + DescribeAddress(counters) + At(kPlacement));
 			if (counters + kMost != most)
 				return NotMeasured("the most objects the placement's check reads at " + DescribeAddress(counters + kMost) + " are not those " +
 					kStoreMost.label + " stores at " + DescribeAddress(most));

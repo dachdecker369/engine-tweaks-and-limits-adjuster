@@ -221,7 +221,8 @@
 //   tbcallhooked   the call after the budgets' stores already leads outside the game (another mod's hook)
 //   tbindexout     the getter's index lies outside the game
 //   tbcounters     the update check's lea of the counters leads 8 bytes past them
-//   tbfactor       the update check's multiplication by its raise factor is an addition (addss)
+//   tbmost         the placement's check loads the most objects from 4 bytes past them
+//   tbfactor      the update check's multiplication by its raise factor is an addition (addss)
 // [streaming memory]
 #include <windows.h>
 #include <winternl.h>
@@ -3687,6 +3688,8 @@ int wmain(int argc, wchar_t** argv)
 			SetRel32(g_textureBudgetIndexRef, ImageEnd() + 0x78000);
 		if (HasOption(argc, argv, L"tbcounters"))	// the update check's lea of the counters 8 bytes past them
 			SetRel32(g_textureBudgetLoads[5].site, counters + 8);
+		if (HasOption(argc, argv, L"tbmost"))		// the placement's check loads the most objects from 4 bytes past them
+			SetRel32(g_textureBudgetLoads[2].site, counters + 0x24);
 		if (HasOption(argc, argv, L"tbfactor"))	// "addss" in the place of the multiplication by the raise factor
 			g_textureBudgetUpdate[0xA3] = 0x58;
 		g_textureBudgetDataAsSet = data;
