@@ -3,11 +3,13 @@
 # The streaming memory, measured first for the Resources part to come (SPECIFICATIONS.md 11.10.7), in the full fake game:
 # with DIAGNOSTIC_MODE=1 alone its four sites found once each, checked and logged with what each holds, and the fake's
 # resource heap summed up 10 seconds in and again when its numbers change - the regions made of 32, their sizes and bytes
-# in use, the streamed resources, the streaming budgets and what is counted against them, the refusals; nothing looked for
-# without DIAGNOSTIC_MODE; a pattern missing, a call another mod hooked, an address outside the game and an object that
-# cannot be read each logged, with no problem, no box and no summary; the plain game; DRY_RUN alike; and nothing written -
-# the sites and the data as the fake left them, every page's protection its own. Fake LOCALAPPDATA: the real one is never
-# touched.
+# in use, the streamed resources, the streaming budgets and what is counted against them, the refusals, the heap's own
+# count of its regions where it differs from the regions found, an object that cannot be read when a summary comes;
+# nothing looked for without DIAGNOSTIC_MODE; a pattern missing, a call another mod hooked, an address outside the game
+# and an object that cannot be read at the start each logged, with no problem and no announcement - no box for a pattern
+# missing, no summary for the writing half's pattern missing and the hooked call; the plain game; DRY_RUN alike; and
+# nothing written - the sites and the data as the fake left them, every page's protection its own. Fake LOCALAPPDATA: the
+# real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" TweaksV.asi
@@ -107,6 +109,15 @@ echo "== M10 the plain game: every pattern looked for and missing, logged, not a
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game plain_game.exe)
 check "the scanner's line for each of the four" "(for l in $LABELS; do log_has \"Pattern \$l not found: \" || exit 1; done)"
 check "the line word for word, the first one named; no problem under its tag" "log_line '${SM}the streaming memory is not measured: Q-E-H1 was not found.\$' && log_lacks '\[Resources\] PROBLEM'"
+
+echo "== M11 the heap's own count of its regions, 10, beside the 9 it has made: named in the summary"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe smcount wait)
+check "the summary 10 s in, word for word, the heap's own count in brackets after the regions found - and no other; no problem; nothing written" "summary '9 of its 32 regions (its own count: 10), 2304 of at most 8192 MB, 1864 MB of them in use, 1710 MB by streamed resources; the streaming budgets 2304 MB virtual and 2304 MB physical, nothing counted against them; no streamed resource refused for memory so far.' && [ \$(summaries) -eq 1 ] && log_lacks 'PROBLEM' && untouched"
+
+echo "== M12 the streaming allocator that cannot be read when the summary comes, though it could at the start"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe smgone wait)
+expect_sites
+check "the announcement; the summary 10 s in says so, word for word, naming the fake's allocator - and no other; no problem; nothing written" 'log_line "$E_ANNOUNCED" && log_line "${SM}streaming memory: the streaming allocator at $(reported allocator) cannot be read.\$" && [ $(summaries) -eq 1 ] && log_lacks PROBLEM && untouched'
 
 echo
 echo "STREAMING MEMORY SCENARIOS: $pass passed, $fail failed"

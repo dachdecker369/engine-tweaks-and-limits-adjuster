@@ -410,8 +410,8 @@ namespace TweaksV
 			!CanBeRead(stamp, kStampSize, "refusal stamp", kStampPattern))
 			return;
 
-		// 4. the most the heap holds: 32 regions of the size asked, capped, each a page less than that (a region
-		// keeps one page to itself)
+		// 4. the most the heap holds: 32 regions of the size asked, capped, each a page less than that, as the game
+		// sizes a region
 		const uint64_t regionSize = std::min<uint64_t>(regionAsked, cap);
 		const uint64_t regionPages = pageSize != 0 ? regionSize / pageSize : 0;
 		g_heapMost = regionPages > 0 ? kMaxRegions * (regionPages - 1) * pageSize : 0;

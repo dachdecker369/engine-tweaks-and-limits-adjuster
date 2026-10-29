@@ -240,6 +240,9 @@
 //                  streamed resource was refused 3 seconds before; the report comes 6.5 seconds later
 //   smmore         11 seconds after TweaksV started, more of the resource heap is in use, nothing more refused; the report
 //                  comes 6.5 seconds later
+//   smcount        the resource heap's own count of its regions says 10, beside the 9 it has made
+//   smgone         the streaming allocator's page cannot be read once TweaksV has started, until the report: with "wait",
+//                  TweaksV's first summary finds it so
 // The streaming memory's four sites are always there, their three calls leading to stand-ins of the game's functions.
 // The resource heap is made once TweaksV has started, as the game makes it after TweaksV's DllMain: 9 of its 32 regions
 // of 256 MB less a page of 8 KB, 1864 MB of them in use, 1710 MB by streamed resources, the streaming budgets the heap's
@@ -1886,7 +1889,7 @@ static void TextureBudgetLater(TextureBudgetChange change)
 constexpr size_t kStreamingMemoryHeapSize = 0x3FF0;
 constexpr size_t kStreamingMemoryAllocatorSize = 0x38;
 constexpr uint64_t kStreamingMemoryPage = 0x2000;
-constexpr uint64_t kStreamingMemoryRegionPages = 0x10000000 / kStreamingMemoryPage - 1;	// a region: 256 MB less its page
+constexpr uint64_t kStreamingMemoryRegionPages = 0x10000000 / kStreamingMemoryPage - 1;	// a region: 256 MB less a page
 alignas(16) static unsigned char g_streamingMemoryHeapStorage[kStreamingMemoryHeapSize];
 static unsigned char* volatile g_streamingMemoryHeap = g_streamingMemoryHeapStorage;
 alignas(4096) static unsigned char g_streamingMemoryAllocatorPage[4096];
@@ -3992,7 +3995,17 @@ int wmain(int argc, wchar_t** argv)
 		StreamingMemorySetQword(g_streamingMemoryAllocator, 0x10, 12ull << 20);
 		StreamingMemorySetQword(g_streamingMemoryAllocator, 0x20, 40ull << 20);
 	}
+	if (HasOption(argc, argv, L"smcount"))		// the heap's own count of its regions differs from the regions made
+	{
+		const uint32_t streamingMemoryCount = 10;
+		memcpy(g_streamingMemoryHeap + 0x1E4, &streamingMemoryCount, sizeof(streamingMemoryCount));
+	}
 	StreamingMemoryLeave();
+	if (HasOption(argc, argv, L"smgone"))			// the allocator's page cannot be read from here on until the report
+	{
+		DWORD old = 0;
+		VirtualProtect(g_streamingMemoryAllocator, sizeof(g_streamingMemoryAllocatorPage), PAGE_NOACCESS, &old);
+	}
 	const bool streamingMemoryGrow = HasOption(argc, argv, L"smgrow");
 	if (streamingMemoryGrow || HasOption(argc, argv, L"smmore"))
 	{
@@ -4086,6 +4099,11 @@ int wmain(int argc, wchar_t** argv)
 	// "streaming memory: heap at RVA 0x..., ..., sites as placed 4 of 4, data as left 3 of 3 | " - where the heap, the
 	// allocator, the stamp and the three functions lie, and whether the sites and the data are as the harness left them
 	{
+		if (HasOption(argc, argv, L"smgone"))		// the allocator's page readable again, for the report
+		{
+			DWORD old = 0;
+			VirtualProtect(g_streamingMemoryAllocator, sizeof(g_streamingMemoryAllocatorPage), PAGE_READWRITE, &old);
+		}
 		int streamingMemorySitesAsPlaced = 0;
 		for (size_t i = 0; i < 4; i++)
 		{
