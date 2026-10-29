@@ -3,7 +3,8 @@
 // that switches each one on, the stand-alone plugins that do its job - the old ones TweaksV replaces and
 // the ones that stay installed - and the function that starts it. DllMain starts them in that order and
 // the conflict check looks for their plugins, so a new feature is one entry there, plus its section and
-// settings in TweaksVSettings.h.
+// settings in TweaksVSettings.h. Beside them kMeasuredFirst lists the limits of the parts to come that are
+// measured first, with DIAGNOSTIC_MODE=1 only: the part's log tag and its module's Measure<Limit>().
 #pragma once
 
 #include <span>
@@ -30,7 +31,8 @@ namespace TweaksV
 
 	std::span<const Feature> Features();
 
-	// Starts every feature that is on, in table order. No exception gets out of it: one from a feature
-	// ends only that feature. True if one of them shows the start-up summary later, so DllMain must not.
+	// Starts every feature that is on, in table order, then - with DIAGNOSTIC_MODE=1 - every part measured
+	// first. No exception gets out of it: one from a feature ends only that feature, one from a measurement
+	// only that measurement. True if one of the features shows the start-up summary later, so DllMain must not.
 	bool StartFeatures();
 }

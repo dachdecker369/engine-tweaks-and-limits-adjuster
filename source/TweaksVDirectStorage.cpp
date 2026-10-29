@@ -262,20 +262,8 @@ namespace TweaksV
 			return text;
 		}
 
-		// ---- reading the callers' memory: a bad pointer must not crash the game in TweaksV
-
-		bool CopyMemorySafely(void* target, const void* source, size_t size)
-		{
-			__try
-			{
-				memcpy(target, source, size);
-				return true;
-			}
-			__except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
-			{
-				return false;
-			}
-		}
+		// ---- reading the callers' memory: a bad pointer must not crash the game in TweaksV (CopyMemorySafely
+		// is the patch module's)
 
 		// The name an NtCreateFile call asked for (cut to capacity - 1 characters) and the folder
 		// handle it is relative to, if any. False if the OBJECT_ATTRIBUTES cannot be read.

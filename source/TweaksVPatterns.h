@@ -11,7 +11,7 @@ namespace TweaksV
 {
 	struct GamePattern
 	{
-		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, D- Decals, R- RageOpenV, S- StraightToStoryMode, Y- the script programs, L- Blips
+		const char* label;	// as in PATTERNS.md: H- Heap, M- Modkit, P- Packfile, B- BoxStreamer, D- Decals, R- RageOpenV, S- StraightToStoryMode, Y- the script programs, L- Blips, W- WeaponLimits, I- SirenSettings, A- PedProps, Q- Resources
 		const char* text;	// the bytes in hex, one space apart; ? matches any byte
 	};
 
@@ -145,6 +145,16 @@ namespace TweaksV
 		// lea loads the pool (P1), and its update of the pool's high-water mark, whose cmp reads the mark (P2)
 		{ "L-E-P1", "BA 04 00 00 00 31 C0 48 8D 1D ? ? ? ? 31 F6" },
 		{ "L-E-P2", "48 89 3B 39 35 ? ? ? ? 7F 09 8D 46 01 89 05" },
+
+		// The parts measured first (SPECIFICATIONS 11.10), looked for with DIAGNOSTIC_MODE only: WeaponLimits (W),
+		// SirenSettings (I), PedProps (A), Resources (Q), one group per limit
+		// [weapon infos]
+		// [weapon components]
+		// [siren ids]
+		// [siren count]
+		// [ped props]
+		// [texture budget]
+		// [streaming memory]
 	};
 
 	// A text the scanner can use: bytes as two hex digits or ?, one space apart, at least one of them

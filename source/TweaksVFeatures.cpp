@@ -5,6 +5,7 @@
 
 #include <windows.h>
 
+#include <initializer_list>
 #include <iterator>
 
 #include "TweaksVBlips.h"
@@ -12,11 +13,19 @@
 #include "TweaksVDecals.h"
 #include "TweaksVDirectStorage.h"
 #include "TweaksVHeapAdjuster.h"
+#include "TweaksVLog.h"
 #include "TweaksVModkitLimit.h"
 #include "TweaksVPackfileLimit.h"
+// [ped props]
 #include "TweaksVRageOpenV.h"
+// [siren count]
+// [siren ids]
 #include "TweaksVStraightToStoryMode.h"
+// [streaming memory]
 #include "TweaksVSummary.h"
+// [texture budget]
+// [weapon components]
+// [weapon infos]
 
 namespace TweaksV
 {
@@ -67,6 +76,26 @@ namespace TweaksV
 			return true;
 		}
 		static_assert(InSectionOrder(), "TweaksV: kFeatures must be in the order of kSections");
+
+		// A limit of a part to come, measured before its part writes anything (SPECIFICATIONS 11.10): with
+		// DIAGNOSTIC_MODE=1 its module finds and checks the sites of the limit and measures it.
+		struct MeasuredFirst
+		{
+			const char* feature;	// the part's log tag: "WeaponLimits"
+			void (*start)();		// the module's Measure<Limit>()
+		};
+
+		// The parts measured first, one entry per limit in the order of SPECIFICATIONS 11.10. A limit leaves the
+		// table when its part is built, or when it is not, so the table may be empty.
+		constexpr std::initializer_list<MeasuredFirst> kMeasuredFirst = {
+			// [weapon infos]
+			// [weapon components]
+			// [siren ids]
+			// [siren count]
+			// [ped props]
+			// [texture budget]
+			// [streaming memory]
+		};
 	}
 
 	std::span<const Feature> Features()
@@ -91,6 +120,20 @@ namespace TweaksV
 				ReportFailure(feature.section->feature, "unexpected exception - this part is skipped for this session");
 			}
 		}
+		// The parts measured first, after the parts and with DIAGNOSTIC_MODE=1 only. A measurement is an aid
+		// (SPECIFICATIONS 12): an exception ends only that one and is logged, not reported.
+		if (IsDiagnosticMode())
+			for (const MeasuredFirst& measured : kMeasuredFirst)
+			{
+				try
+				{
+					measured.start();
+				}
+				catch (...)
+				{
+					WriteLog(measured.feature, "DIAGNOSTIC: unexpected exception - a measurement of this part is skipped for this session.");
+				}
+			}
 		return summaryLater;
 	}
 }

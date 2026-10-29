@@ -139,13 +139,20 @@
     <ClCompile Include="TweaksVModkitLimit.cpp" />
     <ClCompile Include="TweaksVPackfileLimit.cpp" />
     <ClCompile Include="TweaksVPatch.cpp" />
+    <!-- [ped props] -->
     <ClCompile Include="TweaksVRageOpenV.cpp" />
     <ClCompile Include="TweaksVRelocation.cpp" />
     <ClCompile Include="TweaksVScanner.cpp" />
     <ClCompile Include="TweaksVScripts.cpp" />
     <ClCompile Include="TweaksVSettings.cpp" />
+    <!-- [siren count] -->
+    <!-- [siren ids] -->
     <ClCompile Include="TweaksVStraightToStoryMode.cpp" />
+    <!-- [streaming memory] -->
     <ClCompile Include="TweaksVSummary.cpp" />
+    <!-- [texture budget] -->
+    <!-- [weapon components] -->
+    <!-- [weapon infos] -->
     <!-- MinHook v1.3.4, compiled unchanged from vendor\MinHook (x64 only: hde64, not hde32), at warning
          level 3, which it builds without a warning: its code is not TweaksV's to change, and /W4 finds
          its own warnings -->
@@ -181,13 +188,20 @@
     <ClInclude Include="TweaksVPackfileLimit.h" />
     <ClInclude Include="TweaksVPatch.h" />
     <ClInclude Include="TweaksVPatterns.h" />
+    <!-- [ped props] -->
     <ClInclude Include="TweaksVRageOpenV.h" />
     <ClInclude Include="TweaksVRelocation.h" />
     <ClInclude Include="TweaksVScanner.h" />
     <ClInclude Include="TweaksVScripts.h" />
     <ClInclude Include="TweaksVSettings.h" />
+    <!-- [siren count] -->
+    <!-- [siren ids] -->
     <ClInclude Include="TweaksVStraightToStoryMode.h" />
+    <!-- [streaming memory] -->
     <ClInclude Include="TweaksVSummary.h" />
+    <!-- [texture budget] -->
+    <!-- [weapon components] -->
+    <!-- [weapon infos] -->
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h" />
   </ItemGroup>
   <ItemGroup>

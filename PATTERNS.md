@@ -19,11 +19,18 @@ The DirectStorage part uses no patterns. The hooks that do its job are on `NtCre
 
 ### When Game Updates
 
-1. Start the game with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1` - and `CONSOLE=1`, with every part on, so every pattern is looked for, the script programs' three by the Blips part. A dry run does not redirect their call, so the Blips part sees no script program then: whether it still finds `blip_controller`'s guard shows only on a boot without `DRY_RUN`, where its line, or its problem, says so. The game is not patched then. `TweaksV.log` lists every pattern not found, by its label.
+1. Start the game with `DIAGNOSTIC_MODE=1` and `DRY_RUN=1` - and `CONSOLE=1`, with every part on, so every pattern is looked for, the script programs' three by the Blips part and those of the parts measured first by their modules (SPECIFICATIONS.md, section 11.10). A dry run does not redirect their call, so the Blips part sees no script program then: whether it still finds `blip_controller`'s guard shows only on a boot without `DRY_RUN`, where its line, or its problem, says so. The game is not patched then. `TweaksV.log` lists every pattern not found, by its label.
 2. Check whether the project the pattern came from has changed it (`CREDITS.md` names them).
 3. Update the pattern in `source\TweaksVPatterns.h` and in this file - the tests check that both agree - and confirm that it matches exactly once. `GTA5_Enhanced.exe` is encrypted on disk, so look for the code in a copy of the running game: a test build with `TEST_DUMP_CODE=60` saves one (README, Test Builds) - the file on disk shows random bytes where the patterns match in memory, because the code is decrypted only there. The game is built with clang, not MSVC: its code writes `31 C9` and `45 31 C0` for xor where MSVC writes `33 C9`, and the image has a `.retplne` section, two `.text` sections and a `.pdata` function table - so a pattern from a GTA V Legacy mod never carries over and is found anew here. To analyse a dump, rebuild it as a PE (the headers and the saved sections at their offsets, `.data` as zeros) and let Ghidra's headless analyser take it; the `.pdata` table gives the functions. Re-find each site from its anchor pattern rather than trusting its old RVA, and treat a site that moved as new findings, never a guess.
 4. DirectStorage: with `DIAGNOSTIC_MODE=1` the log names the factory's functions and says why `OpenFile` cannot be logged (another interface, an `OpenFile` outside DirectStorage's DLLs) - diagnostic facts only; the part's job depends on how the files are opened (item 5).
 5. The game facts no pattern protects, to check in the dump even when every pattern still matches, because a change in them would go wrong silently: RageOpenV's `fiPackfile` fields (counted from the object's start, 8 bytes further on than Legacy's, which are in brackets: the entry table at +0x28 [+0x20], its count at +0x30 [+0x28], the current file offset at +0xBC [+0xB4]; entries of 16 bytes with the name offset at +0, the type at +4 and the encryption at +12) and the fixed distances of its sites (GetFileTime and GetFileSize 0x10D before `R-E-F2` and `R-E-F3`, 0x15D before `R-E-F6` and `R-E-F7`; the ParseHeader call 19 bytes into `R-E-E5`; the console call 16 bytes into `R-E-C1`), and that every ParseHeader that returns true passes the FindEncryption call (`R-E-E1`) first - once the header's magic is RPF7, that call runs before any branch on the readHeader flag or on a header handed in, and the function returns true only for RPF7 (1.0.1158.16) - which RageOpenV's hooks rely on: the tag FindEncryption sees is the one of the archive being parsed; the archive count at offset 24 of the streaming configuration that `P-E-H1`'s call reads, and that call's single argument; the tree-search calls 30, 34, 42 and 30 bytes into `B-E-L1..L4`, their fifth argument on the stack, and that a search stops 16 entries short of the capacity it is handed (`kSearchHeadroom`, against which the box streamer's measurement counts the searches the game's own list could not hold); the decal manager's loop (the start offset at +1 and the lea at +5 of `D-E-L10`, the pass and the end at +2 and +8 of `D-E-L11`); each array's references are exactly the ones listed - the modkit array's 6 leas, the packfile array's 33 references (25 leas and the 8 stores of `P-E-R23..R30`), the box streamer list's 8 and the decal definitions array's 31 leas - and the scan refuses otherwise; the heap adjuster's rule that a heap of 1024 MB or more is another adjuster's (a build whose own heap is that large would be left alone, with only a log line); DirectStorage's opens - that the game still locks its folder's files through opens that read only and share reading, the opens `UNLOCK_FILES` widens - every file of its folder tree, 280 in the first 10 seconds on 1.0.1158.16, when its RPF cache check is skipped as RageOpenV's part does, and its archives alone when the check runs: a build that opened them for writing or exclusively would leave them locked without an error, so check the 10-second summary: the game folder's files among the opens given write and delete sharing, by type, and few left as they were (with `DIAGNOSTIC_MODE=1` each open is named with its access and sharing); and the script programs' (section "Script programs"): the offsets +0x2C (the native count), +0x58 (the name's hash), +0x60 (the name) and +0x68 (the string page table), the page size of 0x4000 and its rule - every instruction within one page but SWITCH's entry table - and the opcodes' values and lengths, against the game's length table (.rdata 0x2610C50, the dispatch table + 0x800), the native table stored rotated by (code length + index) mod 64, holding the natives' hashes before `Y-E-H1`'s call and their handlers' addresses after it, the function behind that call taking the program alone and returning a byte, the resource placement thread the call runs on at every placement, a save load included, and the registry the program enters only after it, and the name's hash (`blip_controller` gives 0x80CFE974); and the Blips facts (section "Blips"): the pool's 2,000 slots and the three the count leaves out, the count's answers with the pool full (1,997 to 2,000) - `L-E-P1` and `L-E-P2` give the pool's and its mark's addresses, not the number of slots, which the part's measurement takes as 2,000 - and the guard's shape in `blip_controller`: a script update can move it, change its natives' indices, its form or its threshold; the part finds it wherever it lies and in each form its match takes, and refuses one it cannot match, but the threshold 150 it raises, the room it needs and 1,997, the highest limit, are this build's. Last, the encoding of the paths the eight file functions take (`R-E-F1..F8`), settled in the dump of 1.0.1158.16 on 2026-10-27: each takes its path as a char string and turns it into UTF-16 with code page 65001, UTF-8, flags 0, before any Win32 call - `B9 E9 FD 00 00` (`mov ecx, 0xFDE9`), `31 D2`, `49 89 D8` or `49 89 F8`, then `FF 15` through the import slot at RVA 0x51215F4, with MultiByteToWideChar's six arguments - at RVA 0x10B158 (`R-E-F1`), 0x10B973 (`F2`), 0x10B823 (`F3`), 0x10BC55 (`F4`), 0x108028 (`F5`), 0x108781 (`F6`), 0x108971 (`F7`) and 0x108CA0 (`F8`); it converts at most 259 bytes of the path, into 260 wide characters, then makes every run of `/` or `\` one `\` and opens the file by its UTF-16 path, which Windows compares with the files' names by their upper case. RageOpenV's list of the mods folder and its lookups follow that: names in UTF-8 on every Windows, paths of at most 254 bytes, because the hooks hand the game `mods/` and the path, and it reads 259. A game build whose functions took their paths in the ANSI code page would leave every name outside ASCII unserved, without an error - so check the conversion at the eight sites, and the 259 bytes.
+   <!-- [weapon infos] -->
+   <!-- [weapon components] -->
+   <!-- [siren ids] -->
+   <!-- [siren count] -->
+   <!-- [ped props] -->
+   <!-- [texture budget] -->
+   <!-- [streaming memory] -->
 
 ## HeapAdjuster
 
@@ -234,3 +241,45 @@ The pool's two sites, for the part's measurement: looked for only with `DIAGNOST
 |---|---|---|---|---|
 | L-E-P1 | `BA 04 00 00 00 31 C0 48 8D 1D ? ? ? ? 31 F6` | +10: the rel32 of `lea rbx, [rip+disp32]` (`48 8D 1D` at +7) in the pool's allocator - the blip pool, 2,000 slots of 8 bytes (RVA 0x3DEBD70) | found | 0x55D897 |
 | L-E-P2 | `48 89 3B 39 35 ? ? ? ? 7F 09 8D 46 01 89 05` | +5: the disp32 of `cmp [rip+disp32], esi` (`39 35` at +3) in the pool's update of its high-water mark - the mark, a dword (RVA 0x3DEFBF0) | found | 0x55DA0E |
+
+## WeaponLimits
+
+The WeaponLimits part to come (ROADMAP.md) gives the game room for more `weapons.meta` files and more weapon components. Its two limits are measured first (SPECIFICATIONS.md, section 11.10): their patterns are looked for only with `DIAGNOSTIC_MODE=1`, as `L-E-P1` and `L-E-P2` are, every site is checked as the part's writing half will check it, and nothing is written. Its letter is `W`. The facts, from the dump of 1.0.1158.16 (2026-10-29):
+
+### Weapon infos
+
+<!-- [weapon infos] -->
+
+### Weapon components
+
+<!-- [weapon components] -->
+
+## SirenSettings
+
+The SirenSettings part to come (ROADMAP.md) gives the game siren setting IDs past 255 and could give a vehicle more than 20 sirens. Both limits are measured first (SPECIFICATIONS.md, section 11.10): their patterns are looked for only with `DIAGNOSTIC_MODE=1`, every site is checked as the part's writing half will check it, and nothing is written but the one call the siren count's measurement redirects. Its letter is `I`, for both limits (`S` is StraightToStoryMode's). The facts, from the dump of 1.0.1158.16 (2026-10-29):
+
+### Siren IDs
+
+<!-- [siren ids] -->
+
+### Siren count
+
+<!-- [siren count] -->
+
+## PedProps
+
+The PedProps part to come (ROADMAP.md) lifts the 255 props per anchor of a ped model. Its limit is measured first (SPECIFICATIONS.md, section 11.10): its patterns are looked for only with `DIAGNOSTIC_MODE=1`, every site is checked as the part's writing half will check it, and nothing is written. Its letter is `A`. The facts, from the dump of 1.0.1158.16 (2026-10-29):
+
+<!-- [ped props] -->
+
+## Resources
+
+The Resources part to come (ROADMAP.md) would raise the video memory budget for streamed resources and the room of the heap the game streams into. Both limits are measured first (SPECIFICATIONS.md, section 11.10): their patterns are looked for only with `DIAGNOSTIC_MODE=1`, every site is checked as the part's writing half would check it, and nothing is written. Its letter is `Q`. The facts, from the dump of 1.0.1158.16 (2026-10-29):
+
+### Texture budget
+
+<!-- [texture budget] -->
+
+### Streaming memory
+
+<!-- [streaming memory] -->

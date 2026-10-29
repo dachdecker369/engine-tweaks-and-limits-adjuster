@@ -61,6 +61,7 @@
     <ClCompile Include="TweaksVPatch.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <!-- [ped props] -->
     <ClCompile Include="TweaksVRageOpenV.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -76,12 +77,18 @@
     <ClCompile Include="TweaksVSettings.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <!-- [siren count] -->
+    <!-- [siren ids] -->
     <ClCompile Include="TweaksVStraightToStoryMode.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <!-- [streaming memory] -->
     <ClCompile Include="TweaksVSummary.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
+    <!-- [texture budget] -->
+    <!-- [weapon components] -->
+    <!-- [weapon infos] -->
     <ClCompile Include="..\vendor\MinHook\src\buffer.c">
       <Filter>MinHook</Filter>
     </ClCompile>
@@ -150,6 +157,7 @@
     <ClInclude Include="TweaksVPatterns.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <!-- [ped props] -->
     <ClInclude Include="TweaksVRageOpenV.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
@@ -165,12 +173,18 @@
     <ClInclude Include="TweaksVSettings.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <!-- [siren count] -->
+    <!-- [siren ids] -->
     <ClInclude Include="TweaksVStraightToStoryMode.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <!-- [streaming memory] -->
     <ClInclude Include="TweaksVSummary.h">
       <Filter>TweaksV</Filter>
     </ClInclude>
+    <!-- [texture budget] -->
+    <!-- [weapon components] -->
+    <!-- [weapon infos] -->
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h">
       <Filter>MinHook</Filter>
     </ClInclude>

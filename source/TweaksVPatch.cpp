@@ -322,6 +322,19 @@ namespace TweaksV
 		return true;
 	}
 
+	bool CopyMemorySafely(void* target, const void* source, size_t size)
+	{
+		__try
+		{
+			memcpy(target, source, size);
+			return true;
+		}
+		__except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+		{
+			return false;
+		}
+	}
+
 	namespace
 	{
 		// MinHook, initialised once for every hook of TweaksV; a second MH_Initialize is harmless

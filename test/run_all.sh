@@ -11,7 +11,28 @@ set -u
 T="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$T/.." && pwd)"
 export TWEAKSV_TEST_DIR="$R/object/TestRun"
-SUITES="patterns ini_default story modkit packfile boxstreamer decals rageopenv directstorage blips integration"
+# the suites, one a line, run in this order: the tables first, the parts in the order of the parts, the parts
+# measured first in the order of SPECIFICATIONS.md 11.10, the whole of TweaksV last
+SUITES=(
+	patterns
+	ini_default
+	story
+	modkit
+	packfile
+	boxstreamer
+	decals
+	rageopenv
+	directstorage
+	blips
+	# [weapon infos]
+	# [weapon components]
+	# [siren ids]
+	# [siren count]
+	# [ped props]
+	# [texture budget]
+	# [streaming memory]
+	integration
+)
 
 build=1; keep=0
 for a in "$@"; do
@@ -59,7 +80,7 @@ OUT_DIR="$(cygpath -w "$TWEAKSV_TEST_DIR")" cmd //c "$(cygpath -w "$T/build.cmd"
 check_warnings "$TWEAKSV_TEST_DIR/build_tests.txt"
 
 total_pass=0; total_fail=0; summary=""
-for s in $SUITES; do
+for s in "${SUITES[@]}"; do
 	echo; echo "######## $s"
 	bash "$T/run_$s.sh" 2>&1 | tee "$TWEAKSV_TEST_DIR/$s.out"
 	line=$(grep -E '[0-9]+ passed, [0-9]+ failed' "$TWEAKSV_TEST_DIR/$s.out" | tail -n 1)

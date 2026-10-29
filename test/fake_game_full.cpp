@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Test harness for TweaksV: pretends to be GTA5_Enhanced.exe and contains copies of the game
 // code TweaksV patches: HeapAdjuster's, StraightToStoryMode's, ModkitLimit's, PackfileLimit's,
-// BoxStreamer's and Decals' here, RageOpenV's in fake_game_rov.cpp.
+// BoxStreamer's and Decals' here, with the script programs', the Blips part's and the sites of the parts
+// measured first, RageOpenV's in fake_game_rov.cpp.
 // Prints every patch site after TweaksV.asi has loaded.
 // Link it with a version resource (fake_game_version.rc) for the game build to pretend to be.
 // Usage: GTA5_Enhanced.exe [TweaksV.asi] [options...]
@@ -96,6 +97,14 @@
 //   blipbadbyte    the byte 0xA0, no instruction, at 0x200
 // The blip pool's two sites are always there, the pool with 162 slots in use below its high-water mark, 170, and
 // two beyond it.
+// The parts measured first (TweaksV's SPECIFICATIONS.md 11.10), one block per limit: its options, and what is always there.
+// [weapon infos]
+// [weapon components]
+// [siren ids]
+// [siren count]
+// [ped props]
+// [texture budget]
+// [streaming memory]
 #include <windows.h>
 #include <winternl.h>
 #include <cstddef>
@@ -363,6 +372,16 @@ volatile unsigned char g_blipMarkSite[] = { 0x48, 0x89, 0x3B, 0x39, 0x35, 0, 0, 
 	0, 0, 0, 0, 0xCC };
 static Site g_blipPoolRef = SITE(g_blipPoolSite, 10);
 static Site g_blipMarkRefs[] = { SITE(g_blipMarkSite, 5), SITE(g_blipMarkSite, 16) };
+
+// The parts measured first: the game code each limit's module finds and checks, one block per limit. What its
+// sites reference lies below, outside this section, as the game's does.
+// [weapon infos]
+// [weapon components]
+// [siren ids]
+// [siren count]
+// [ped props]
+// [texture budget]
+// [streaming memory]
 #pragma data_seg()
 
 // The game's own modkit array (1024 entries of 2 bytes) and packfile array (4500 entries of 8 bytes). The
@@ -392,6 +411,16 @@ static uint64_t g_blipPoolStorage[2000];
 static uint64_t* volatile g_blipPool = g_blipPoolStorage;
 static int32_t g_blipMarkStorage = 0;
 static int32_t* volatile g_blipMark = &g_blipMarkStorage;
+
+// The parts measured first: the game's data their sites reference and what stands in for the game's code they
+// call, one block per limit. The harness reaches the data only through pointers, as it does the arrays above.
+// [weapon infos]
+// [weapon components]
+// [siren ids]
+// [siren count]
+// [ped props]
+// [texture budget]
+// [streaming memory]
 
 // The game's two tree searches behind the box streamer's four calls: the first and the third call lead
 // to the first search, the second and the fourth to the second. Each writes the number of entries the
@@ -858,6 +887,14 @@ static void ForEachSite(void (*fn)(const Site&))
 	for (const Site& site : g_boxRefs) fn(site);
 	Site indirect = { reinterpret_cast<volatile unsigned char*>(&g_packIndirectSize), 0, sizeof(g_packIndirectSize) };
 	fn(indirect);
+	// the parts measured first: every site of each limit
+	// [weapon infos]
+	// [weapon components]
+	// [siren ids]
+	// [siren count]
+	// [ped props]
+	// [texture budget]
+	// [streaming memory]
 }
 
 static void MakeSitesReadExecute()
@@ -2089,6 +2126,14 @@ int wmain(int argc, wchar_t** argv)
 	SetRel32(g_blipPoolRef, g_blipPool);
 	for (const Site& site : g_blipMarkRefs)
 		SetRel32(site, g_blipMark);
+	// The parts measured first: each limit's sites lead to its data, as its options ask for them
+	// [weapon infos]
+	// [weapon components]
+	// [siren ids]
+	// [siren count]
+	// [ped props]
+	// [texture budget]
+	// [streaming memory]
 
 	RovSetup(argc, argv);
 	ForEachSite(TouchSite);
@@ -2154,6 +2199,14 @@ int wmain(int argc, wchar_t** argv)
 		RenameAsked();
 	if (HasOption(argc, argv, L"dsrenameflood"))
 		FloodRenames();
+	// The parts measured first: what the game does with each limit once TweaksV has started, as its options ask
+	// [weapon infos]
+	// [weapon components]
+	// [siren ids]
+	// [siren count]
+	// [ped props]
+	// [texture budget]
+	// [streaming memory]
 	if (HasOption(argc, argv, L"wait"))
 		Sleep(11000);	// TweaksV's UNLOCK_FILES summary comes 10 s after the first open it counts, the OpenFile summary 10 s
 						// after the first OpenFile, the interface check 10 s after the request
@@ -2182,6 +2235,14 @@ int wmain(int argc, wchar_t** argv)
 	RovReport();
 	wprintf(L"%ls%ls%ls%ls%ls%ls%ls%ls%ls%ls", g_dstorageResult, g_floodResult, g_shareResult, g_ownResult, g_fileOpensResult,
 		g_replaceResult, g_renamesResult, g_renameFloodResult, g_scriptResult, g_blipResult);
+	// The parts measured first: each limit's field of the report, and the stub of a call it redirected
+	// [weapon infos]
+	// [weapon components]
+	// [siren ids]
+	// [siren count]
+	// [ped props]
+	// [texture budget]
+	// [streaming memory]
 	CheckStub(Rel32Target(g_packCallSite));
 	CheckStub(Rel32Target(g_scriptCallSite));
 	for (const Site& site : g_boxCalls)
