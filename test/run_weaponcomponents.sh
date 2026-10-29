@@ -27,10 +27,12 @@ summary() { log_line "${TAG}$1 weapon component definitions from $2 weaponcompon
 summaries() { count 'weapon component definitions from'; }
 # target KIND LABEL: the RVA the module's line of that kind ("reference", "count reference", ...) leads to, for LABEL
 target() { tr -d '\r' < TweaksV.log | sed -n "s/.*${TAG}$1 at RVA 0x[0-9A-F]* -> RVA \(0x[0-9A-F]*\) ($2)\$/\1/p"; }
-# quiet: no problem of any part, no start-up summary and no box; unannounced: no announcement of the measurement; loads:
-# the module's lines of the list's loads
+# quiet: no problem of any part, no start-up summary and no box; unannounced: no announcement of the measurement;
+# no_site_line: none of the module's site lines, each of which names a W-E-C pattern or the lea scan at its end - the
+# weapon infos module logs its own sites under the same tag; loads: the module's lines of the list's loads
 quiet() { log_lacks 'PROBLEM' && log_lacks -i 'start-up summary' && log_lacks 'message box'; }
 unannounced() { log_lacks 'the definitions and the files are logged'; }
+no_site_line() { log_lacks "${TAG}.*(W-E-C[1-4])" && log_lacks "${TAG}.*(lea scan)"; }
 loads() { count "${TAG}reference at .* (lea scan)"; }
 # checked: the four patterns found once each, every site's line, the 17 loads and the announcement
 checked() {
@@ -84,12 +86,12 @@ check "nothing written, no problem" "has '$PLACED' && quiet"
 echo "== W7 TEST_BREAK_PATTERN=W-E-C1 (test build, ERROR_POPUP=1) for 12 seconds: logged, no problem, no box, no summary"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; setkey ERROR_POPUP 1; addkey TEST_BREAK_PATTERN W-E-C1; out=$(ASI=TweaksV_test.asi game full_game.exe wait)
 check "the scanner's line and the module's, word for word; the other three still looked for and found" "log_has 'TEST BUILD: pattern W-E-C1 is treated as not found (TEST_BREAK_PATTERN).' && log_line '${NOT_MEASURED}W-E-C1 was not found.\$' && [ \$(grep -c -E 'Pattern W-E-C[234] found: .* 1 match,' TweaksV.log) -eq 3 ]"
-check "no site line, no announcement, no summary" "log_lacks '${TAG}reference' && unannounced && log_lacks 'weapon component definitions'"
+check "no site line, no announcement, no summary" "no_site_line && unannounced && log_lacks 'weapon component definitions'"
 check "no problem, no start-up summary, no box; nothing written" "quiet && has '$PLACED'"
 
 echo "== W8 TEST_BREAK_PATTERN=W-E-C4 (test build): the last of the four, logged by its label"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; addkey TEST_BREAK_PATTERN W-E-C4; out=$(ASI=TweaksV_test.asi game full_game.exe)
-check "the module's line, word for word; the other three found, no site line" "log_line '${NOT_MEASURED}W-E-C4 was not found.\$' && [ \$(grep -c -E 'Pattern W-E-C[123] found: .* 1 match,' TweaksV.log) -eq 3 ] && log_lacks '${TAG}reference'"
+check "the module's line, word for word; the other three found, no site line" "log_line '${NOT_MEASURED}W-E-C4 was not found.\$' && [ \$(grep -c -E 'Pattern W-E-C[123] found: .* 1 match,' TweaksV.log) -eq 3 ] && no_site_line"
 check "no problem, nothing written" "quiet && has '$PLACED'"
 
 echo "== W9 the list another mod moved: its leas outside the game (test build, ERROR_POPUP=1)"
