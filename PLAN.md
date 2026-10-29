@@ -108,7 +108,7 @@ The topics:
 
 **Weapon components:** under way since 10:53: item 1 done - the PE rebuilt from the dump, the full analysis running since 10:56; next item 2, the original's page, README, license and changelog, no source file, beside the byte-level tools on the dump.
 
-**Siren IDs:** under way since 10:53: item 1 done - the PE rebuilt from the dump, the full analysis running since 10:54; next item 2, the original's pages and license as D3 allows, beside the byte-level tools on the dump.
+**Siren IDs:** under way since 10:53: items 1 and 2 done - the PE rebuilt from the dump and the full analysis running since 10:54; the original's pages, README, license (none: idea only), changelog, file list by name and the forum's prose recorded, with what was not read; beside ROADMAP: LCPDFR carries a 2.0.4 (build 3788) and a 2.0.5 (FiveM, 3889); the 2021 technique in its author's relayed words, byte references (8-bit) replaced with word references (16-bit); a forum hint that IDs above 255 are taken modulo 255, to be checked in the dump; the plugin's file name on no official page (my question below); next item 3, the limit in the dump.
 
 **Siren count:** under way since 10:53: item 1 done - the PE rebuilt from the dump (55,809,024 bytes, PE timestamp 0x6AA45F10), the full analysis running since about 10:56; next item 2, the original's pages as D3 allows, beside the byte-level tools on the dump.
 
@@ -120,6 +120,6 @@ The topics:
 
 **The verification:** none yet.
 
-**Decisions waiting on me:** none.
+**Decisions waiting on me:** none that block. Two wait for my word: the weapon infos pass's liberty of method (its paragraph above), recommended to accept; and the SirenSettings original's file name for the conflict check, which no official page gives - third-party pages say `SirenSetting_Limit_Adjuster.asi` twice and `SirenSettings_Limit_Adjuster.asi` once - recommended: the conflict check takes both names, and my look at the file names in the official 2.0.3 zip (21 KB), or my yes to its download for listing the names only, settles it.
 
 **Boots:** 2.4.0's, once the merge session reports its build - the Profiles folder (`Documents\Rockstar Games\GTAV Enhanced\Profiles`) backed up first, since the hook sees every rename the game's process makes, its saves' too; the Release build; its log's line 1 `TweaksV 2.4.0 (git <hash>)` without `-dirty`, every part applied, no PROBLEM line, and the line that says `NtSetInformationFile` is hooked. The research needs no boot.
