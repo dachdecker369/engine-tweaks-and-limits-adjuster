@@ -13,9 +13,13 @@
 //                   writing while sharing nothing still gets a sharing violation. Archives, write and
 //                   exclusive opens, folders and everything outside the game folder are left as they are,
 //                   and nothing is refused. Decided per call before it, on the stack: no memory allocation
-//                   and no lock of TweaksV's. A summary 10 seconds after the first open in the game folder,
-//                   then every minute while the numbers change, counts the opens given the wider sharing,
-//                   their files by type, and the opens left as they were.
+//                   and no lock of TweaksV's. NtSetInformationFile is hooked too: a rename made inside the
+//                   game that replaces a file in the game folder - which Windows refuses over a file somebody
+//                   holds open, whatever the sharing - is made with POSIX semantics instead, on a copy of the
+//                   caller's buffer, and made again as the caller made it where the file system refuses
+//                   that; every other call goes on as made. A summary 10 seconds after the first open in the
+//                   game folder, then every minute while the numbers change, counts the opens given the
+//                   wider sharing, their files by type, the opens left as they were and the replace-renames.
 //   DIAGNOSTIC_MODE the game's calls into DirectStorage (DStorageSetConfiguration, ...1,
 //                   DStorageGetFactory and the factory's OpenFile, which TweaksV passes on unchanged) with
 //                   the code that made them, the factory's functions and the configuration values, and every
@@ -33,6 +37,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -69,6 +74,7 @@ namespace TweaksV
 		constexpr size_t kMaxTableEntries = 100000;	// entries per table of the open summary; more are only counted
 		constexpr size_t kMaxTypesShown = 15;		// types a summary lists; the rest are "others"
 		constexpr size_t kMaxPathChars = 2047;		// characters of an OpenFile path TweaksV checks
+		constexpr size_t kMaxRenameChars = 1024;	// characters of a rename's name, and of its file's path, TweaksV copies
 
 		// The switches, read once: the hooks never read TweaksV.ini.
 		bool g_unlockFiles = false;				// UNLOCK_FILES
@@ -312,13 +318,17 @@ namespace TweaksV
 			const char* name = "";
 			switch (static_cast<uint32_t>(status))
 			{
+			case 0xC0000003: name = " invalid information class"; break;
+			case 0xC000000D: name = " invalid parameter"; break;
 			case 0xC0000022: name = " access denied"; break;
+			case 0xC0000033: name = " name invalid"; break;
 			case 0xC0000034: name = " not found"; break;
 			case 0xC0000035: name = " already exists"; break;
 			case 0xC000003A: name = " path not found"; break;
 			case 0xC0000043: name = " sharing violation"; break;
 			case 0xC0000056: name = " delete pending"; break;
 			case 0xC00000BA: name = " is a folder"; break;
+			case 0xC00000BB: name = " not supported"; break;
 			case 0xC0000103: name = " not a folder"; break;
 			}
 			char text[48];
@@ -694,13 +704,44 @@ namespace TweaksV
 			}
 		}
 
+		enum class Place : uint8_t { Outside, Folder, Inside, Unknown };
+
+		// Where a full name lies, NtCreateFile's or a rename's: "\??\C:\..." - "\??\UNC\server\share\..." for a
+		// game folder on a network share - compared with the game folder, letters in ASCII case, and every other
+		// spelling (a device, \Device\...) outside: Inside, rest the part below the game folder, the game Folder
+		// itself, or Outside. Reads name[0, length) only; the caller guards against a bad pointer.
+		Place PlaceOfFullName(const wchar_t* name, size_t length, const wchar_t*& rest, size_t& restLength)
+		{
+			if (length < 4 || name[0] != L'\\' || name[1] != L'?' || name[2] != L'?' || name[3] != L'\\')
+				return Place::Outside;
+			name += 4;
+			length -= 4;
+			const wchar_t* folder = g_gameFolder.data();
+			size_t n = g_gameFolder.size();
+			if (n > 2 && folder[0] == L'\\' && folder[1] == L'\\')
+			{
+				if (length < 3 || !SameFolded(name, L"unc", 3))
+					return Place::Outside;
+				name += 3;	// "\server\share\...", compared with the folder from its second backslash
+				length -= 3;
+				folder += 1;
+				n -= 1;
+			}
+			if (n == 0 || length < n || !SameFolded(name, folder, n))
+				return Place::Outside;
+			if (length == n || (length == n + 1 && name[n] == L'\\'))
+				return Place::Folder;
+			if (name[n] != L'\\')
+				return Place::Outside;	// a folder whose name only starts with the game folder's
+			rest = name + n + 1;
+			restLength = length - n - 1;
+			return Place::Inside;
+		}
+
 		// Where the name an NtCreateFile call asked for lies: Inside the game folder (facts filled), the game
 		// Folder itself, Outside it, or Unknown - a name that cannot be read. Read on the caller's memory within
 		// the length it gives; a bad pointer is caught. relative: the name is relative to the game folder (its
-		// handle was checked); otherwise it must be "\??\C:\..." - "\??\UNC\server\share\..." for a game folder
-		// on a network share - and every other spelling (a device, \Device\...) is outside.
-		enum class Place : uint8_t { Outside, Folder, Inside, Unknown };
-
+		// handle was checked); otherwise it is a full name (PlaceOfFullName).
 		Place ExamineName(const OBJECT_ATTRIBUTES* attributes, bool relative, PathFacts& facts)
 		{
 			__try
@@ -722,29 +763,12 @@ namespace TweaksV
 					return Place::Inside;
 				}
 
-				if (length < 4 || name[0] != L'\\' || name[1] != L'?' || name[2] != L'?' || name[3] != L'\\')
-					return Place::Outside;
-				name += 4;
-				length -= 4;
-				const wchar_t* folder = g_gameFolder.data();
-				size_t n = g_gameFolder.size();
-				if (n > 2 && folder[0] == L'\\' && folder[1] == L'\\')
-				{
-					if (length < 3 || !SameFolded(name, L"unc", 3))
-						return Place::Outside;
-					name += 3;	// "\server\share\...", compared with the folder from its second backslash
-					length -= 3;
-					folder += 1;
-					n -= 1;
-				}
-				if (n == 0 || length < n || !SameFolded(name, folder, n))
-					return Place::Outside;
-				if (length == n || (length == n + 1 && name[n] == L'\\'))
-					return Place::Folder;
-				if (name[n] != L'\\')
-					return Place::Outside;	// a folder whose name only starts with the game folder's
-				ReadPathFacts(name + n + 1, length - n - 1, facts);
-				return Place::Inside;
+				const wchar_t* rest = nullptr;
+				size_t restLength = 0;
+				const Place place = PlaceOfFullName(name, length, rest, restLength);
+				if (place == Place::Inside)
+					ReadPathFacts(rest, restLength, facts);
+				return place;
 			}
 			__except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
 			{
@@ -827,25 +851,313 @@ namespace TweaksV
 			}
 		}
 
-		uint64_t CountedOpens()
+		HANDLE g_firstCounted = nullptr;		// an event the hooks set at the first thing they count: the summary's clock
+		std::atomic<bool> g_firstCountedSet{ false };
+
+		// The first open or rename counted starts the UNLOCK_FILES summary's clock; its thread waits from the
+		// start-up on. The caller's last error is kept.
+		void StartSummaryClock()
+		{
+			if (g_firstCountedSet.load(std::memory_order_relaxed) || g_firstCountedSet.exchange(true) || !g_firstCounted)
+				return;
+			const DWORD lastError = GetLastError();
+			SetEvent(g_firstCounted);
+			SetLastError(lastError);
+		}
+
+		// ---- UNLOCK_FILES: the replace-renames into the game folder (NtSetInformationFile), turned before the call
+
+		// Windows refuses the classic rename of a new file over one that somebody holds open, whatever the
+		// sharing of the handles on it - the usual safe way to save a settings file. With POSIX semantics such a
+		// rename goes through as long as every handle on the file shares deleting, which the opens above give
+		// the game's: the holders go on reading the file they opened, and the name is the new file's. So a rename
+		// made inside the game that replaces what may lie at its target in the game folder - FileRenameInformation
+		// with ReplaceIfExists, or FileRenameInformationEx with replace-if-exists but without POSIX semantics - is
+		// made as FileRenameInformationEx with both, the caller's other flags kept, on a copy of its buffer on the
+		// stack. Where the target lies is told as for an open: a full name compared with the game folder, a name
+		// relative to a folder handle by that folder's identity, and a bare name - a rename inside the source's own
+		// folder - by the source's path, one query of Windows; every other rename goes on as made.
+		using NtSetInformationFileFn = NTSTATUS(NTAPI*)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, ULONG);
+		NtSetInformationFileFn g_originalNtSetInformationFile = nullptr;
+		constexpr ULONG kFileRenameInformation = 10;
+		constexpr ULONG kFileRenameInformationEx = 65;
+		constexpr ULONG kReplaceIfExists = 0x1;	// FILE_RENAME_REPLACE_IF_EXISTS
+		constexpr ULONG kPosixSemantics = 0x2;		// FILE_RENAME_POSIX_SEMANTICS
+
+		// FILE_RENAME_INFORMATION's layout, for both classes - FileRenameInformation's ReplaceIfExists is the
+		// first byte of flags - with room for a name of kMaxRenameChars characters: the copy a rename is turned on.
+		struct RenameCopy
+		{
+			ULONG flags;
+			HANDLE root;			// the folder handle the name is relative to, or none
+			ULONG nameLength;		// in bytes
+			wchar_t name[kMaxRenameChars];
+		};
+		constexpr size_t kRenameNameOffset = 20;	// the name follows nameLength
+		constexpr ULONG kRenameMinLength = 24;		// FILE_RENAME_INFORMATION's size: the shortest buffer Windows takes
+		static_assert(offsetof(RenameCopy, root) == 8 && offsetof(RenameCopy, nameLength) == 16 &&
+			offsetof(RenameCopy, name) == kRenameNameOffset);
+
+		// What a file system that does not take FileRenameInformationEx, or its POSIX semantics, answers - a FAT
+		// volume, a network share, a Windows older than 10 1607: the rename is then made again as the caller made it.
+		bool Refused(NTSTATUS status)
+		{
+			switch (static_cast<uint32_t>(status))
+			{
+			case 0xC0000002:	// STATUS_NOT_IMPLEMENTED
+			case 0xC0000003:	// STATUS_INVALID_INFO_CLASS
+			case 0xC000000D:	// STATUS_INVALID_PARAMETER
+			case 0xC0000010:	// STATUS_INVALID_DEVICE_REQUEST
+			case 0xC00000BB:	// STATUS_NOT_SUPPORTED
+				return true;
+			default:
+				return false;
+			}
+		}
+
+#ifdef TWEAKSV_TEST_BUILD
+		// test builds only: TWEAKSV_TEST_NO_RENAME_EX=1 in the environment answers every rename turned as a file
+		// system that refuses FileRenameInformationEx would, without asking Windows, so that the suite tests the
+		// fallback
+		bool g_testRefuseRenames = false;
+#endif
+
+		// Every replace-rename into the game folder lands in exactly one count, whatever its result: turned and
+		// given POSIX semantics, made again as made where the file system refused them, or passed on as made, its
+		// name longer than the copy takes. Every other rename is not counted.
+		enum RenameKind : uint8_t
+		{
+			kRenameTurned,
+			kRenameFallback,
+			kRenameTooLong,
+			kRenameKinds
+		};
+		std::atomic<uint64_t> g_renameCounts[kRenameKinds];
+		std::atomic<uint64_t> g_renameNumber{ 0 };	// renames turned, for their lines
+		std::atomic<uint64_t> g_renameLines{ 0 };	// rename lines written
+
+		void CountRename(RenameKind kind)
+		{
+			g_renameCounts[kind].fetch_add(1, std::memory_order_relaxed);
+			StartSummaryClock();
+		}
+
+		// The header of a rename's buffer, and its name when it fits the copy (copied), read within the length
+		// the caller gives, under the guard against a bad pointer. False for a buffer that cannot be read or that
+		// Windows refuses itself: shorter than FILE_RENAME_INFORMATION, a name empty, of odd length or longer
+		// than the buffer.
+		bool ReadRename(const void* information, ULONG length, RenameCopy& copy, bool& copied)
+		{
+			__try
+			{
+				if (!information || length < kRenameMinLength)
+					return false;
+				memcpy(&copy, information, kRenameNameOffset);
+				const ULONG n = copy.nameLength;
+				if (n == 0 || n % sizeof(wchar_t) != 0 || n > length - kRenameNameOffset)
+					return false;
+				copied = n <= sizeof(copy.name);
+				if (copied)
+					memcpy(copy.name, static_cast<const uint8_t*>(information) + kRenameNameOffset, n);
+				return true;
+			}
+			__except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+			{
+				return false;
+			}
+		}
+
+		// Where a rename's target lies, by its name - read within its length, under the guard: Inside the game
+		// folder, a Bare name - a rename inside the source's own folder, which the source's path decides - or
+		// Outside: the game folder itself, another place, a stream's name (a ':' below the game folder), a bare
+		// name with a '\', which Windows refuses, or a name that cannot be read. relative: the name is relative to
+		// the game folder's handle. rest: the part of the name below the game folder.
+		enum class Target : uint8_t { Outside, Inside, Bare };
+
+		Target ExamineTarget(const wchar_t* name, size_t length, bool relative, const wchar_t*& rest, size_t& restLength)
+		{
+			__try
+			{
+				if (relative || name[0] != L'\\')
+				{
+					for (size_t i = 0; i < length; i++)
+						if (name[i] == L':' || (name[i] == L'\\' && (i == 0 || !relative)))
+							return Target::Outside;
+					rest = name;
+					restLength = length;
+					return relative ? Target::Inside : Target::Bare;
+				}
+				if (PlaceOfFullName(name, length, rest, restLength) != Place::Inside)
+					return Target::Outside;
+				for (size_t i = 0; i < restLength; i++)
+					if (rest[i] == L':')
+						return Target::Outside;
+				return Target::Inside;
+			}
+			__except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+			{
+				return Target::Outside;
+			}
+		}
+
+		// The game folder as Windows names a file object in it (NtQueryObject: "\Device\HarddiskVolume3\..."),
+		// without a trailing backslash, read once before the hook is made; empty if it could not be read.
+		std::wstring g_gameFolderPath;
+		using NtQueryObjectFn = NTSTATUS(NTAPI*)(HANDLE, ULONG, PVOID, ULONG, PULONG);
+		NtQueryObjectFn g_queryObject = nullptr;	// ntdll's, read before the hook
+		constexpr ULONG kObjectNameInformation = 1;
+
+		// OBJECT_NAME_INFORMATION with room for a name of kMaxRenameChars characters
+		struct ObjectName
+		{
+			UNICODE_STRING name;
+			wchar_t text[kMaxRenameChars];
+		};
+
+		// For a bare name: the target lies in the source's folder, so below the game folder when the source - the
+		// file being renamed - does. Its path as Windows names it, one query on the stack, compared with the game
+		// folder's read the same way, letters in ASCII case; a stream (a ':' below the game folder) is no file in
+		// it. folder: the part of the path below the game folder up to its last '\', for the line.
+		bool SourceInGameFolder(HANDLE file, ObjectName& source, const wchar_t*& folder, size_t& folderLength)
+		{
+			const size_t n = g_gameFolderPath.size();
+			if (n == 0 || !NT_SUCCESS(g_queryObject(file, kObjectNameInformation, &source, sizeof(source), nullptr)))
+				return false;
+			const wchar_t* const path = source.name.Buffer;
+			const wchar_t* const end = source.text + std::size(source.text);
+			const size_t length = source.name.Length / sizeof(wchar_t);
+			if (!path || path < source.text || path > end || length > static_cast<size_t>(end - path))
+				return false;
+			if (length <= n + 1 || path[n] != L'\\' || !SameFolded(path, g_gameFolderPath.data(), n))
+				return false;
+			const wchar_t* const below = path + n + 1;
+			const size_t belowLength = length - n - 1;
+			size_t last = 0;	// after the last '\' below the game folder
+			for (size_t i = 0; i < belowLength; i++)
+			{
+				if (below[i] == L':')
+					return false;
+				if (below[i] == L'\\')
+					last = i + 1;
+			}
+			folder = below;
+			folderLength = last ? last - 1 : 0;
+			return true;
+		}
+
+		// UNLOCK_FILES' decision on one rename, made before the call on the stack: no memory allocation, no lock
+		// of TweaksV's, nothing that can throw. A replace-rename into the game folder is Turned, its copy made
+		// ready, or with a name longer than the copy takes TooLong; every other rename goes on AsMade.
+		enum class RenameDecision : uint8_t { AsMade, Turned, TooLong };
+		struct RenameCheck
+		{
+			RenameDecision decision = RenameDecision::AsMade;
+			ULONG flags = 0;					// what the caller asked for: ReplaceIfExists's byte, or the flags
+			ULONG length = 0;					// the copy's length for the turned call
+			const char* form = "";				// how the target was named, for the line
+			const wchar_t* folder = nullptr;	// a bare name's folder below the game folder, for the line
+			size_t folderLength = 0;
+			const wchar_t* name = nullptr;		// the target below the game folder - a bare name in that folder
+			size_t nameLength = 0;
+			RenameCopy copy;
+			ObjectName source;					// a bare name's source as Windows names it
+		};
+
+		void CheckRename(HANDLE file, const void* information, ULONG length, ULONG informationClass, RenameCheck& check)
+		{
+			bool copied = false;
+			if (!ReadRename(information, length, check.copy, copied))
+				return;
+			check.flags = check.copy.flags;
+			const bool replace = informationClass == kFileRenameInformation ? (check.flags & 0xFF) != 0 :
+				(check.flags & kReplaceIfExists) != 0 && (check.flags & kPosixSemantics) == 0;
+			if (!replace)
+				return;	// a rename that replaces nothing, or one with POSIX semantics already
+			const HANDLE root = check.copy.root;
+			if (root)
+			{
+				FolderIdentity identity;
+				if (g_identityKind == IdentityKind::None || !IdentityOf(root, g_identityKind, identity) ||
+					identity != g_gameFolderIdentity)
+					return;	// relative to another folder: where it lies cannot be told
+			}
+			// the copy is examined when the name fits it, so that what is examined is what goes to Windows;
+			// a longer name where the caller has it, only to be counted
+			const wchar_t* const name = copied ? check.copy.name :
+				reinterpret_cast<const wchar_t*>(static_cast<const uint8_t*>(information) + kRenameNameOffset);
+			const Target target = ExamineTarget(name, check.copy.nameLength / sizeof(wchar_t), root != nullptr, check.name,
+				check.nameLength);
+			if (target == Target::Outside ||
+				(target == Target::Bare && !SourceInGameFolder(file, check.source, check.folder, check.folderLength)))
+				return;
+			if (!copied)
+			{
+				check.decision = RenameDecision::TooLong;
+				return;
+			}
+			check.form = target == Target::Bare ? "a bare name" : root ? "a name relative to the game folder" : "a full name";
+			check.copy.flags = (informationClass == kFileRenameInformationEx ? check.flags : 0) | kReplaceIfExists | kPosixSemantics;
+			check.length = std::max(kRenameMinLength, static_cast<ULONG>(kRenameNameOffset) + check.copy.nameLength);
+			check.decision = RenameDecision::Turned;
+		}
+
+		// The rename turned - in test builds with TWEAKSV_TEST_NO_RENAME_EX=1 answered as a file system that
+		// refuses it would, without asking Windows.
+		NTSTATUS MakeTurnedRename(HANDLE file, PIO_STATUS_BLOCK ioStatus, RenameCheck& check)
+		{
+#ifdef TWEAKSV_TEST_BUILD
+			if (g_testRefuseRenames)
+				return static_cast<NTSTATUS>(0xC000000D);	// STATUS_INVALID_PARAMETER, FAT's answer
+#endif
+			return g_originalNtSetInformationFile(file, ioStatus, &check.copy, check.length, kFileRenameInformationEx);
+		}
+
+		// One line per rename turned (DIAGNOSTIC_MODE), 20,000 at most: its target below the game folder, what
+		// Windows answered - where the file system refused POSIX semantics, and what the call as made gave - how
+		// the caller asked and how it was made, and the code that made it.
+		void LogRename(const RenameCheck& check, ULONG informationClass, NTSTATUS turned, bool refused, NTSTATUS status)
+		{
+			const uint64_t number = ++g_renameNumber;
+			if (!Counted(g_renameLines, "DIAGNOSTIC: ", "renames turned"))
+				return;
+			std::wstring target;
+			if (check.folderLength)
+				target.assign(check.folder, check.folderLength).push_back(L'\\');
+			target.append(check.name, check.nameLength);
+			char asked[64], made[64];
+			if (informationClass == kFileRenameInformation)
+				snprintf(asked, sizeof(asked), "FileRenameInformation with ReplaceIfExists");
+			else
+				snprintf(asked, sizeof(asked), "FileRenameInformationEx, flags 0x%08lX", static_cast<unsigned long>(check.flags));
+			snprintf(made, sizeof(made), "FileRenameInformationEx, flags 0x%08lX", static_cast<unsigned long>(check.copy.flags));
+			const std::string result = refused ? "refused (" + StatusText(turned) + "), made again as made: " + StatusText(status) :
+				StatusText(status);
+			WriteLog(kTag, "rename #" + std::to_string(number) + ": " + ToUtf8(target) + " | " + result + " | " + asked + ", " +
+				check.form + " -> " + made + " | from " + DescribeCallers(nullptr));
+		}
+
+		// Every open and every replace-rename counted: what the summary has to say
+		uint64_t CountedEvents()
 		{
 			uint64_t total = 0;
 			for (size_t kind = kWidened; kind < static_cast<size_t>(kOpenKinds); kind++)
 				total += g_openCounts[kind].load();
+			for (const std::atomic<uint64_t>& count : g_renameCounts)
+				total += count.load();
 			return total;
 		}
 
 		bool g_unlockSummaryWritten = false;	// only the measurement's thread uses it
-		HANDLE g_firstCounted = nullptr;		// an event the hook sets at the first open it counts: the summary's clock
-		std::atomic<bool> g_firstCountedSet{ false };
 
-		// The UNLOCK_FILES summary, 10 seconds after the first open counted and then every minute while the
-		// count changes. Each figure is read once, so the figures add up whatever comes meanwhile.
+		// The UNLOCK_FILES summary, 10 seconds after the first open or rename counted and then every minute while
+		// the count changes. Each figure is read once, so the figures add up whatever comes meanwhile.
 		void LogUnlockSummary(uint64_t)
 		{
-			uint64_t counts[kOpenKinds];
+			uint64_t counts[kOpenKinds], renames[kRenameKinds];
 			for (size_t kind = 0; kind < static_cast<size_t>(kOpenKinds); kind++)
 				counts[kind] = g_openCounts[kind].load();
+			for (size_t kind = 0; kind < static_cast<size_t>(kRenameKinds); kind++)
+				renames[kind] = g_renameCounts[kind].load();
 			const uint64_t files = g_files.load(), untracked = g_untrackedOpens.load();
 			const std::string when = g_unlockSummaryWritten ? std::string("so far") :
 				"in its first " + std::to_string(kFirstSummaryMs / 1000) + " seconds";
@@ -857,10 +1169,13 @@ namespace TweaksV
 				(types.empty() ? std::string() : "; by type: " + types) + "; left as they were: " +
 				std::to_string(counts[kArchive]) + " opens of archives, " + std::to_string(counts[kWriteOpen]) + " write opens, " +
 				std::to_string(counts[kExclusive]) + " exclusive opens, " + std::to_string(counts[kDirectory]) + " directories, " +
-				std::to_string(counts[kUnexamined]) + " whose path could not be examined.");
+				std::to_string(counts[kUnexamined]) + " whose path could not be examined; replace-renames into the game folder: " +
+				std::to_string(renames[kRenameTurned]) + " given POSIX semantics, " + std::to_string(renames[kRenameFallback]) +
+				" made again as the caller made them where the file system refused that, " + std::to_string(renames[kRenameTooLong]) +
+				" passed on as made, their names longer than " + std::to_string(kMaxRenameChars) + " characters.");
 		}
 
-		constexpr Measurement kUnlockMeasurement = { "UNLOCK_FILES summary", kFirstSummaryMs, &CountedOpens, &LogUnlockSummary,
+		constexpr Measurement kUnlockMeasurement = { "UNLOCK_FILES summary", kFirstSummaryMs, &CountedEvents, &LogUnlockSummary,
 			&g_firstCounted };
 
 		// ---- the file opens (DIAGNOSTIC_MODE)
@@ -1041,7 +1356,7 @@ namespace TweaksV
 		// The open summary, a minute in and then every minute while the count changes.
 		constexpr Measurement kMeasurement = { "DirectStorage open summary", kSummaryEveryMs, &Opens, &LogSummary };
 
-		// ---- the hook: both jobs on one NtCreateFile
+		// ---- the hooks: both jobs on one NtCreateFile, and UNLOCK_FILES' replace-renames on NtSetInformationFile
 
 		NTSTATUS NTAPI HookNtCreateFile(PHANDLE fileHandle, ACCESS_MASK access, POBJECT_ATTRIBUTES attributes,
 			PIO_STATUS_BLOCK ioStatus, PLARGE_INTEGER allocationSize, ULONG fileAttributes, ULONG share,
@@ -1057,13 +1372,37 @@ namespace TweaksV
 			if (check.kind != kNotCounted)
 			{
 				CountOpen(check);
-				// the first open counted starts the summary's clock; its thread waits from the start-up on
-				if (!g_firstCountedSet.load(std::memory_order_relaxed) && !g_firstCountedSet.exchange(true) && g_firstCounted)
-					SetEvent(g_firstCounted);
+				StartSummaryClock();
 			}
 			// STATUS_ACCESS_VIOLATION: the caller's arguments could not even be read by the system
 			if (g_diagnostic && status != static_cast<NTSTATUS>(STATUS_ACCESS_VIOLATION))
 				AfterCall([&] { LogFileOpen(attributes, access, share, shareUsed, disposition, options, status); });
+			return status;
+		}
+
+		NTSTATUS NTAPI HookNtSetInformationFile(HANDLE file, PIO_STATUS_BLOCK ioStatus, PVOID information, ULONG length,
+			ULONG informationClass)
+		{
+			// every other class goes on at once, and so does what TweaksV renames inside a hook of its own
+			if ((informationClass != kFileRenameInformation && informationClass != kFileRenameInformationEx) || t_inside)
+				return g_originalNtSetInformationFile(file, ioStatus, information, length, informationClass);
+			RenameCheck check;
+			CheckRename(file, information, length, informationClass, check);
+			if (check.decision != RenameDecision::Turned)
+			{
+				const NTSTATUS status = g_originalNtSetInformationFile(file, ioStatus, information, length, informationClass);
+				if (check.decision == RenameDecision::TooLong)
+					CountRename(kRenameTooLong);
+				return status;
+			}
+			const NTSTATUS turned = MakeTurnedRename(file, ioStatus, check);
+			// the file system refused the class or the flag: the call as the caller made it, and its result
+			const bool refused = Refused(turned);
+			const NTSTATUS status = refused ? g_originalNtSetInformationFile(file, ioStatus, information, length, informationClass) :
+				turned;
+			CountRename(refused ? kRenameFallback : kRenameTurned);
+			if (g_diagnostic)
+				AfterCall([&] { LogRename(check, informationClass, turned, refused, status); });
 			return status;
 		}
 
@@ -1524,6 +1863,47 @@ namespace TweaksV
 			error = ERROR_NOT_SUPPORTED;	// the file system gives neither
 			return g_identityKind != IdentityKind::None;
 		}
+
+		// The game folder as Windows names a file object in it (g_gameFolderPath), read before the rename hook is
+		// made, the same way the hook reads a source's path. False, with Windows' error, if it cannot be read: no
+		// rename by a bare name is then known to lie in the game folder.
+		bool ReadGameFolderPath(DWORD& error)
+		{
+			using StatusToErrorFn = ULONG(NTAPI*)(NTSTATUS);
+			StatusToErrorFn statusToError = nullptr;
+			if (const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll"))
+			{
+				g_queryObject = reinterpret_cast<NtQueryObjectFn>(GetProcAddress(ntdll, "NtQueryObject"));
+				statusToError = reinterpret_cast<StatusToErrorFn>(GetProcAddress(ntdll, "RtlNtStatusToDosError"));
+			}
+			if (!g_queryObject || !statusToError)
+			{
+				error = ERROR_PROC_NOT_FOUND;
+				return false;
+			}
+			const HANDLE folder = CreateFileW(g_gameFolder.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE |
+				FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+			if (folder == INVALID_HANDLE_VALUE)
+			{
+				error = GetLastError();
+				return false;
+			}
+			std::vector<uint8_t> buffer(sizeof(UNICODE_STRING) + 65536);	// room for the longest name Windows gives
+			const NTSTATUS status = g_queryObject(folder, kObjectNameInformation, buffer.data(), static_cast<ULONG>(buffer.size()), nullptr);
+			CloseHandle(folder);
+			if (!NT_SUCCESS(status))
+			{
+				error = statusToError(status);
+				return false;
+			}
+			const auto* const name = reinterpret_cast<const UNICODE_STRING*>(buffer.data());
+			if (name->Buffer)
+				g_gameFolderPath.assign(name->Buffer, name->Length / sizeof(wchar_t));
+			while (!g_gameFolderPath.empty() && g_gameFolderPath.back() == L'\\')
+				g_gameFolderPath.pop_back();
+			error = ERROR_NOT_SUPPORTED;	// a folder without a name
+			return !g_gameFolderPath.empty();
+		}
 	}
 
 	void InitDirectStorage()
@@ -1550,8 +1930,12 @@ namespace TweaksV
 		if (IsDryRun())
 		{
 			if (unlock)
+			{
 				WriteLog(kTag, "DRY_RUN: would hook NtCreateFile so that the game folder's other files are opened with write and "
 					"delete sharing (UNLOCK_FILES).");
+				WriteLog(kTag, "DRY_RUN: would hook NtSetInformationFile so that a rename inside the game that replaces a file in the "
+					"game folder gets POSIX semantics (UNLOCK_FILES).");
+			}
 			if (diagnostic)
 			{
 				WriteLog(kTag, "DRY_RUN: would hook dstorage.dll to log the game's DirectStorage calls.");
@@ -1587,30 +1971,50 @@ namespace TweaksV
 		}
 
 		// One NtCreateFile hook for both jobs, made whatever loaded DirectStorage: UNLOCK_FILES frees the files
-		// whoever opens them. First what the hook uses from its first call on: the game folder's identity and
-		// the event it sets at the first open it counts.
-		DWORD identityError = 0;
+		// whoever opens them, and turns the replace-renames into the game folder on a hook of NtSetInformationFile.
+		// First what the hooks use from their first call on: the game folder's identity and path and the event
+		// they set at the first thing they count.
+		DWORD identityError = 0, pathError = 0;
 		const bool identity = unlock && ReadGameFolderIdentity(identityError);
+		const bool path = unlock && ReadGameFolderPath(pathError);
 		if (unlock)
 			g_firstCounted = CreateEventW(nullptr, TRUE, FALSE, nullptr);	// null: the summary's clock starts at once
-		if (!InstallHook(L"ntdll.dll", "NtCreateFile", reinterpret_cast<LPVOID>(&HookNtCreateFile),
-			reinterpret_cast<LPVOID*>(&g_originalNtCreateFile)))
+#ifdef TWEAKSV_TEST_BUILD
+		wchar_t refuseRenames[4]{};
+		if (unlock && GetEnvironmentVariableW(L"TWEAKSV_TEST_NO_RENAME_EX", refuseRenames, 4) == 1 && refuseRenames[0] == L'1')
 		{
-			if (unlock)
-				ReportFailure(kTag, "The files in the game folder are not unlocked this session: NtCreateFile could not be hooked "
-					"(details in TweaksV.log).");
-			return;
+			g_testRefuseRenames = true;
+			WriteLog(kTag, "TEST BUILD: every rename turned is answered as on a file system that refuses POSIX semantics, without "
+				"asking Windows (TWEAKSV_TEST_NO_RENAME_EX=1).");
 		}
-		if (unlock)
-		{
+#endif
+		const bool created = InstallHook(L"ntdll.dll", "NtCreateFile", reinterpret_cast<LPVOID>(&HookNtCreateFile),
+			reinterpret_cast<LPVOID*>(&g_originalNtCreateFile));
+		if (unlock && created)
 			WriteLog(kTag, "UNLOCK_FILES: NtCreateFile is hooked - a read-only open of a file in the game folder other than .rpf "
 				"and .cache that shares reading gets write and delete sharing too, so those files stay free for other programs.");
+		else if (unlock)
+			ReportFailure(kTag, "The files in the game folder are not unlocked this session: NtCreateFile could not be hooked "
+				"(details in TweaksV.log).");
+		const bool renamed = unlock && InstallHook(L"ntdll.dll", "NtSetInformationFile",
+			reinterpret_cast<LPVOID>(&HookNtSetInformationFile), reinterpret_cast<LPVOID*>(&g_originalNtSetInformationFile));
+		if (unlock && renamed)
+			WriteLog(kTag, "UNLOCK_FILES: NtSetInformationFile is hooked - a rename inside the game that replaces a file in the "
+				"game folder gets POSIX semantics, so it goes through while the game holds that file open.");
+		else if (unlock)
+			ReportFailure(kTag, "The replace-renames into the game folder are not given POSIX semantics this session: "
+				"NtSetInformationFile could not be hooked (details in TweaksV.log).");
+		if (unlock && (created || renamed))
+		{
 			StartMeasurement<kUnlockMeasurement>();	// the summary; one that cannot start is logged
 			if (!identity)
 				ReportFailure(kTag, "Files in the game folder opened by a relative path are not unlocked this session: the game "
 					"folder's file ID could not be read (" + DescribeError(identityError) + ").");
+			if (renamed && !path)
+				ReportFailure(kTag, "Replace-renames in the game folder by a bare name are not given POSIX semantics this session: "
+					"the game folder's path could not be read (" + DescribeError(pathError) + ").");
 		}
-		if (diagnostic)
+		if (diagnostic && created)
 		{
 			WriteLog(kTag, "DIAGNOSTIC: every open of a file or folder in " + ToUtf8(g_gameFolder) + " is logged, " +
 				std::to_string(kLinesPerWay) + " lines per file, caller and sharing; a summary follows every minute.");
