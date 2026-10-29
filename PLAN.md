@@ -100,23 +100,23 @@ The topics:
 
 ## Next steps
 
-**State:** the first round of the full release, under way since 2026-10-29, as planned above: the merge session, started by the overview session at my go, writes the eight briefs, and the eight sessions start at my go in its session. Before it: 2.3.0, tagged on 1bc8532 and pushed, not published - the next version I publish is the full one, with all of the upgrades, and until then 2.2.1 stays the last one published, 2.2.2, 2.2.3 and 2.3.0 tags for my own use. My dump boot of 2026-10-29, 10:09 to 10:11, with the test build of 14a5ad5 and LuminanceV out: line 1 `TweaksV 2.3.0 (git 14a5ad5)`, every part applied, no PROBLEM line, no crash; both dumps saved, 54,388,072 bytes each, none unreadable. The suites stand at 609 checks on main; the open issues are T-HARDEN, T-DIAG, T-SUMMARY, T-FREEZE and T-REPLACE, which goes with 2.4.0. Above the pushed main, documents-only commits wait for 2.4.0's push.
+**State:** the first round of the full release, under way since 2026-10-29, as planned above: the merge session, started by the overview session at my go, wrote the eight briefs, which the overview session checked, and started the eight sessions at my go in its session at 10:53, each in a worktree and on a branch of its own from main at 252b090. Before it: 2.3.0, tagged on 1bc8532 and pushed, not published - the next version I publish is the full one, with all of the upgrades, and until then 2.2.1 stays the last one published, 2.2.2, 2.2.3 and 2.3.0 tags for my own use. My dump boot of 2026-10-29, 10:09 to 10:11, with the test build of 14a5ad5 and LuminanceV out: line 1 `TweaksV 2.3.0 (git 14a5ad5)`, every part applied, no PROBLEM line, no crash; both dumps saved, 54,388,072 bytes each, none unreadable. The suites stand at 609 checks on main; the open issues are T-HARDEN, T-DIAG, T-SUMMARY, T-FREEZE and T-REPLACE, which goes with 2.4.0. Above the pushed main, documents-only commits wait for 2.4.0's push.
 
-**The replace-rename:** not started.
+**The replace-rename:** under way since 10:53, in a worktree and on a branch of its own; its paragraph there carries its state until the merge session rebases it onto main.
 
-**Weapon infos:** not started.
+**Weapon infos:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
 
-**Weapon components:** not started.
+**Weapon components:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
 
-**Siren IDs:** not started.
+**Siren IDs:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
 
-**Siren count:** not started.
+**Siren count:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
 
-**Ped props:** not started.
+**Ped props:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
 
-**Texture budget:** not started.
+**Texture budget:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
 
-**Streaming memory:** not started.
+**Streaming memory:** under way since 10:53, item 1 first - the PE rebuilt from the dump and the full analysis started.
 
 **The verification:** none yet.
 
