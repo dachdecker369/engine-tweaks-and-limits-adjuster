@@ -26,6 +26,7 @@
 // [texture budget]
 // [weapon components]
 // [weapon infos]
+#include "TweaksVWeaponInfos.h"
 
 namespace TweaksV
 {
@@ -89,6 +90,7 @@ namespace TweaksV
 		// table when its part is built, or when it is not, so the table may be empty.
 		constexpr std::initializer_list<MeasuredFirst> kMeasuredFirst = {
 			// [weapon infos]
+			{ "WeaponLimits", MeasureWeaponInfos },
 			// [weapon components]
 			// [siren ids]
 			// [siren count]

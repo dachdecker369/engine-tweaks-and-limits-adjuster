@@ -89,6 +89,9 @@
     <!-- [texture budget] -->
     <!-- [weapon components] -->
     <!-- [weapon infos] -->
+    <ClCompile Include="TweaksVWeaponInfos.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="..\vendor\MinHook\src\buffer.c">
       <Filter>MinHook</Filter>
     </ClCompile>
@@ -185,6 +188,9 @@
     <!-- [texture budget] -->
     <!-- [weapon components] -->
     <!-- [weapon infos] -->
+    <ClInclude Include="TweaksVWeaponInfos.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h">
       <Filter>MinHook</Filter>
     </ClInclude>

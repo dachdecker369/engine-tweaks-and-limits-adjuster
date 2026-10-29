@@ -149,6 +149,11 @@ namespace TweaksV
 		// The parts measured first (SPECIFICATIONS 11.10), looked for with DIAGNOSTIC_MODE only: WeaponLimits (W),
 		// SirenSettings (I), PedProps (A), Resources (Q), one group per limit
 		// [weapon infos]
+		// WeaponLimits, the weapon infos (TweaksVWeaponInfos.cpp): the game's initializer of the weapon info blob array -
+		// the number of blobs allocated, the call that allocates them, the block's store and the capacity's (I1) - and
+		// the loader's head - the count read and written, the blob's size and the block (I2)
+		{ "W-E-I1", "C7 05 ? ? ? ? 00 00 00 00 BA ? ? ? ? E8 ? ? ? ? 48 89 05 ? ? ? ? 66 C7 05 ? ? ? ? ? ? 48 8D 0D" },
+		{ "W-E-I2", "0F B7 05 ? ? ? ? 8D 48 01 66 89 0D ? ? ? ? 4C 69 E8 ? ? ? ? 4C 03 2D ? ? ? ?" },
 		// [weapon components]
 		// [siren ids]
 		// [siren count]

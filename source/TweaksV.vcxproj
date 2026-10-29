@@ -153,6 +153,7 @@
     <!-- [texture budget] -->
     <!-- [weapon components] -->
     <!-- [weapon infos] -->
+    <ClCompile Include="TweaksVWeaponInfos.cpp" />
     <!-- MinHook v1.3.4, compiled unchanged from vendor\MinHook (x64 only: hde64, not hde32), at warning
          level 3, which it builds without a warning: its code is not TweaksV's to change, and /W4 finds
          its own warnings -->
@@ -202,6 +203,7 @@
     <!-- [texture budget] -->
     <!-- [weapon components] -->
     <!-- [weapon infos] -->
+    <ClInclude Include="TweaksVWeaponInfos.h" />
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h" />
   </ItemGroup>
   <ItemGroup>
