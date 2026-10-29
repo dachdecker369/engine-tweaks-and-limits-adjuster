@@ -152,6 +152,7 @@
     <ClCompile Include="TweaksVSummary.cpp" />
     <!-- [texture budget] -->
     <!-- [weapon components] -->
+    <ClCompile Include="TweaksVWeaponComponents.cpp" />
     <!-- [weapon infos] -->
     <ClCompile Include="TweaksVWeaponInfos.cpp" />
     <!-- MinHook v1.3.4, compiled unchanged from vendor\MinHook (x64 only: hde64, not hde32), at warning
@@ -202,6 +203,7 @@
     <ClInclude Include="TweaksVSummary.h" />
     <!-- [texture budget] -->
     <!-- [weapon components] -->
+    <ClInclude Include="TweaksVWeaponComponents.h" />
     <!-- [weapon infos] -->
     <ClInclude Include="TweaksVWeaponInfos.h" />
     <ClInclude Include="..\vendor\MinHook\include\MinHook.h" />

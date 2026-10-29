@@ -25,6 +25,7 @@
 #include "TweaksVSummary.h"
 // [texture budget]
 // [weapon components]
+#include "TweaksVWeaponComponents.h"
 // [weapon infos]
 #include "TweaksVWeaponInfos.h"
 
@@ -92,6 +93,7 @@ namespace TweaksV
 			// [weapon infos]
 			{ "WeaponLimits", MeasureWeaponInfos },
 			// [weapon components]
+			{ "WeaponLimits", MeasureWeaponComponents },
 			// [siren ids]
 			// [siren count]
 			// [ped props]
