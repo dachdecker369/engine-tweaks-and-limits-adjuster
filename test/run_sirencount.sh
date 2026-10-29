@@ -3,11 +3,12 @@
 # The siren count, a limit of the SirenSettings part measured first (TweaksVSirenCount): with DIAGNOSTIC_MODE=1 the fake game's
 # four sites found, checked and logged, the vehicle lights' call of the siren lights' renderer redirected, and the fake's
 # vehicles drawn through it from two threads at once - the game's renderer first, with its arguments, its result and its last
-# error, then each model counted once and summed up 10 seconds after the first, and again when the models change; models that
-# cannot be read and one whose names disagree with its bone structure; more models than the table holds; each pattern missing,
-# the two calls another mod redirected, the renderer's call to another function, find-bone-by-name not a function start, the
-# plain game, DRY_RUN and Windows' dynamic code policy - each logged, never a problem, nothing redirected; without
-# DIAGNOSTIC_MODE nothing looked for. Fake LOCALAPPDATA: the real one is never touched.
+# error, then each model counted once and summed up 10 seconds after the first, and again when the models change, and with
+# nothing drawn no summary at all; models that cannot be read, one whose names disagree with its bone structure and one whose
+# lookup faults; more models than the table holds; each pattern missing, the two calls another mod redirected, the renderer's
+# call to another function, find-bone-by-name not a function start and without unwind data, the plain game, DRY_RUN and
+# Windows' dynamic code policy - each logged, never a problem, nothing redirected; without DIAGNOSTIC_MODE nothing looked for.
+# Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" TweaksV.asi
@@ -51,6 +52,10 @@ check "the call stub read+execute, 12 in all (the other parts' 11 and this one),
 check "the sites but the redirected call and the models' data as placed" "has '$PLACED'"
 check "no problem, no box" "log_lacks 'PROBLEM' && log_lacks 'Start-up summary'"
 
+echo "== C2b DIAGNOSTIC_MODE=1 and nothing drawn for 11 s: the call redirected, no summary - its 10 seconds run from the first model counted"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe wait)
+check "the call redirected and announced, its stub read+execute; no model counted, no summary; no problem" "sc_line 'DIAGNOSTIC: the siren lights. renderer call at RVA 0x[0-9A-F]* is redirected (I-E-B1): the vehicle models with sirens on, each counted once with its siren bones looked up by name up to siren32, are logged 10 seconds after the first, then every minute while they change.' && has 'siren draws: none, the call leads to a TweaksV stub |' && has 'stubs: 12, all RX' && log_lacks 'vehicle models with sirens seen' && log_lacks 'PROBLEM'"
+
 echo "== C3 the test build, its summaries every 2 s: again when the models change - two more models 11 s in, then 3 s more"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(TWEAKSV_TEST_SUMMARY_MS=2000 ASI=TweaksV_test.asi game full_game.exe scdraw scmore); echo "      $out"
 check "the test build's line for this measurement" "log_line '\[TweaksV\] TEST BUILD: the siren count summary comes every 2000 ms after its first (TWEAKSV_TEST_SUMMARY_MS=2000).\$'"
@@ -58,13 +63,14 @@ check "the first summary, then a second with 6 models in 820 passes, 2 of them p
 check "a line for the new model made for 32 sirens, none for the one with 16; the earlier two lines not written again" "sc_line 'DIAGNOSTIC: vehicle model 0xB2C3D4E5, 110 bones - siren and glass bones by name: 32 and 32, up to siren32 and siren_glass32; named by its bone structure: 20 and 20; past siren20, never lit: 12 and 12.' && [ \$(count 'vehicle model 0xA1B2C3D4,') -eq 1 ] && [ \$(count 'vehicle model 0x0C0FFEE0,') -eq 1 ] && [ \$(count 'DIAGNOSTIC: vehicle model 0x') -eq 3 ]"
 check "820 passes through the stub with the renderer's arguments, result and last error; 64 lookups for each of the 6 models" "has 'siren draws: 820 through a TweaksV stub, the renderer 820 times, args ok, result and last error kept 820 of 820, 384 lookups in turn |' && log_lacks 'PROBLEM'"
 
-echo "== C4 three more models: a bone structure that cannot be read, a vehicle drawn without a skeleton, names that disagree with the bone structure"
-fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe scdraw scodd wait); echo "      $out"
-check "1400 passes, the one without a skeleton handed on as it was; no lookup for the two that cannot be read" "has 'siren draws: 1400 through a TweaksV stub, the renderer 1400 times, args ok, result and last error kept 1400 of 1400, 320 lookups in turn |'"
-check "the summary: 7 models, 2 that could not be read" "sc_line 'DIAGNOSTIC: 7 vehicle models with sirens seen in 1400 passes of the siren lights. renderer - the most sirens a model.s bone structure names: 20 of 20 (model 0x79FBB0C5); 1 with siren bones past siren20, which the game never lights; 1 losing siren bones past bone 127, which a bone structure cannot name; 2 that could not be read.'"
-check "the two that could not be read, each with what could not" "sc_line 'DIAGNOSTIC: vehicle model 0x0BAD0001 could not be read: its bone structure (the model info.s +0xB0).' && sc_line 'DIAGNOSTIC: vehicle model 0x0BAD0002 could not be read: its skeleton data (the renderer.s 7th argument, its first field).'"
-check "the one whose names disagree with its bone structure: a glass bone not found by name, siren1 found at another bone" "sc_line 'DIAGNOSTIC: vehicle model 0x0DD0DD00, 50 bones - siren and glass bones by name: 4 and 0, up to siren4 and no siren_glass; named by its bone structure: 4 and 1; named by its bone structure but not found by name: 0 and 1; found by name at another bone than its bone structure names: 1 and 0.' && [ \$(count 'DIAGNOSTIC: vehicle model 0x') -eq 5 ]"
-check "no problem, no box; sites and data as placed" "log_lacks 'PROBLEM' && log_lacks 'Start-up summary' && has '$PLACED'"
+echo "== C4 four more models: a bone structure that cannot be read, a vehicle drawn without a skeleton, names that disagree with the bone structure, a lookup that faults"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe scdraw scodd scfault wait); echo "      $out"
+check "1410 passes, the one without a skeleton handed on as it was; no lookup for the two whose data cannot be read, one for the one whose lookup faults" "has 'siren draws: 1410 through a TweaksV stub, the renderer 1410 times, args ok, result and last error kept 1410 of 1410, 321 lookups in turn |'"
+check "the summary: 8 models, 3 that could not be read" "sc_line 'DIAGNOSTIC: 8 vehicle models with sirens seen in 1410 passes of the siren lights. renderer - the most sirens a model.s bone structure names: 20 of 20 (model 0x79FBB0C5); 1 with siren bones past siren20, which the game never lights; 1 losing siren bones past bone 127, which a bone structure cannot name; 3 that could not be read.'"
+check "the two whose data could not be read, each with what could not" "sc_line 'DIAGNOSTIC: vehicle model 0x0BAD0001 could not be read: its bone structure (the model info.s +0xB0).' && sc_line 'DIAGNOSTIC: vehicle model 0x0BAD0002 could not be read: its skeleton data (the renderer.s 7th argument, its first field).'"
+check "the lookup that faults: the access violation caught, the model one that could not be read and looked at no more, the game going on" "sc_line 'DIAGNOSTIC: vehicle model 0x0BAD0003 could not be read: find-bone-by-name faulted on its skeleton data (an access violation).' && has '$PLACED'"
+check "the one whose names disagree with its bone structure: siren2 below bone 128 not named, a glass bone not found by name, siren1 found at another bone" "sc_line 'DIAGNOSTIC: vehicle model 0x0DD0DD00, 50 bones - siren and glass bones by name: 4 and 0, up to siren4 and no siren_glass; named by its bone structure: 3 and 1; found by name below bone 128 but not named by its bone structure: 1 and 0; named by its bone structure but not found by name: 0 and 1; found by name at another bone than its bone structure names: 1 and 0.' && [ \$(count 'DIAGNOSTIC: vehicle model 0x') -eq 6 ]"
+check "no problem, no box" "log_lacks 'PROBLEM' && log_lacks 'Start-up summary'"
 
 echo "== C5 1,100 more models after the four, one pass each: more than the table of 1,024 holds"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe scdraw scfull wait); echo "      $out"
@@ -97,6 +103,10 @@ check "the line, word for word, naming the function the unwind data gives; the c
 echo "== C10 find-bone-by-name's pattern 16 bytes into its function: not a function start - logged, nothing redirected"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe scdraw scnotstart)
 check "its site line and the module's line, word for word, by the unwind data; the call not redirected; no problem" "sc_line 'DIAGNOSTIC: find-bone-by-name at RVA 0x[0-9A-F]*, inside the function at RVA 0x[0-9A-F]* (unwind data), bone count offset at RVA 0x[0-9A-F]* holds 0x5E (I-E-B4)' && sc_line '$NOT_MEASURED find-bone-by-name at RVA 0x[0-9A-F]* is not a function start (inside the function at RVA 0x[0-9A-F]* (unwind data)) (I-E-B4).' && has '$UNCOUNTED' && log_lacks 'PROBLEM'"
+
+echo "== C10b find-bone-by-name's pattern where no unwind data names a function, CC before it: not a start by the unwind data - logged, nothing redirected"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe scdraw scnounwind)
+check "its site line and the module's line, word for word; the call not redirected; no problem" "sc_line 'DIAGNOSTIC: find-bone-by-name at RVA 0x[0-9A-F]*, no unwind data, bone count offset at RVA 0x[0-9A-F]* holds 0x5E (I-E-B4)' && sc_line '$NOT_MEASURED find-bone-by-name at RVA 0x[0-9A-F]* is not a function start (no unwind data) (I-E-B4).' && has '$UNCOUNTED' && has 'stubs: 11, all RX' && log_lacks 'PROBLEM'"
 
 echo "== C11 none of the game code present (plain fake game): logged, not a problem"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game plain_game.exe)

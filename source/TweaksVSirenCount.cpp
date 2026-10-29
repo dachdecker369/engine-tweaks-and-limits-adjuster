@@ -19,7 +19,8 @@
 //                    that the game never lights and which lose siren bones past bone 127
 //   DRY_RUN          the call is not redirected and nothing is counted: the line that would redirect it
 // Every site is found and checked first: the call must lead into the game, to the function the renderer's bone
-// read lies in by the game's unwind data, and find-bone-by-name's match must be a function start. A pattern
+// read lies in by the game's unwind data, and find-bone-by-name's match must be a function start by it too; each
+// lookup by name is guarded against an access violation, since no pattern pins what it is handed. A pattern
 // missing, a site not as expected, a summary thread that cannot start or a call that cannot be redirected is
 // logged, not reported - the measurement is an aid (NOTES.md, T-DIAG) - and nothing is redirected.
 // Written for TweaksV from the research's own findings in the game's code (PATTERNS.md); no code of anyone's
@@ -156,7 +157,8 @@ namespace TweaksV
 			uint8_t byName[2];			// of siren1 to siren32: the bones found by name
 			uint8_t highest[2];			// the highest n of siren<n> found by name
 			uint8_t past[2];			// found by name past siren20, never lit
-			uint8_t lost[2];			// of siren1 to siren20: found by name, not named by its bone structure - past bone 127
+			uint8_t lost[2];			// of siren1 to siren20: found by name past bone 127, not named by its bone structure
+			uint8_t unnamed[2];			// of siren1 to siren20: found by name below bone 128, not named by its bone structure
 			uint8_t missed[2];			// of siren1 to siren20: named by its bone structure, not found by name
 			uint8_t moved[2];			// of siren1 to siren20: found by name at another index than its bone structure names
 			bool written;				// its line written (the summary's thread only)
@@ -183,8 +185,24 @@ namespace TweaksV
 			return true;
 		}
 
+		// find-bone-by-name, an access violation in it caught - false then. The function is the game's own, but what it is
+		// handed, the renderer's 7th argument, no pattern pins: after a game update it may be no skeleton.
+		bool FindBoneSafely(const uint8_t* data, const char* name, const uint8_t*& bone)
+		{
+			__try
+			{
+				bone = g_findBone(data, name);
+				return true;
+			}
+			__except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+			{
+				return false;
+			}
+		}
+
 		// A model's first pass: its bone structure's siren and glass bytes, its skeleton's bones, and the 64 lookups by
-		// name. Every pointer of the game's goes through IsReadable before it is read.
+		// name. Every pointer of the game's goes through IsReadable before it is read, and every lookup through
+		// FindBoneSafely: one that faults makes the model one that could not be read, looked at no more.
 		void ReadModel(ModelSlot& slot, const uint8_t* model, const uint8_t* skeleton)
 		{
 			Read(model + kNameHashAt, slot.hash);
@@ -209,7 +227,12 @@ namespace TweaksV
 					const bool named = n <= kGameSirens && table[kind][n - 1] >= 0;
 					if (named)
 						slot.inTable[kind]++;
-					const uint8_t* const bone = slot.bones ? g_findBone(data, kBoneNames[kind][n - 1].text) : nullptr;
+					const uint8_t* bone = nullptr;
+					if (slot.bones && !FindBoneSafely(data, kBoneNames[kind][n - 1].text, bone))
+					{
+						slot.unreadable = "find-bone-by-name faulted on its skeleton data (an access violation)";
+						return;
+					}
 					if (!bone)
 					{
 						if (named)
@@ -225,12 +248,14 @@ namespace TweaksV
 					}
 					uint16_t index = 0;
 					const bool indexRead = Read(bone + kBoneIndexAt, index);
-					if (!named)
+					if (!named && indexRead && index >= kNameableBones)	// past what a signed byte names
 					{
 						slot.lost[kind]++;
-						if (indexRead && index > slot.lostBone)
+						if (index > slot.lostBone)
 							slot.lostBone = index;
 					}
+					else if (!named)
+						slot.unnamed[kind]++;
 					else if (indexRead && index != static_cast<uint16_t>(table[kind][n - 1]))
 						slot.moved[kind]++;
 				}
@@ -317,6 +342,8 @@ namespace TweaksV
 			if (slot.lost[0] || slot.lost[1])
 				line += "; lost past bone " + std::to_string(kNameableBones - 1) + ", found by name but not named by its bone structure: " +
 					Pair(slot.lost) + " (the highest bone " + std::to_string(slot.lostBone) + ")";
+			if (slot.unnamed[0] || slot.unnamed[1])
+				line += "; found by name below bone " + std::to_string(kNameableBones) + " but not named by its bone structure: " + Pair(slot.unnamed);
 			if (slot.missed[0] || slot.missed[1])
 				line += "; named by its bone structure but not found by name: " + Pair(slot.missed);
 			if (slot.moved[0] || slot.moved[1])
@@ -328,8 +355,8 @@ namespace TweaksV
 		// its bone structure disagree - which says the measurement itself is not right for it.
 		bool WorthALine(const ModelSlot& slot)
 		{
-			return slot.unreadable || slot.past[0] || slot.past[1] || slot.lost[0] || slot.lost[1] || slot.missed[0] || slot.missed[1] ||
-				slot.moved[0] || slot.moved[1];
+			return slot.unreadable || slot.past[0] || slot.past[1] || slot.lost[0] || slot.lost[1] || slot.unnamed[0] || slot.unnamed[1] ||
+				slot.missed[0] || slot.missed[1] || slot.moved[0] || slot.moved[1];
 		}
 
 		// The models counted so far, then a line for each model that is worth one and has none yet.
@@ -458,14 +485,15 @@ namespace TweaksV
 			return;
 		}
 
-		// 4. the glass bones' bytes, and find-bone-by-name: a function start
+		// 4. the glass bones' bytes, and find-bone-by-name: a function start by the game's unwind data, as the wrapper calls it
 		WriteLog(kTag, "DIAGNOSTIC: siren_glass1's bone offset at " + DescribeAddress(glassRead + kGlassBonesRead) + " " +
 			Holds(glassRead + kGlassBonesRead) + " (" + kGlassReadPattern.label + ")");
-		std::string start;
-		const bool isStart = IsFunctionStart(findBone, start);
+		const uint8_t* const findBoneFunction = FunctionStartOf(findBone);
+		const std::string start = findBoneFunction == findBone ? std::string("a function start (unwind data)") : findBoneFunction ?
+			"inside the function at " + DescribeAddress(findBoneFunction) + " (unwind data)" : std::string("no unwind data");
 		WriteLog(kTag, "DIAGNOSTIC: find-bone-by-name at " + DescribeAddress(findBone) + ", " + start + ", bone count offset at " +
 			DescribeAddress(findBone + kBoneCountRead) + " " + Holds(findBone + kBoneCountRead) + " (" + kFindBonePattern.label + ")");
-		if (!isStart)
+		if (findBoneFunction != findBone)
 		{
 			NotMeasured("find-bone-by-name at " + DescribeAddress(findBone) + " is not a function start (" + start + ") (" + kFindBonePattern.label + ").");
 			return;

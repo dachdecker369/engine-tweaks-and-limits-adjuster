@@ -163,14 +163,16 @@
 // [siren count]
 // The siren count (SirenSettings): its sites in .fakesit - the vehicle lights' calls of the siren lights' renderer and of the
 // siren settings getter (I-E-B1), a read of a siren's glass bone (I-E-B3) - and the renderer, with its read of a siren's bone
-// (I-E-B2), and find-bone-by-name (I-E-B4) as code the fake's unwind data names; nine vehicle models at the game's offsets, of
+// (I-E-B2), and find-bone-by-name (I-E-B4) as code the fake's unwind data names; ten vehicle models at the game's offsets, of
 // which scdraw draws four: the police car (0x79FBB0C5) with 20 sirens and 20 glass bones, one made for 32 (0xA1B2C3D4), one
 // whose siren9 and siren10 are bones 128 and 129 (0x0C0FFEE0), past what a signed byte names, one with 8 sirens (0x2C3D4E5F).
 //   scdraw         once TweaksV has started, draws their sirens through the call at the site - TweaksV's stub when it is
 //                  redirected, the fake's renderer when it is not - 100 passes of each model from each of two threads at once
 //   scodd          with scdraw: three more models among them - one whose bone structure cannot be read (0x0BAD0001), one drawn
-//                  without a skeleton (0x0BAD0002), one whose bone structure names siren1 at another bone than its name has and
-//                  a glass bone it has no name for (0x0DD0DD00)
+//                  without a skeleton (0x0BAD0002), one whose bone structure names siren1 at another bone than its name has,
+//                  leaves siren2 unnamed though its bone is below 128, and names a glass bone it has no name for (0x0DD0DD00)
+//   scfault        with scdraw: 10 passes of a model whose bones by name lie at an address that cannot be read (0x0BAD0003): the
+//                  fake's lookup faults, as find-bone-by-name would on what is no skeleton
 //   scmore         with scdraw: 11 seconds after the first passes, two more models, 10 passes each - one more made for 32 sirens
 //                  (0xB2C3D4E5) and one with 16 (0x16161616) - then 3 seconds more
 //   scfull         with scdraw: 1,100 more models after the four, one pass each - more than TweaksV's table of 1,024 holds
@@ -178,6 +180,7 @@
 //   scgetterhooked the call of the getter already leads outside the game
 //   scelsewhere    the call of the renderer leads to another function of the game than the one the bone read lies in
 //   scnotstart     find-bone-by-name's pattern lies 16 bytes into its function, not at its start
+//   scnounwind     find-bone-by-name's pattern lies in .fakesit, CC before it, where no unwind data names a function
 // [ped props]
 // [texture budget]
 // [streaming memory]
@@ -534,6 +537,10 @@ volatile unsigned char g_sirenCountGlassRead[] = { 0x0F, 0xBE, 0x94, 0x18, 0xAD,
 static Site g_sirenCountRendererCall = SITE(g_sirenCountCallSite, 14);	// the rel32 of the E8 at +13
 static Site g_sirenCountGetterCall = SITE(g_sirenCountCallSite, 25);		// the rel32 of the E8 at +24
 static Site g_sirenCountGlassSite = SITE(g_sirenCountGlassRead, 4);		// the disp32 of siren_glass1's byte
+// scnounwind: find-bone-by-name's pattern here, where no unwind data names a function - its first byte, at +1, 41 only then
+volatile unsigned char g_sirenCountFindBoneCopy[] = { 0xCC, 0xCC, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x20,
+	0x66, 0x83, 0x79, 0x5E, 0x00, 0xCC };
+static Site g_sirenCountFindBoneSite = SITE(g_sirenCountFindBoneCopy, 1);
 // [ped props]
 // [texture budget]
 // [streaming memory]
@@ -1040,6 +1047,7 @@ enum
 	kSirenCountPolice, kSirenCount32, kSirenCountLost, kSirenCount8,	// what scdraw draws
 	kSirenCountNoStructure, kSirenCountNoSkeleton, kSirenCountOdd,		// and with scodd
 	kSirenCountMore32, kSirenCountMore16,								// scmore, later
+	kSirenCountFault,													// scfault
 	kSirenCountVehicles
 };
 constexpr int kSirenCountMany = 1100;		// scfull: models past what TweaksV's table of 1,024 holds, each the police car's but its hash
@@ -1200,6 +1208,7 @@ static uint64_t SirenCountPlaced()
 	hash = SirenCountHash(hash, g_sirenCountCallSite, kRel32At);
 	hash = SirenCountHash(hash, g_sirenCountCallSite + kRel32At + 4, sizeof(g_sirenCountCallSite) - kRel32At - 4);
 	hash = SirenCountHash(hash, g_sirenCountGlassRead, sizeof(g_sirenCountGlassRead));
+	hash = SirenCountHash(hash, g_sirenCountFindBoneCopy, sizeof(g_sirenCountFindBoneCopy));
 	hash = SirenCountHash(hash, SirenCountCode(&SirenCountRendererCarrier), g_sirenCountRendererRoom);
 	hash = SirenCountHash(hash, SirenCountCode(&SirenCountFindBoneCarrier), g_sirenCountFindBoneRoom);
 	hash = SirenCountHash(hash, g_sirenCountVehicles, sizeof(g_sirenCountVehicleStorage));
@@ -1207,8 +1216,9 @@ static uint64_t SirenCountPlaced()
 }
 
 // Before TweaksV loads: the stand-ins written over their carriers, the vehicle lights' two calls pointed at the renderer and the
-// getter - or where an option asks - and the models made.
-static void SirenCountSetup(bool hooked, bool getterHooked, bool elsewhere, bool notStart)
+// getter - or where an option asks - and the models made. With noUnwind find-bone-by-name's pattern is not written into its
+// carrier but completed in .fakesit, where no unwind data names a function.
+static void SirenCountSetup(bool hooked, bool getterHooked, bool elsewhere, bool notStart, bool noUnwind)
 {
 	unsigned char* const renderer = SirenCountCode(&SirenCountRendererCarrier);
 	unsigned char* const findBone = SirenCountCode(&SirenCountFindBoneCarrier);
@@ -1229,14 +1239,19 @@ static void SirenCountSetup(bool hooked, bool getterHooked, bool elsewhere, bool
 		FlushInstructionCache(GetCurrentProcess(), renderer, g_sirenCountRendererRoom);
 		VirtualProtect(findBone, g_sirenCountFindBoneRoom, PAGE_EXECUTE_READWRITE, &old);
 		memset(findBone, 0xCC, g_sirenCountFindBoneRoom);
-		memcpy(findBone + findBoneAt, kSirenCountFindBoneStart, sizeof(kSirenCountFindBoneStart));
-		SirenCountJump(findBone + findBoneAt + sizeof(kSirenCountFindBoneStart), &g_sirenCountFindBoneTarget);
+		if (!noUnwind)
+		{
+			memcpy(findBone + findBoneAt, kSirenCountFindBoneStart, sizeof(kSirenCountFindBoneStart));
+			SirenCountJump(findBone + findBoneAt + sizeof(kSirenCountFindBoneStart), &g_sirenCountFindBoneTarget);
+		}
 		VirtualProtect(findBone, g_sirenCountFindBoneRoom, old, &unused);
 		FlushInstructionCache(GetCurrentProcess(), findBone, g_sirenCountFindBoneRoom);
 	}
 	SetRel32(g_sirenCountRendererCall, hooked ? static_cast<const void*>(ImageEnd() + 0x71000) :
 		elsewhere ? reinterpret_cast<const void*>(&SirenCountGetter) : static_cast<const void*>(renderer));
 	SetRel32(g_sirenCountGetterCall, getterHooked ? static_cast<const void*>(ImageEnd() + 0x72000) : reinterpret_cast<const void*>(&SirenCountGetter));
+	if (noUnwind)
+		g_sirenCountFindBoneCopy[1] = 0x41;
 
 	SirenCountVehicle* const v = g_sirenCountVehicles;
 	SirenCountMake(v[kSirenCountPolice], 0x79FBB0C5, 90, 20, 40, 20, 60);
@@ -1249,6 +1264,9 @@ static void SirenCountSetup(bool hooked, bool getterHooked, bool elsewhere, bool
 	SirenCountMake(v[kSirenCountOdd], 0x0DD0DD00, 50, 4, 10, 0, 0);
 	v[kSirenCountOdd].structure.ids[0x10 + 0x89] = 50;		// siren1 at another bone than its name has
 	v[kSirenCountOdd].structure.ids[0x10 + 0x9D] = 20;		// and a glass bone it has no name for
+	v[kSirenCountOdd].structure.ids[0x10 + 0x8A] = -1;		// siren2, bone 11, not named, though a signed byte holds 11
+	SirenCountMake(v[kSirenCountFault], 0x0BAD0003, 50, 4, 10, 0, 0);
+	v[kSirenCountFault].data.list = nullptr;				// its bones by name at an address that cannot be read: the lookup faults
 	SirenCountMake(v[kSirenCountMore32], 0xB2C3D4E5, 110, 32, 0, 32, 32);
 	SirenCountMake(v[kSirenCountMore16], 0x16161616, 60, 16, 30, 16, 46);
 	for (int i = 0; i < kSirenCountMany; i++)
@@ -1308,9 +1326,9 @@ static DWORD WINAPI SirenCountRunPasses(LPVOID parameter)
 }
 
 // Once TweaksV has started (scdraw), when the call leads to the fake's renderer or to TweaksV's stub: 100 passes of the four
-// models - seven with scodd - from each of two threads at once; with scmore 11 seconds later 10 passes of two more, then 3 seconds
-// more; with scfull 1,100 more models, one pass each.
-static void SirenCountDrawAll(bool odd, bool more, bool full)
+// models - seven with scodd - from each of two threads at once; with scfault 10 passes of the model whose lookup faults; with
+// scmore 11 seconds later 10 passes of two more, then 3 seconds more; with scfull 1,100 more models, one pass each.
+static void SirenCountDrawAll(bool odd, bool more, bool full, bool fault)
 {
 	const wchar_t* const where = SirenCountWhere();
 	if (!g_sirenCountBuilt || (wcscmp(where, L"the renderer") != 0 && wcscmp(where, L"a TweaksV stub") != 0))
@@ -1329,6 +1347,11 @@ static void SirenCountDrawAll(bool odd, bool more, bool full)
 		WaitForMultipleObjects(started, threads, TRUE, INFINITE);
 	for (DWORD i = 0; i < started; i++)
 		CloseHandle(threads[i]);
+	if (fault)
+	{
+		SirenCountRun faulting = { lights, kSirenCountFault, 1, 10 };
+		SirenCountRunPasses(&faulting);
+	}
 	if (more)
 	{
 		Sleep(11000);
@@ -1839,6 +1862,7 @@ static void ForEachSite(void (*fn)(const Site&))
 	// [siren count]
 	fn(g_sirenCountRendererCall);
 	fn(g_sirenCountGlassSite);
+	fn(g_sirenCountFindBoneSite);
 	// [ped props]
 	// [texture budget]
 	// [streaming memory]
@@ -3151,7 +3175,7 @@ int wmain(int argc, wchar_t** argv)
 	SirenIdsSetup(argc, argv);
 	// [siren count]
 	SirenCountSetup(HasOption(argc, argv, L"schooked"), HasOption(argc, argv, L"scgetterhooked"), HasOption(argc, argv, L"scelsewhere"),
-		HasOption(argc, argv, L"scnotstart"));
+		HasOption(argc, argv, L"scnotstart"), HasOption(argc, argv, L"scnounwind"));
 	// [ped props]
 	// [texture budget]
 	// [streaming memory]
@@ -3236,7 +3260,8 @@ int wmain(int argc, wchar_t** argv)
 	SirenIdsLater();
 	// [siren count]
 	if (HasOption(argc, argv, L"scdraw"))
-		SirenCountDrawAll(HasOption(argc, argv, L"scodd"), HasOption(argc, argv, L"scmore"), HasOption(argc, argv, L"scfull"));
+		SirenCountDrawAll(HasOption(argc, argv, L"scodd"), HasOption(argc, argv, L"scmore"), HasOption(argc, argv, L"scfull"),
+			HasOption(argc, argv, L"scfault"));
 	// [ped props]
 	// [texture budget]
 	// [streaming memory]
