@@ -27,6 +27,7 @@
 // [streaming memory]
 #include "TweaksVSummary.h"
 // [texture budget]
+#include "TweaksVTextureBudget.h"
 // [weapon components]
 #include "TweaksVWeaponComponents.h"
 // [weapon infos]
@@ -104,6 +105,7 @@ namespace TweaksV
 			// [ped props]
 			{ "PedProps", MeasurePedProps },
 			// [texture budget]
+			{ "Resources", MeasureTextureBudget },
 			// [streaming memory]
 		};
 	}

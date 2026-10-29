@@ -154,6 +154,7 @@
     <!-- [streaming memory] -->
     <ClCompile Include="TweaksVSummary.cpp" />
     <!-- [texture budget] -->
+    <ClCompile Include="TweaksVTextureBudget.cpp" />
     <!-- [weapon components] -->
     <ClCompile Include="TweaksVWeaponComponents.cpp" />
     <!-- [weapon infos] -->
@@ -208,6 +209,7 @@
     <!-- [streaming memory] -->
     <ClInclude Include="TweaksVSummary.h" />
     <!-- [texture budget] -->
+    <ClInclude Include="TweaksVTextureBudget.h" />
     <!-- [weapon components] -->
     <ClInclude Include="TweaksVWeaponComponents.h" />
     <!-- [weapon infos] -->

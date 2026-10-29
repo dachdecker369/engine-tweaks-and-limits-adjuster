@@ -212,6 +212,15 @@ namespace TweaksV
 		{ "A-E-C2", "44 0F B7 54 39 08 41 0F B6 CA 01 C8 49 FF C3 4D 39 C3 74 ? 4B 8B 0C D9 0F B7 71 60 45 31 D2 48 85 F6 74 ? 48 8B 49 58 48 C1 E6 03 48 8D 34 76 31 FF" },
 		{ "A-E-S1", "3B 05 ? ? ? ? 0F 8D ? ? ? ? 48 8B 0D ? ? ? ? 89 C2 C1 EA 05 8B 0C 91 0F A3 C1 0F 83 ? ? ? ? 48 8B 0D ? ? ? ? 48 85 C9 74 ? 44 89 7C 24 34 48 98 48 0F AF 05 ? ? ? ? 4C 8B 3C 01 BB 02 00 00 00 4D 85 FF 74 ? 41 0F B6 87 9D 00 00 00 24 1F 3C 06" },
 		// [texture budget]
+		// Resources, the texture budget (TweaksVTextureBudget.cpp): the start-up's store of the most streamed objects and its
+		// load of budgets 0 and 1 (T1), its store of budgets 2 and 3 and the call after the stores (T2), the budget's getter
+		// and the index it reads (T3), a resource's placement and its loads of the counters (T4), the update check and its
+		// switch (T5)
+		{ "Q-E-T1", "8B 88 4C 05 00 00 89 0D ? ? ? ? 66 0F 38 25 80 50 05 00 00" },
+		{ "Q-E-T2", "66 0F 38 25 80 58 05 00 00 66 0F 73 F0 14 F3 0F 7F 05 ? ? ? ? 4C 8D 35 ? ? ? ? 4C 89 35 ? ? ? ? 48 83 EC 20 E8" },
+		{ "Q-E-T3", "48 63 05 ? ? ? ? 48 8B 44 C1 28 C3" },
+		{ "Q-E-T4", "8B 05 ? ? ? ? 8B 0D ? ? ? ? 01 C1 3B 0D ? ? ? ? 73 ? 48 8B 05 ? ? ? ? 48 8B 35" },
+		{ "Q-E-T5", "83 3D ? ? ? ? 00 0F 84 ? ? ? ? 48 8D 0D ? ? ? ? 48 8B 3D ? ? ? ? 48 8B 35 ? ? ? ? E8" },
 		// [streaming memory]
 	};
 

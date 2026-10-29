@@ -96,6 +96,9 @@
       <Filter>TweaksV</Filter>
     </ClCompile>
     <!-- [texture budget] -->
+    <ClCompile Include="TweaksVTextureBudget.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <!-- [weapon components] -->
     <ClCompile Include="TweaksVWeaponComponents.cpp">
       <Filter>TweaksV</Filter>
@@ -207,6 +210,9 @@
       <Filter>TweaksV</Filter>
     </ClInclude>
     <!-- [texture budget] -->
+    <ClInclude Include="TweaksVTextureBudget.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <!-- [weapon components] -->
     <ClInclude Include="TweaksVWeaponComponents.h">
       <Filter>TweaksV</Filter>
