@@ -79,6 +79,9 @@
     </ClCompile>
     <!-- [siren count] -->
     <!-- [siren ids] -->
+    <ClCompile Include="TweaksVSirenIds.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVStraightToStoryMode.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -181,6 +184,9 @@
     </ClInclude>
     <!-- [siren count] -->
     <!-- [siren ids] -->
+    <ClInclude Include="TweaksVSirenIds.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVStraightToStoryMode.h">
       <Filter>TweaksV</Filter>
     </ClInclude>

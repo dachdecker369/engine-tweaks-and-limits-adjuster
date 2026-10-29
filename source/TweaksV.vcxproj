@@ -147,6 +147,7 @@
     <ClCompile Include="TweaksVSettings.cpp" />
     <!-- [siren count] -->
     <!-- [siren ids] -->
+    <ClCompile Include="TweaksVSirenIds.cpp" />
     <ClCompile Include="TweaksVStraightToStoryMode.cpp" />
     <!-- [streaming memory] -->
     <ClCompile Include="TweaksVSummary.cpp" />
@@ -198,6 +199,7 @@
     <ClInclude Include="TweaksVSettings.h" />
     <!-- [siren count] -->
     <!-- [siren ids] -->
+    <ClInclude Include="TweaksVSirenIds.h" />
     <ClInclude Include="TweaksVStraightToStoryMode.h" />
     <!-- [streaming memory] -->
     <ClInclude Include="TweaksVSummary.h" />

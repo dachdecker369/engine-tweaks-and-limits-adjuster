@@ -20,6 +20,7 @@
 #include "TweaksVRageOpenV.h"
 // [siren count]
 // [siren ids]
+#include "TweaksVSirenIds.h"
 #include "TweaksVStraightToStoryMode.h"
 // [streaming memory]
 #include "TweaksVSummary.h"
@@ -95,6 +96,7 @@ namespace TweaksV
 			// [weapon components]
 			{ "WeaponLimits", MeasureWeaponComponents },
 			// [siren ids]
+			{ "SirenSettings", MeasureSirenIds },
 			// [siren count]
 			// [ped props]
 			// [texture budget]

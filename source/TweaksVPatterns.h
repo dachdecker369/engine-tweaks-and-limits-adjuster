@@ -163,6 +163,27 @@ namespace TweaksV
 		{ "W-E-C3", "48 63 15 ? ? ? ? 8D 4A 01 89 0D ? ? ? ? 4D 89 04 D2" },
 		{ "W-E-C4", "48 8B 0D ? ? ? ? BA CF 3C E3 BA 41 B8 ? ? ? ? E8 ? ? ? ? 89 C3" },
 		// [siren ids]
+		// SirenSettings, the siren setting IDs (TweaksVSirenIds.cpp): the parser registrations of the siren settings (P1) and the
+		// vehicle variations (P2), whose tables lead to the members that carry an ID, and the simple member's XML reader (P3); the
+		// loaders' four lea of the ID table with the ID's byte loads and stores and the free-ID searches' limits - the base
+		// variations' loop (T1), the base builder (T2), a pack's variations (T3) and a pack's builder (T4); a pack's dedupe (D1)
+		// and its compare loop (D2); the constructors of a siren setting (C1) and of a variation, in place (C2) and allocating
+		// (C3); the vehicle metadata's init, its last fill of the table and its call of the base loader (R1); the getter of a
+		// model's siren setting (M1)
+		{ "I-E-P1", "C7 05 ? ? ? ? 0D 9B EB 84 0F 57 C0 0F 11 05 ? ? ? ? 48 8D 05 ? ? ? ? 48 89 05 ? ? ? ? 48 8D 05" },
+		{ "I-E-P2", "C7 05 ? ? ? ? A9 FE EA 18 0F 57 C0 0F 11 05 ? ? ? ? 48 8D 05 ? ? ? ? 48 89 05 ? ? ? ? 48 8D 05" },
+		{ "I-E-P3", "48 8B 41 08 0F B6 48 10 48 83 F9 21 0F 87" },
+		{ "I-E-T1", "B9 4B 00 00 00 31 D2 4C 8D 05 ? ? ? ? 4C 8D 0D" },
+		{ "I-E-T2", "41 0F B7 46 50 48 85 C0 0F 84 ? ? ? ? 49 8B 4E 48 31 D2 48 8D 1D" },
+		{ "I-E-T3", "B8 4B 00 00 00 31 C9 4C 8D 05 ? ? ? ? 48 8D 2D" },
+		{ "I-E-T4", "4C 8B 05 ? ? ? ? 49 8B 58 48 89 CA 48 8D 2D" },
+		{ "I-E-D1", "4D 8B 6F 48 4D 69 FE E8 05 00 00 43 0F B6 54 3D 00 0F B7 7B 50 80 FA FF 74" },
+		{ "I-E-D2", "31 F6 66 2E 0F 1F 84 00 00 00 00 00 38 54 35 00 0F 84 ? ? ? ? 48 81 C6 E8 05 00 00 48 39 F3 75 EA" },
+		{ "I-E-C1", "56 48 83 EC 20 48 89 CE C7 41 1C 00 00 00 00 B8 83 00 00 00 0F 57 C0" },
+		{ "I-E-C2", "C7 41 40 00 00 00 00 C7 41 48 00 00 FF FF C3" },
+		{ "I-E-C3", "C7 40 40 00 00 00 00 C7 40 48 00 00 FF FF 48 83 C4 28 C3" },
+		{ "I-E-R1", "66 0F 7F 05 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? 80 3D" },
+		{ "I-E-M1", "0F B6 81 3B 05 00 00 48 85 C0 74 13 48 8B 0D ? ? ? ? 48 69 C0 E8 05 00 00 48 03 41 48 C3" },
 		// [siren count]
 		// [ped props]
 		// [texture budget]
