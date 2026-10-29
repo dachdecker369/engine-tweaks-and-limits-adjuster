@@ -37,6 +37,7 @@ SUITES=(
 	# [texture budget]
 	texturebudget
 	# [streaming memory]
+	streamingmemory
 	integration
 )
 

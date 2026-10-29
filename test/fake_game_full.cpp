@@ -230,6 +230,20 @@
 //   tbmost         the placement's check loads the most objects from 4 bytes past them
 //   tbfactor      the update check's multiplication by its raise factor is an addition (addss)
 // [streaming memory]
+//   smoutside      the streaming memory (Resources): the resource heap's lea (Q-E-H1) leads outside the game
+//   smhooked       the call of the game's timeGetTime before the refusal stamp (Q-E-S1) already leads outside the game
+//                  (another mod's hook)
+//   smunreadable   the streaming allocator's page (Q-E-A1) cannot be read while TweaksV starts
+//   smrefused      a streamed resource was refused for memory 2 seconds before TweaksV started: the stamp holds that moment
+//   smcounted      12 MB and 40 MB are counted against the streaming budgets, as in a game that counts their use
+//   smgrow         11 seconds after TweaksV started, the resource heap has all 32 of its regions, more of it in use, and a
+//                  streamed resource was refused 3 seconds before; the report comes 6.5 seconds later
+//   smmore         11 seconds after TweaksV started, more of the resource heap is in use, nothing more refused; the report
+//                  comes 6.5 seconds later
+// The streaming memory's four sites are always there, their three calls leading to stand-ins of the game's functions.
+// The resource heap is made once TweaksV has started, as the game makes it after TweaksV's DllMain: 9 of its 32 regions
+// of 256 MB less a page of 8 KB, 1864 MB of them in use, 1710 MB by streamed resources, the streaming budgets the heap's
+// size, nothing counted against them and nothing refused.
 #include <windows.h>
 #include <winternl.h>
 #include <cstddef>
@@ -685,6 +699,27 @@ static Site g_textureBudgetGetterCall = SITE(g_textureBudgetUpdate, 35);
 static Site g_textureBudgetFlagRef = SITE(g_textureBudgetUpdate, 0x4D);
 static Site g_textureBudgetFactorRefs[] = { SITE(g_textureBudgetUpdate, 0x58), SITE(g_textureBudgetUpdate, 0xA5) };	// the lower, the raise
 // [streaming memory]
+// Resources, the streaming memory: the start-up's "lea rcx, [rip+disp32]" of the resource heap, "mov edx, 0x2000" (its
+// page size), "mov r8d, 0x40000000" (the region size asked) and the call of its constructor (Q-E-H1); the streaming
+// update's lea of the streaming allocator, the call of the budgets' reset and two moves the measurement does not read
+// (Q-E-A1); the loader's call of timeGetTime and "mov [rip+disp32], eax" of the refusal stamp (Q-E-S1); and the cap on
+// a region's size, 256 MB in "cmp rbx, imm32" and "mov eax, imm32", with the field 0x1D8 and the floor of 16 MB (Q-E-R1).
+volatile unsigned char g_streamingMemoryHeapSite[] = { 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0xBA, 0x00, 0x20, 0x00, 0x00, 0x41, 0xB8, 0x00, 0x00,
+	0x00, 0x40, 0xE8, 0, 0, 0, 0, 0xCC };																// lea rel32 at +3, call at +18
+volatile unsigned char g_streamingMemoryAllocatorSite[] = { 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0xE8, 0, 0, 0, 0, 0x8B, 0x05, 0x10, 0x20, 0x30,
+	0x00, 0x89, 0x05, 0x50, 0x60, 0x70, 0x00, 0x48, 0x83, 0xC4, 0x28, 0xCC };								// lea rel32 at +3, call at +7
+volatile unsigned char g_streamingMemoryStampSite[] = { 0xFF, 0x50, 0x30, 0x84, 0xC0, 0x75, 0x0B, 0xE8, 0, 0, 0, 0, 0x89, 0x05, 0, 0, 0, 0,
+	0x89, 0xD8, 0xCC };																					// call at +7, the stamp's disp32 at +14
+volatile unsigned char g_streamingMemoryCapSite[] = { 0x49, 0x8B, 0x9F, 0xD8, 0x01, 0x00, 0x00, 0x48, 0x81, 0xFB, 0x00, 0x00, 0x00, 0x10,
+	0xB8, 0x00, 0x00, 0x00, 0x10, 0x48, 0x0F, 0x43, 0xD8, 0x48, 0x81, 0xFB, 0x00, 0x00, 0x00, 0x01, 0xCC };	// the caps at +10 and +15
+static Site g_streamingMemoryHeapRef = SITE(g_streamingMemoryHeapSite, 3);
+static Site g_streamingMemoryConstructorCall = SITE(g_streamingMemoryHeapSite, 19);		// the rel32 of the E8 at +18
+static Site g_streamingMemoryAllocatorRef = SITE(g_streamingMemoryAllocatorSite, 3);
+static Site g_streamingMemoryResetCall = SITE(g_streamingMemoryAllocatorSite, 8);		// the rel32 of the E8 at +7
+static Site g_streamingMemoryClockCall = SITE(g_streamingMemoryStampSite, 8);			// the rel32 of the E8 at +7
+static Site g_streamingMemoryStampRef = SITE(g_streamingMemoryStampSite, 14);
+static Site g_streamingMemorySites[] = { SITE(g_streamingMemoryHeapSite, 0), SITE(g_streamingMemoryAllocatorSite, 0),
+	SITE(g_streamingMemoryStampSite, 0), SITE(g_streamingMemoryCapSite, 0) };
 #pragma data_seg()
 
 // The game's own modkit array (1024 entries of 2 bytes) and packfile array (4500 entries of 8 bytes). The
@@ -1843,6 +1878,89 @@ static void TextureBudgetLater(TextureBudgetChange change)
 		change == TextureBudgetChange::High ? L", highs raised one at a time after the first summary" : L", set after the first summary");
 }
 // [streaming memory]
+// Resources, the streaming memory: the game's resource heap - its object of 0x3FF0 bytes, all zeros until the harness
+// makes it once TweaksV has started, as the game does after TweaksV's DllMain - the streaming allocator, 0x38 bytes on a
+// page of its own (so that "smunreadable" can take the page away while TweaksV starts), and the refusal stamp; a copy of
+// each as the harness last left it, and of the four sites as it placed them, for the report; and the game's three
+// functions the sites' calls lead to - each its own, so that the linker cannot fold them into one.
+constexpr size_t kStreamingMemoryHeapSize = 0x3FF0;
+constexpr size_t kStreamingMemoryAllocatorSize = 0x38;
+constexpr uint64_t kStreamingMemoryPage = 0x2000;
+constexpr uint64_t kStreamingMemoryRegionPages = 0x10000000 / kStreamingMemoryPage - 1;	// a region: 256 MB less its page
+alignas(16) static unsigned char g_streamingMemoryHeapStorage[kStreamingMemoryHeapSize];
+static unsigned char* volatile g_streamingMemoryHeap = g_streamingMemoryHeapStorage;
+alignas(4096) static unsigned char g_streamingMemoryAllocatorPage[4096];
+static unsigned char* volatile g_streamingMemoryAllocator = g_streamingMemoryAllocatorPage;
+static uint32_t g_streamingMemoryStampStorage = 0;
+static uint32_t* volatile g_streamingMemoryStamp = &g_streamingMemoryStampStorage;
+static unsigned char g_streamingMemoryHeapAsLeft[kStreamingMemoryHeapSize];
+static unsigned char g_streamingMemoryAllocatorAsLeft[kStreamingMemoryAllocatorSize];
+static uint32_t g_streamingMemoryStampAsLeft = 0;
+static unsigned char g_streamingMemorySitesAsPlaced[4][32];
+static ULONGLONG g_streamingMemoryStart = 0;	// when TweaksV was loaded
+
+static void StreamingMemorySetQword(unsigned char* object, size_t at, uint64_t value)
+{
+	memcpy(object + at, &value, sizeof(value));
+}
+
+static uint64_t StreamingMemoryQword(const unsigned char* object, size_t at)
+{
+	uint64_t value = 0;
+	memcpy(&value, object + at, sizeof(value));
+	return value;
+}
+
+// A region of the resource heap made, as the game's heap makes one: its memory (an address the game would have, never
+// read), its allocator's page count, page size and size, and its pages in use; the heap's count of its regions raised.
+static void StreamingMemoryMakeRegion(unsigned char* heap, uint32_t region, uint64_t pagesInUse)
+{
+	unsigned char* const allocator = heap + 0x1E8 + region * 0x1E0;
+	StreamingMemorySetQword(allocator, 0x20, kStreamingMemoryRegionPages);
+	StreamingMemorySetQword(allocator, 0x28, pagesInUse);
+	StreamingMemorySetQword(allocator, 0x1D0, kStreamingMemoryPage);
+	StreamingMemorySetQword(allocator, 0x1D8, kStreamingMemoryRegionPages * kStreamingMemoryPage);
+	StreamingMemorySetQword(heap, 0x3EE8 + region * sizeof(uint64_t), 0x200000000ull + region * 0x10000000ull);
+	uint32_t made = 0;
+	memcpy(&made, heap + 0x1E4, sizeof(made));
+	made++;
+	memcpy(heap + 0x1E4, &made, sizeof(made));
+}
+
+// The game's resource heap's constructor, where Q-E-H1's call leads: the page size and the region size asked, then the
+// first region. The harness calls it once TweaksV has started, as the game's start-up does.
+static void StreamingMemoryConstruct(unsigned char* heap, uint64_t pagesInUse)
+{
+	StreamingMemorySetQword(heap, 0x1D0, kStreamingMemoryPage);
+	StreamingMemorySetQword(heap, 0x1D8, 0x40000000);
+	StreamingMemoryMakeRegion(heap, 0, pagesInUse);
+}
+
+// The streaming allocator's budgets' reset, where Q-E-A1's call leads: the heap's size - its regions' sizes - into both
+// budgets.
+static void StreamingMemoryResetBudgets(unsigned char* allocator, const unsigned char* heap)
+{
+	uint64_t size = 0;
+	for (uint32_t region = 0; region < 32; region++)
+		if (StreamingMemoryQword(heap, 0x3EE8 + region * sizeof(uint64_t)) != 0)
+			size += StreamingMemoryQword(heap + 0x1E8 + region * 0x1E0, 0x1D8);
+	StreamingMemorySetQword(allocator, 0x08, size);
+	StreamingMemorySetQword(allocator, 0x18, size);
+}
+
+// The game's timeGetTime, where the call before Q-E-S1's store leads: the milliseconds since Windows started.
+static DWORD StreamingMemoryTimeGetTime()
+{
+	return static_cast<DWORD>(GetTickCount64());
+}
+
+// What the harness left in the heap, the allocator and the stamp, for the report's "data as left".
+static void StreamingMemoryLeave()
+{
+	memcpy(g_streamingMemoryHeapAsLeft, g_streamingMemoryHeap, kStreamingMemoryHeapSize);
+	memcpy(g_streamingMemoryAllocatorAsLeft, g_streamingMemoryAllocator, kStreamingMemoryAllocatorSize);
+	g_streamingMemoryStampAsLeft = *g_streamingMemoryStamp;
+}
 
 // The game's two tree searches behind the box streamer's four calls: the first and the third call lead
 // to the first search, the second and the fourth to the second. Each writes the number of entries the
@@ -2332,6 +2450,7 @@ static void ForEachSite(void (*fn)(const Site&))
 		SITE(g_textureBudgetUpdate, 0) };
 	for (const Site& site : textureBudgetSites) fn(site);
 	// [streaming memory]
+	for (const Site& site : g_streamingMemorySites) fn(site);
 }
 
 static void MakeSitesReadExecute()
@@ -3736,6 +3855,29 @@ int wmain(int argc, wchar_t** argv)
 		TextureBudgetSites(g_textureBudgetSitesAsPlaced, false, asPlaced);
 	}
 	// [streaming memory]
+	// Resources, the streaming memory: the sites lead to the heap, the allocator, the stamp and the three functions...
+	SetRel32(g_streamingMemoryHeapRef, g_streamingMemoryHeap);
+	SetRel32(g_streamingMemoryConstructorCall, reinterpret_cast<const void*>(&StreamingMemoryConstruct));
+	SetRel32(g_streamingMemoryAllocatorRef, g_streamingMemoryAllocator);
+	SetRel32(g_streamingMemoryResetCall, reinterpret_cast<const void*>(&StreamingMemoryResetBudgets));
+	SetRel32(g_streamingMemoryClockCall, reinterpret_cast<const void*>(&StreamingMemoryTimeGetTime));
+	SetRel32(g_streamingMemoryStampRef, g_streamingMemoryStamp);
+	if (HasOption(argc, argv, L"smoutside"))		// ...unless the heap's lea leads outside the game
+		SetRel32(g_streamingMemoryHeapRef, ImageEnd() + 0x70000);
+	if (HasOption(argc, argv, L"smhooked"))		// ...or another mod hooked the call of timeGetTime
+		SetRel32(g_streamingMemoryClockCall, ImageEnd() + 0x80000);
+	if (HasOption(argc, argv, L"smrefused"))		// a streamed resource refused 2 seconds before TweaksV starts
+		*g_streamingMemoryStamp = StreamingMemoryTimeGetTime() - 2000;
+	for (size_t i = 0; i < 4; i++)
+		for (size_t at = 0; at < g_streamingMemorySites[i].size; at++)
+			g_streamingMemorySitesAsPlaced[i][at] = g_streamingMemorySites[i].bytes[at];
+	StreamingMemoryLeave();
+	if (HasOption(argc, argv, L"smunreadable"))	// the allocator's page cannot be read while TweaksV starts
+	{
+		DWORD old = 0;
+		VirtualProtect(g_streamingMemoryAllocator, sizeof(g_streamingMemoryAllocatorPage), PAGE_NOACCESS, &old);
+	}
+	g_streamingMemoryStart = GetTickCount64();	// TweaksV is loaded a few milliseconds after this
 
 	RovSetup(argc, argv);
 	ForEachSite(TouchSite);
@@ -3833,6 +3975,47 @@ int wmain(int argc, wchar_t** argv)
 	else if (HasOption(argc, argv, L"tblate"))
 		TextureBudgetLater(TextureBudgetChange::Late);
 	// [streaming memory]
+	// Resources, the streaming memory: the game makes its resource heap after TweaksV's DllMain - 9 of its 32 regions,
+	// 1864 MB of them in use, 1710 MB by streamed resources, the budgets the heap's size - and later, as asked, grows it
+	if (HasOption(argc, argv, L"smunreadable"))	// the allocator's page readable again
+	{
+		DWORD old = 0;
+		VirtualProtect(g_streamingMemoryAllocator, sizeof(g_streamingMemoryAllocatorPage), PAGE_READWRITE, &old);
+	}
+	StreamingMemoryConstruct(g_streamingMemoryHeap, 29000);
+	for (uint32_t region = 1; region < 9; region++)
+		StreamingMemoryMakeRegion(g_streamingMemoryHeap, region, region < 8 ? 29000 : 6592);
+	StreamingMemoryResetBudgets(g_streamingMemoryAllocator, g_streamingMemoryHeap);
+	StreamingMemorySetQword(g_streamingMemoryAllocator, 0x30, 1710ull << 20);
+	if (HasOption(argc, argv, L"smcounted"))		// a game that counts the use of its budgets
+	{
+		StreamingMemorySetQword(g_streamingMemoryAllocator, 0x10, 12ull << 20);
+		StreamingMemorySetQword(g_streamingMemoryAllocator, 0x20, 40ull << 20);
+	}
+	StreamingMemoryLeave();
+	const bool streamingMemoryGrow = HasOption(argc, argv, L"smgrow");
+	if (streamingMemoryGrow || HasOption(argc, argv, L"smmore"))
+	{
+		const ULONGLONG streamingMemoryAt = g_streamingMemoryStart + 11000;	// a second after TweaksV's first summary
+		const ULONGLONG streamingMemoryNow = GetTickCount64();
+		if (streamingMemoryNow < streamingMemoryAt)
+			Sleep(static_cast<DWORD>(streamingMemoryAt - streamingMemoryNow));
+		if (streamingMemoryGrow)	// all 32 regions, 7384 MB of them in use, 7200 MB by streamed resources, a refusal 3 s ago
+		{
+			for (uint32_t region = 9; region < 32; region++)
+				StreamingMemoryMakeRegion(g_streamingMemoryHeap, region, 30720);
+			StreamingMemoryResetBudgets(g_streamingMemoryAllocator, g_streamingMemoryHeap);
+			StreamingMemorySetQword(g_streamingMemoryAllocator, 0x30, 7200ull << 20);
+			*g_streamingMemoryStamp = StreamingMemoryTimeGetTime() - 3000;
+		}
+		else						// 1989 MB in use, 1835 MB by streamed resources
+		{
+			StreamingMemorySetQword(g_streamingMemoryHeap + 0x1E8 + 8 * 0x1E0, 0x28, 22592);
+			StreamingMemorySetQword(g_streamingMemoryAllocator, 0x30, 1835ull << 20);
+		}
+		StreamingMemoryLeave();
+		Sleep(6500);	// with TWEAKSV_TEST_SUMMARY_MS=3000, TweaksV's summaries 13 and 16 s in
+	}
 	if (HasOption(argc, argv, L"wait"))
 		Sleep(11000);	// TweaksV's UNLOCK_FILES summary comes 10 s after the first open it counts, the OpenFile summary 10 s
 						// after the first OpenFile, the interface check 10 s after the request
@@ -3900,6 +4083,26 @@ int wmain(int argc, wchar_t** argv)
 			rva(reinterpret_cast<const void*>(&TextureBudgetNextStep)), rva(&data.counters), rva(&data.index), rva(&data.flag), rva(&data.updateCheck));
 	}
 	// [streaming memory]
+	// "streaming memory: heap at RVA 0x..., ..., sites as placed 4 of 4, data as left 3 of 3 | " - where the heap, the
+	// allocator, the stamp and the three functions lie, and whether the sites and the data are as the harness left them
+	{
+		int streamingMemorySitesAsPlaced = 0;
+		for (size_t i = 0; i < 4; i++)
+		{
+			bool same = true;
+			for (size_t at = 0; at < g_streamingMemorySites[i].size; at++)
+				same = same && g_streamingMemorySites[i].bytes[at] == g_streamingMemorySitesAsPlaced[i][at];
+			streamingMemorySitesAsPlaced += same ? 1 : 0;
+		}
+		const int streamingMemoryDataAsLeft = (memcmp(g_streamingMemoryHeapAsLeft, g_streamingMemoryHeap, kStreamingMemoryHeapSize) == 0 ? 1 : 0) +
+			(memcmp(g_streamingMemoryAllocatorAsLeft, g_streamingMemoryAllocator, kStreamingMemoryAllocatorSize) == 0 ? 1 : 0) +
+			(*g_streamingMemoryStamp == g_streamingMemoryStampAsLeft ? 1 : 0);
+		const auto rva = [](const void* p) { return static_cast<unsigned long long>(static_cast<const unsigned char*>(p) - ImageBase()); };
+		wprintf(L"streaming memory: heap at RVA 0x%llX, allocator at RVA 0x%llX, stamp at RVA 0x%llX, calls to RVA 0x%llX, 0x%llX and 0x%llX, "
+			L"sites as placed %d of 4, data as left %d of 3 | ", rva(g_streamingMemoryHeap), rva(g_streamingMemoryAllocator), rva(g_streamingMemoryStamp),
+			rva(reinterpret_cast<const void*>(&StreamingMemoryConstruct)), rva(reinterpret_cast<const void*>(&StreamingMemoryResetBudgets)),
+			rva(reinterpret_cast<const void*>(&StreamingMemoryTimeGetTime)), streamingMemorySitesAsPlaced, streamingMemoryDataAsLeft);
+	}
 	CheckStub(Rel32Target(g_packCallSite));
 	CheckStub(Rel32Target(g_scriptCallSite));
 	for (const Site& site : g_boxCalls)
