@@ -149,6 +149,7 @@
 //   siunreadable  the settings' array in memory that cannot be read
 //   siwidened     the base loop's first ID load a word load already (0F B7), as another mod would leave it
 //   sitype        the variations' ID member's type 0x03, a word, as another mod would leave it
+//   siregister    the members' offset fields 0 - their structures not registered yet - until TweaksV has started
 //   simembers     the variations' registration with an eighth member
 //   sioffsets     the siren settings' member 2 at +0x8, not +0x4
 //   sidataout     the siren settings' ID member's data pointer leads outside the game
@@ -728,7 +729,7 @@ static unsigned char** volatile g_sirenIdsPointer = g_sirenIdsPointerStorage;
 constexpr size_t kSirenIdsSettingSize = 0x5E8;
 static unsigned char* g_sirenIdsSettings = nullptr;			// the siren settings' array, allocated by SirenIdsSetup
 static size_t g_sirenIdsCapacity = 0;
-static bool g_sirenIdsPack = false, g_sirenIdsNone = false, g_sirenIdsUnreadable = false;
+static bool g_sirenIdsPack = false, g_sirenIdsNone = false, g_sirenIdsUnreadable = false, g_sirenIdsRegister = false;
 
 // The sites, each with a hash of its bytes as placed, and one of the data, for the report
 struct SirenIdsSite { volatile unsigned char* bytes; size_t size; uint64_t placed; };
@@ -798,6 +799,14 @@ static void SirenIdsCount(size_t count)
 	const uint16_t value = static_cast<uint16_t>(count);
 	memcpy(g_sirenIdsCarcols + 0x50, &value, sizeof(value));
 }
+// The game registering the two structures: every member's offset into its data
+static void SirenIdsRegister()
+{
+	for (size_t i = 0; i < 20; i++)
+		g_sirenIdsMembers[i].offset = g_sirenIdsSettingOffsets[i];
+	for (size_t i = 0; i < 7; i++)
+		g_sirenIdsMembers[20 + i].offset = g_sirenIdsVariationOffsets[i];
+}
 
 // The sites as the game has them, as the options change them, and the data: 24 siren settings with the IDs 1 to 24 (simany: 300,
 // the IDs 0 to 254, then none)
@@ -840,19 +849,20 @@ static void SirenIdsSetup(int argc, wchar_t** argv)
 	SirenIdsPut(g_sirenIdsM1, 0, "0F B6 81 3B 05 00 00 48 85 C0 74 13 48 8B 0D 00 00 00 00 48 69 C0 E8 05 00 00 48 03 41 48 C3");
 	SirenIdsPut(g_sirenIdsLeaExtra, 0, HasOption(argc, argv, L"sififth") ? "48 8D 05 00 00 00 00" : "CC 8D 05 00 00 00 00");
 
-	// the parser registrations' tables and the members' data
+	// the parser registrations' tables and the members' data, registered - siregister: once TweaksV has started
 	for (size_t i = 0; i < 20; i++)
 	{
-		g_sirenIdsMembers[i].offset = g_sirenIdsSettingOffsets[i];
 		g_sirenIdsMembers[i].type = i == 0 ? 0x01 : 0x07;
 		g_sirenIdsSettingTable[i] = &g_sirenIdsMembers[i];
 	}
 	for (size_t i = 0; i < 7; i++)
 	{
-		g_sirenIdsMembers[20 + i].offset = g_sirenIdsVariationOffsets[i];
 		g_sirenIdsMembers[20 + i].type = i >= 5 ? 0x01 : 0x07;	// the light and the siren setting ID, a byte each
 		g_sirenIdsVariationTable[i] = &g_sirenIdsMembers[20 + i];
 	}
+	g_sirenIdsRegister = HasOption(argc, argv, L"siregister");
+	if (!g_sirenIdsRegister)
+		SirenIdsRegister();
 	g_sirenIdsMembers[27].type = 0x01;
 	if (HasOption(argc, argv, L"simembers"))
 		g_sirenIdsVariationTable[7] = &g_sirenIdsMembers[27];
@@ -907,11 +917,16 @@ static void SirenIdsSetup(int argc, wchar_t** argv)
 	g_sirenIdsDataPlaced = SirenIdsData();
 }
 
-// What the game does with its siren settings once TweaksV has started, 12 s after it loaded - after the measurement's first
-// summary: a pack's 6 settings appended with the IDs 40 to 45 (sipack), or the base files read (sinone); then the fake stays
-// to 15 s, for the summary after it
+// What the game does with its siren settings once TweaksV has started: the structures registered at once (siregister); 12 s
+// after TweaksV loaded - after the measurement's first summary - a pack's 6 settings appended with the IDs 40 to 45 (sipack),
+// or the base files read (sinone), and the fake stays to 15 s, for the summary after it
 static void SirenIdsLater()
 {
+	if (g_sirenIdsRegister)
+	{
+		SirenIdsRegister();
+		g_sirenIdsDataPlaced = SirenIdsData();
+	}
 	if (!g_sirenIdsPack && !g_sirenIdsNone)
 		return;
 	Sleep(10500);

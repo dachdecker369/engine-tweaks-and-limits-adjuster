@@ -16,8 +16,10 @@
 //                    the IDs given to more than one setting. Without it nothing is looked for; DRY_RUN changes nothing
 //                    here, since nothing is written.
 // The sites: the parser registrations of the two members that carry an ID - the siren setting's member 0 at +0x00, the
-// variation's member 6 at +0x4B - with their offsets and their member data's type, a byte (0x01 or 0x02), read in the
-// game's data and never written; the simple member's XML reader, which stores a byte or a word by that type; the four
+// variation's member 6 at +0x4B - with their offsets, and their member data's offset field and type, read in the game's
+// data and never written, logged at the start and again at the first summary: the game may register its structures after
+// TweaksV has started, and a type other than a byte's (0x01 or 0x02) is a finding for the writing half that stops
+// nothing; the simple member's XML reader, which stores a byte or a word by that type; the four
 // lea of the ID table, which a scan of the game's code must find exactly; in the loaders, the nine byte loads and the
 // two byte stores of an ID, the four checks for "none" (0xFF), the two IDs given when none is free, the two IDs stored
 // into a variation and the four free-ID searches' limits of 256; a pack's dedupe and its compare loop; the three
@@ -311,9 +313,25 @@ namespace TweaksV
 		};
 		constexpr Registration kSirenSetting = { kP1, "siren settings'", "siren setting's ID member", 0, 0x00, 2, 0x04, 0 };
 		constexpr Registration kVariation = { kP2, "vehicle variations'", "variation's siren setting ID member", 6, 0x4B, 5, 0x4A, 7 };
+		static_assert(kP1 == 0 && kP2 == 1, "TweaksV: the two registrations' members are kept by their match");
+		const uint8_t* g_memberData[2] = {};		// the two ID members' data, by their match: logged again at the first summary
+
+		// The ID member's offset field and its type as the game holds them now, logged; a type other than a byte's (0x01
+		// or 0x02) is a finding for the part's writing half, logged too, and stops nothing - the measurement does not
+		// depend on it, and the game may register its structures after TweaksV has started
+		void LogMemberData(const Registration& r, const uint8_t* data, const std::string& head)
+		{
+			const char* const label = kLimitPatterns[r.match]->label;
+			const uint8_t type = data[kMemberTypeAt];
+			WriteLog(kTag, "DIAGNOSTIC: " + std::string(r.member) + head + "its data at " + DescribeAddress(data) + ", offset field " +
+				Hex(ReadAt<uint64_t>(data + kMemberOffsetAt)) + ", type " + Hex(type) + " (" + label + ")");
+			if (type != 0x01 && type != 0x02)
+				WriteLog(kTag, "DIAGNOSTIC: the " + std::string(r.member) + "'s type at " + DescribeAddress(data + kMemberTypeAt) + " is " + Hex(type) +
+					", not 0x1 or 0x2, which store a byte - a finding for the part's writing half (" + label + ").");
+		}
 
 		// The tables the registration leads to, inside the game; the member and its neighbour at their offsets, and as many
-		// members as the findings have; the member's data inside the game, its type a byte - read, never written
+		// members as the findings have; the member's data inside the game, read, never written
 		bool CheckRegistration(const Registration& r)
 		{
 			const uint8_t* const match = g_matches[r.match];
@@ -348,14 +366,24 @@ namespace TweaksV
 			const uint8_t* const data = ReadAt<const uint8_t*>(memberTable + r.id * sizeof(uint64_t));
 			if (!Readable(data, kMemberTypeAt + 1, std::string(r.member) + "'s data", label))
 				return false;
-			const uint8_t type = data[kMemberTypeAt];
-			WriteLog(kTag, "DIAGNOSTIC: " + std::string(r.member) + ": member " + std::to_string(r.id) + count + " at +" + Hex(idOffset) + ", member " +
-				std::to_string(r.neighbour) + " at +" + Hex(neighbourOffset) + "; its data at " + DescribeAddress(data) + ", offset field " +
-				Hex(ReadAt<uint64_t>(data + kMemberOffsetAt)) + ", type " + Hex(type) + " (" + label + ")");
-			if (type != 0x01 && type != 0x02)
-				return Fail("the " + std::string(r.member) + "'s type at " + DescribeAddress(data + kMemberTypeAt) + " is " + Hex(type) +
-					", not 0x1 or 0x2, which store a byte (" + label + ").");
+			g_memberData[r.match] = data;
+			LogMemberData(r, data, ": member " + std::to_string(r.id) + count + " at +" + Hex(idOffset) + ", member " + std::to_string(r.neighbour) +
+				" at +" + Hex(neighbourOffset) + "; ");
 			return true;
+		}
+
+		// The two ID members once more, at the first summary: what the game holds there once it has started
+		void LogMembersAgain()
+		{
+			for (const Registration* r : { &kSirenSetting, &kVariation })
+			{
+				const uint8_t* const data = g_memberData[r->match];
+				if (IsReadable(data, kMemberTypeAt + 1))
+					LogMemberData(*r, data, ", at the first summary: ");
+				else
+					WriteLog(kTag, "DIAGNOSTIC: " + std::string(r->member) + ", at the first summary: its data at " + DescribeAddress(data) +
+						" cannot be read (" + kLimitPatterns[r->match]->label + ")");
+			}
 		}
 
 		// The simple member's XML reader: where it finds a member's data and type - pinned by its pattern, logged
@@ -551,8 +579,15 @@ namespace TweaksV
 			return Numbers(State::Counted, settings.count, inUse, givenTwice);
 		}
 
+		bool g_firstSummary = true;	// the measurement's thread alone reads and writes it
+
 		void LogSettings(uint64_t numbers)
 		{
+			if (g_firstSummary)
+			{
+				g_firstSummary = false;
+				LogMembersAgain();
+			}
 			const auto state = static_cast<State>(numbers >> 56);
 			if (state == State::NotLoaded)
 				WriteLog(kTag, "DIAGNOSTIC: no siren settings loaded yet - the game has not read carcols.ymt.");

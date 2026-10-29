@@ -5,9 +5,10 @@
 # data and ID table at the game's sizes - 10 seconds in, again when the numbers change (the test build's
 # TWEAKSV_TEST_SUMMARY_MS), before the base files are read, with the table full and with the settings unreadable; a
 # pattern missing, the plain game, a site another mod changed, the table moved, split or loaded a fifth time, a member's
-# type, count, offset or data, a jump, a fill, a call and a pointer not as the findings have them - each logged, with no
-# problem, no box and nothing measured; DRY_RUN alike; nothing written - the fake's sites and data as placed, every page's
-# protection its own. Fake LOCALAPPDATA: the real one is never touched.
+# count, offset or data, a jump, a fill, a call and a pointer not as the findings have them - each logged, with no problem,
+# no box and nothing measured; a member's type a word and the structures registered after TweaksV has started, logged at
+# the start and at the first summary and measured all the same; DRY_RUN alike; nothing written - the fake's sites and data
+# as placed, every page's protection its own. Fake LOCALAPPDATA: the real one is never touched.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$B" || exit 1
 cp "$R/x64/Release/TweaksV.asi" TweaksV.asi
@@ -90,6 +91,7 @@ check "every site's line, word for word: the registrations, the reader, the load
 check "the 2 limits of each builder and the 4 lea of the table, to one table, and the scan's 4 to the same; the IDs' bytes 8 loads and 2 stores" "[ \$(count '${L}limit at ') -eq 4 ] && [ \$(to_table 'I-E-T[1-4]') -eq 4 ] && [ \$(to_table 'lea scan') -eq 4 ] && [ \$(count '${L}siren setting ID load at ') -eq 8 ] && [ \$(count '${L}siren setting ID store at ') -eq 2 ]"
 check "the announcement, word for word" "measured"
 check "the summary 10 s in, once, at the game's sizes: 24 settings, 24 of the 256 IDs in use, none past position 255, no ID given twice" "summary 24 24 0 0 && [ \$(summaries) -eq 1 ]"
+check "the two ID members once more, right before the first summary: their data, offset fields 0x0 and 0x4B, type 0x1" "lines \"siren setting's ID member, at the first summary: its data at $RVA, offset field 0x0, type 0x1 (I-E-P1)\" \"variation's siren setting ID member, at the first summary: its data at $RVA, offset field 0x4B, type 0x1 (I-E-P2)\" && [ \$(grep -n 'at the first summary' TweaksV.log | tail -n 1 | cut -d: -f1) -lt \$(grep -n 'siren settings loaded: ' TweaksV.log | head -n 1 | cut -d: -f1) ]"
 check "no problem; nothing written - the sites and the data as placed, every page's protection its own" "log_lacks 'PROBLEM' && untouched"
 
 echo "== I3 the test build, TWEAKSV_TEST_SUMMARY_MS=500: a pack's 6 settings at 12 s, the summary again when the numbers change"
@@ -136,8 +138,6 @@ fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game plain_game.exe)
 check "the 14 not found, the line names I-E-P1; no problem of the module's (the parts report theirs), nothing measured" "[ \$(grep -c -E 'Pattern $LABELS not found: ' TweaksV.log) -eq 14 ] && lines 'the siren settings are not measured: I-E-P1 was not found.' && log_lacks '\[SirenSettings\] PROBLEM' && log_lacks 'the settings loaded and the IDs in use are logged'"
 
 echo "== I12 the parser registrations not as the findings have them, each logged and nothing measured"
-fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe sitype)
-check "the variations' ID member of type 0x3, a word: its line, then the reason, word for word" "lines \"variation's siren setting ID member: member 6 of 7 at +0x4B, member 5 at +0x4A; its data at $RVA, offset field 0x4B, type 0x3 (I-E-P2)\" && not_measured \"the variation's siren setting ID member's type at $RVA is 0x3, not 0x1 or 0x2, which store a byte (I-E-P2).\" && untouched"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe simembers)
 check "an eighth member of the variations" "not_measured \"the vehicle variations' parser registration has 8 or more members, not 7 (I-E-P2).\" && untouched"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe sioffsets)
@@ -160,6 +160,12 @@ fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe sicallhooked)
 check "the base loader call another mod redirected" "not_measured 'the base loader call at $RVA is not a call into the game (another mod may have hooked it already) (I-E-R1).' && untouched"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe sicarcols)
 check "the getter's carcols pointer not a pack builder's" "not_measured \"the carcols pointer the siren settings getter reads, $RVA, is not the one a pack's builder reads, $RVA (I-E-M1).\" && untouched"
+
+echo "== I15 the variations' ID member's type a word, and the structures registered after TweaksV has started: logged twice, measured"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe sitype siregister wait)
+check "at the start: the offset fields not written yet, the type 0x3; the measurement announced all the same" "lines \"siren setting's ID member: member 0 at +0x0, member 2 at +0x4; its data at $RVA, offset field 0x0, type 0x1 (I-E-P1)\" \"variation's siren setting ID member: member 6 of 7 at +0x4B, member 5 at +0x4A; its data at $RVA, offset field 0x0, type 0x3 (I-E-P2)\" && measured"
+check "the type's finding, word for word, at the start and at the first summary; there the offset field 0x4B the game wrote since; then the summary" "[ \$(count \"${L}the variation's siren setting ID member's type at RVA 0x[0-9A-F]* is 0x3, not 0x1 or 0x2, which store a byte - a finding for the part's writing half (I-E-P2).\") -eq 2 ] && lines \"variation's siren setting ID member, at the first summary: its data at $RVA, offset field 0x4B, type 0x3 (I-E-P2)\" && summary 24 24 0 0"
+check "no problem; nothing written - the data as the fake left it after it registered the structures" "log_lacks 'PROBLEM' && untouched"
 
 echo
 echo "SIREN IDS SCENARIOS: $pass passed, $fail failed"
