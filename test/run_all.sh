@@ -25,6 +25,7 @@ SUITES=(
 	directstorage
 	blips
 	# [weapon infos]
+	weaponinfos
 	# [weapon components]
 	# [siren ids]
 	# [siren count]

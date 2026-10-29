@@ -99,6 +99,28 @@
 // two beyond it.
 // The parts measured first (TweaksV's SPECIFICATIONS.md 11.10), one block per limit: its options, and what is always there.
 // [weapon infos]
+// The weapon infos (WeaponLimits): the game's initializer of the weapon info blob array - its lea of the array, then
+// W-E-I1: "mov edx, 160", the call to the allocation, the block's store, "mov word [capacity], 160" -, the allocation's
+// first bytes, and the loader, a CC before its start and W-E-I2 0x18 bytes into it, are always there; the array, in the
+// fake's data, is empty while TweaksV starts. Once TweaksV has started, the fake sets the array up as the game's
+// initializer does - a block on its heap of as many blobs of 248 bytes as its site's "mov edx" says, the room its
+// capacity's store says - and its loader's count at 152.
+//   wisetup        the array is set up before TweaksV starts (an initializer that ran before it)
+//   wiraised       the array gets room for 512, as if another mod had raised both immediates after TweaksV checked
+//                  them, and 170 files are loaded
+//   wipacks        packs mounted while the game runs: once TweaksV.log holds the first weapon infos summary, the count
+//                  becomes 160 (the array full), once it holds the second, 165 (past its end); then 2.5 s of nothing
+//                  new (for the test build's TWEAKSV_TEST_SUMMARY_MS=1000)
+//   wimismatch     the capacity holds 161, the number allocated 160
+//   wizero         both hold 0
+//   wihooked       the call to the allocation leads outside the game (another mod's hook)
+//   wibytes        the allocation begins with a jump (E9) instead of its own bytes
+//   wioutside      the block's store leads outside the game
+//   wicapacity     the capacity's store leads to the array + 0xC instead of + 0xA
+//   wicount        the loader's read of the count leads to the array + 0x10 instead of + 8
+//   wisize         the loader's blob size is 0x100, the allocation's element size 0xF8
+//   winotstart     the byte before the loader's start is 48, so that it is no function start
+//   wiextra        a third reference to the array, a second store of a block
 // [weapon components]
 // [siren ids]
 // [siren count]
@@ -376,6 +398,29 @@ static Site g_blipMarkRefs[] = { SITE(g_blipMarkSite, 5), SITE(g_blipMarkSite, 1
 // The parts measured first: the game code each limit's module finds and checks, one block per limit. What its
 // sites reference lies below, outside this section, as the game's does.
 // [weapon infos]
+// The weapon infos: the game's initializer of the weapon info blob array - its "lea rcx" of the array (0x58 bytes before
+// W-E-I1 in the game), then W-E-I1: a field of the manager zeroed, "mov edx, 160", the call to the allocation, the block's
+// "mov [rip+disp32], rax", the capacity's "mov word [rip+disp32], 160" - whose disp32 counts from the instruction's end,
+// after its imm16 - and the "lea rcx" of the manager's exit destructor; the allocation's first bytes, "push rsi" to
+// "imul rcx, rdi, 0xF8", and "mov edx, 8"; the loader, a CC before its start, its prologue and two moves, then W-E-I2: the
+// count read, "lea ecx, [rax+1]", the count written, "imul r13, rax, 0xF8" and "add r13, [block]"; and a third reference
+// to the array, a store of a block once "wiextra" makes its first byte 48. Every site ends in CC.
+volatile unsigned char g_weaponInfosLea[] = { 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_weaponInfosInit[] = { 0xC7, 0x05, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0xBA, 0xA0, 0x00, 0x00, 0x00, 0xE8, 0, 0,
+	0, 0, 0x48, 0x89, 0x05, 0, 0, 0, 0, 0x66, 0xC7, 0x05, 0, 0, 0, 0, 0xA0, 0x00, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0xCC };
+volatile unsigned char g_weaponInfosAllocation[] = { 0x56, 0x57, 0x48, 0x83, 0xEC, 0x28, 0x89, 0xD6, 0x48, 0x63, 0xFA, 0x48, 0x69,
+	0xCF, 0xF8, 0x00, 0x00, 0x00, 0xBA, 0x08, 0x00, 0x00, 0x00, 0xCC };
+volatile unsigned char g_weaponInfosLoader[] = { 0xCC, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x56, 0x57, 0x53, 0x48, 0x81,
+	0xEC, 0x80, 0x01, 0x00, 0x00, 0x48, 0x89, 0xCE, 0x48, 0x89, 0xD7, 0x0F, 0xB7, 0x05, 0, 0, 0, 0, 0x8D, 0x48, 0x01, 0x66, 0x89, 0x0D,
+	0, 0, 0, 0, 0x4C, 0x69, 0xE8, 0xF8, 0x00, 0x00, 0x00, 0x4C, 0x03, 0x2D, 0, 0, 0, 0, 0xCC };	// W-E-I2 at +25
+volatile unsigned char g_weaponInfosExtra[] = { 0xCC, 0x89, 0x05, 0, 0, 0, 0, 0xCC };
+static Site g_weaponInfosLeaRef = SITE(g_weaponInfosLea, 3);
+static Site g_weaponInfosCall = SITE(g_weaponInfosInit, 16);
+static Site g_weaponInfosBlockRef = SITE(g_weaponInfosInit, 23);
+static Site g_weaponInfosLoaderRefs[] = { SITE(g_weaponInfosLoader, 28), SITE(g_weaponInfosLoader, 38), SITE(g_weaponInfosLoader, 52) };
+static Site g_weaponInfosExtraRef = SITE(g_weaponInfosExtra, 3);
+static Site g_weaponInfosSites[] = { SITE(g_weaponInfosLea, 0), SITE(g_weaponInfosInit, 0), SITE(g_weaponInfosAllocation, 0),
+	SITE(g_weaponInfosLoader, 0), SITE(g_weaponInfosExtra, 0) };
 // [weapon components]
 // [siren ids]
 // [siren count]
@@ -415,6 +460,106 @@ static int32_t* volatile g_blipMark = &g_blipMarkStorage;
 // The parts measured first: the game's data their sites reference and what stands in for the game's code they
 // call, one block per limit. The harness reaches the data only through pointers, as it does the arrays above.
 // [weapon infos]
+// The weapon info manager's array of blobs - the block's pointer, the count at +8, the capacity at +0xA - in the fake's
+// data, as the game's is in its own: zero while TweaksV starts. The block the fake's initializer allocates, the sites'
+// bytes as laid before TweaksV starts, and TweaksV.log as the fake reads it for "wipacks".
+struct WeaponInfosArray { void* block; uint16_t count; uint16_t capacity; uint32_t unused; };
+static_assert(offsetof(WeaponInfosArray, count) == 8 && offsetof(WeaponInfosArray, capacity) == 0xA, "the game's array layout");
+static WeaponInfosArray g_weaponInfosArrayStorage;
+static WeaponInfosArray* volatile g_weaponInfosArray = &g_weaponInfosArrayStorage;
+static void* g_weaponInfosBlock = nullptr;
+static unsigned char g_weaponInfosLaid[sizeof(g_weaponInfosLea) + sizeof(g_weaponInfosInit) + sizeof(g_weaponInfosAllocation) +
+	sizeof(g_weaponInfosLoader) + sizeof(g_weaponInfosExtra)];
+static char g_weaponInfosLog[4 << 20];
+
+// The capacity's store: its disp32 counts from the instruction's end, the imm16 after it
+static void WeaponInfosPointCapacityAt(const void* target)
+{
+	const int32_t rel = static_cast<int32_t>(reinterpret_cast<intptr_t>(target) - reinterpret_cast<intptr_t>(g_weaponInfosInit + 36));
+	memcpy(const_cast<unsigned char*>(g_weaponInfosInit + 30), &rel, sizeof(rel));
+}
+
+// The sites' bytes as laid, kept before TweaksV starts, and whether they are still so: TweaksV writes none of them.
+static void WeaponInfosKeepSites()
+{
+	size_t at = 0;
+	for (const Site& site : g_weaponInfosSites)
+		for (size_t i = 0; i < site.size; i++)
+			g_weaponInfosLaid[at++] = site.bytes[i];
+}
+static bool WeaponInfosSitesAsLaid()
+{
+	size_t at = 0;
+	for (const Site& site : g_weaponInfosSites)
+		for (size_t i = 0; i < site.size; i++)
+			if (g_weaponInfosLaid[at++] != site.bytes[i])
+				return false;
+	return true;
+}
+
+// The game's initializer of the array, as the fake runs it: a block on its heap of as many blobs of 248 bytes as the
+// site's "mov edx" says, the block into the array and the room the site's capacity says - or room for raisedTo, as if
+// another mod had raised both immediates ("wiraised") - then the loader's count of the files loaded.
+static void WeaponInfosInitialize(unsigned raisedTo, unsigned loaded)
+{
+	uint32_t number = raisedTo;
+	uint16_t capacity = static_cast<uint16_t>(raisedTo);
+	if (raisedTo == 0)
+	{
+		memcpy(&number, const_cast<const unsigned char*>(g_weaponInfosInit + 11), sizeof(number));
+		memcpy(&capacity, const_cast<const unsigned char*>(g_weaponInfosInit + 34), sizeof(capacity));
+	}
+	g_weaponInfosBlock = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, static_cast<SIZE_T>(number) * 248 + 1);
+	g_weaponInfosArray->block = g_weaponInfosBlock;
+	g_weaponInfosArray->capacity = capacity;
+	g_weaponInfosArray->count = static_cast<uint16_t>(loaded);
+}
+
+// How often TweaksV.log, read whole and shared as TweaksV shares it while it writes, holds text.
+static int WeaponInfosLogHas(const char* text)
+{
+	const HANDLE file = CreateFileW(L"TweaksV.log", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+		return 0;
+	DWORD read = 0;
+	const BOOL ok = ReadFile(file, g_weaponInfosLog, static_cast<DWORD>(sizeof(g_weaponInfosLog) - 1), &read, nullptr);
+	CloseHandle(file);
+	if (!ok)
+		return 0;
+	g_weaponInfosLog[read] = '\0';
+	int found = 0;
+	for (const char* at = strstr(g_weaponInfosLog, text); at; at = strstr(at + 1, text))
+		found++;
+	return found;
+}
+
+// Waits, 100 ms at a time and ms at most, until TweaksV.log holds n weapon infos summaries.
+static bool WeaponInfosAwaitSummaries(int n, DWORD ms)
+{
+	for (DWORD waited = 0; WeaponInfosLogHas(" weapons.meta files loaded (") < n; waited += 100)
+	{
+		if (waited >= ms)
+			return false;
+		Sleep(100);
+	}
+	return true;
+}
+
+// "wipacks": packs mounted while the game runs, as the loader counts their files - once the first summary is logged, 8
+// more, the array full; once the second is, 5 more, past its end, where the game's loader would write without a check
+// (the fake writes nothing there); then 2.5 s of nothing new.
+static void WeaponInfosMountPacks()
+{
+	if (!WeaponInfosAwaitSummaries(1, 20000))
+		return;
+	g_weaponInfosArray->count = 160;
+	if (!WeaponInfosAwaitSummaries(2, 10000))
+		return;
+	g_weaponInfosArray->count = 165;
+	if (WeaponInfosAwaitSummaries(3, 10000))
+		Sleep(2500);
+}
 // [weapon components]
 // [siren ids]
 // [siren count]
@@ -889,6 +1034,7 @@ static void ForEachSite(void (*fn)(const Site&))
 	fn(indirect);
 	// the parts measured first: every site of each limit
 	// [weapon infos]
+	for (const Site& site : g_weaponInfosSites) fn(site);
 	// [weapon components]
 	// [siren ids]
 	// [siren count]
@@ -2128,6 +2274,41 @@ int wmain(int argc, wchar_t** argv)
 		SetRel32(site, g_blipMark);
 	// The parts measured first: each limit's sites lead to its data, as its options ask for them
 	// [weapon infos]
+	// The weapon infos: the sites lead to the array and to the allocation, but where an option asks otherwise; the array
+	// stays empty while TweaksV starts, unless "wisetup" sets it up first
+	{
+		const auto array = reinterpret_cast<const unsigned char*>(g_weaponInfosArray);
+		const auto outside = ImageEnd() + 0x70000;
+		SetRel32(g_weaponInfosLeaRef, array);
+		SetRel32(g_weaponInfosExtraRef, array);
+		SetRel32(g_weaponInfosCall, HasOption(argc, argv, L"wihooked") ? outside : const_cast<const unsigned char*>(g_weaponInfosAllocation));
+		SetRel32(g_weaponInfosBlockRef, HasOption(argc, argv, L"wioutside") ? outside : array);
+		WeaponInfosPointCapacityAt(array + (HasOption(argc, argv, L"wicapacity") ? 0xC : 0xA));
+		SetRel32(g_weaponInfosLoaderRefs[0], array + (HasOption(argc, argv, L"wicount") ? 0x10 : 8));
+		SetRel32(g_weaponInfosLoaderRefs[1], array + 8);
+		SetRel32(g_weaponInfosLoaderRefs[2], array);
+		if (HasOption(argc, argv, L"wimismatch"))	// the capacity 161
+			g_weaponInfosInit[34] = 0xA1;
+		if (HasOption(argc, argv, L"wizero"))		// both limits 0
+		{
+			g_weaponInfosInit[11] = 0;
+			g_weaponInfosInit[34] = 0;
+		}
+		if (HasOption(argc, argv, L"wibytes"))		// a jump at the allocation's start
+			g_weaponInfosAllocation[0] = 0xE9;
+		if (HasOption(argc, argv, L"wisize"))		// the loader's blob size 0x100
+		{
+			g_weaponInfosLoader[45] = 0x00;
+			g_weaponInfosLoader[46] = 0x01;
+		}
+		if (HasOption(argc, argv, L"winotstart"))	// no padding before the loader's start
+			g_weaponInfosLoader[0] = 0x48;
+		if (HasOption(argc, argv, L"wiextra"))		// a second store of a block into the array
+			g_weaponInfosExtra[0] = 0x48;
+		if (HasOption(argc, argv, L"wisetup"))		// the initializer ran before TweaksV
+			WeaponInfosInitialize(0, 152);
+		WeaponInfosKeepSites();
+	}
 	// [weapon components]
 	// [siren ids]
 	// [siren count]
@@ -2201,6 +2382,10 @@ int wmain(int argc, wchar_t** argv)
 		FloodRenames();
 	// The parts measured first: what the game does with each limit once TweaksV has started, as its options ask
 	// [weapon infos]
+	if (!HasOption(argc, argv, L"wisetup"))	// the game's initializer of the weapon info blob array, then its loader
+		WeaponInfosInitialize(HasOption(argc, argv, L"wiraised") ? 512 : 0, HasOption(argc, argv, L"wiraised") ? 170 : 152);
+	if (HasOption(argc, argv, L"wipacks"))
+		WeaponInfosMountPacks();
 	// [weapon components]
 	// [siren ids]
 	// [siren count]
@@ -2237,6 +2422,9 @@ int wmain(int argc, wchar_t** argv)
 		g_replaceResult, g_renamesResult, g_renameFloodResult, g_scriptResult, g_blipResult);
 	// The parts measured first: each limit's field of the report, and the stub of a call it redirected
 	// [weapon infos]
+	wprintf(L"weapon infos: sites %ls, array %u of %u%ls | ", WeaponInfosSitesAsLaid() ? L"as laid" : L"CHANGED",
+		static_cast<unsigned>(g_weaponInfosArray->count), static_cast<unsigned>(g_weaponInfosArray->capacity),
+		g_weaponInfosArray->block == g_weaponInfosBlock ? L"" : L", its block CHANGED");
 	// [weapon components]
 	// [siren ids]
 	// [siren count]
