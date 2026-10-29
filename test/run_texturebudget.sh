@@ -4,7 +4,8 @@
 # the five patterns found in the full fake game, every site checked and logged with the addresses the fake reports, and the
 # counters summed up 10 seconds in, at the game's own sizes - the budgets 1500, 1500, 3000 and 3000 MB, 98304 objects - and
 # again once they grow past the budget (the test build's TWEAKSV_TEST_SUMMARY_MS), not while nothing changes, and a first
-# summary before the game's start-up has set the budgets, which it sets after it, the update check's line again; a pattern
+# summary before the game's start-up has set the budgets, which it sets after it, the update check's line again, and one for
+# each new high alone, the update check's flag unchanged; a pattern
 # missing (TEST_BREAK_PATTERN), a site not as expected, a call another mod hooked, an address outside the game, sites that
 # disagree on the counters and a factor's multiplication changed - each logged, no problem, no box, no summary; the plain
 # game; DRY_RUN alike; and in every run nothing written: the fake's sites and data as they were, no call redirected, every
@@ -16,9 +17,13 @@ cp "$R/object/Test/Release/TweaksV.asi" TweaksV_test.asi
 mkdir -p appdata
 
 # The summaries: the counters as the fake sets them, then grown by 200 MB and 800 textures past the 3000 MB budget, the
-# update check's flag up; the update check's switch and factors; and both before the game's start-up has set its data
+# update check's flag up; one new high at a time, the flag down - the bytes by 100 MB, the game's mark at 2950 MB, the objects by
+# 400; the update check's switch and factors; and both before the game's start-up has set its data
 SUMMARY1='\[Resources\] DIAGNOSTIC: texture budget: 2845 MB of the 3000 MB budget for the texture quality.s index 2 (MaxStreamingMemory_0..3_Base: 1500, 1500, 3000 and 3000 MB) - textures 2456 MB, buffers 389 MB; 23456 of the 98304 objects allowed (MaxStreamingResources) - 22222 textures, 1234 buffers; the most so far 2900 MB by the game.s own mark, 2845 MB and 23456 objects at TweaksV.s readings; the update check.s flag is down.$'
 SUMMARY2='\[Resources\] DIAGNOSTIC: texture budget: 3045 MB of the 3000 MB budget for the texture quality.s index 2 (MaxStreamingMemory_0..3_Base: 1500, 1500, 3000 and 3000 MB) - textures 2656 MB, buffers 389 MB; 24256 of the 98304 objects allowed (MaxStreamingResources) - 23022 textures, 1234 buffers; the most so far 3045 MB by the game.s own mark, 3045 MB and 24256 objects at TweaksV.s readings; the update check.s flag is up: it evicts ahead of time - at the budget: the streaming engine evicts what it cannot place (texture loss).$'
+HIGH_BYTES='\[Resources\] DIAGNOSTIC: texture budget: 2945 MB of the 3000 MB budget for the texture quality.s index 2 (MaxStreamingMemory_0..3_Base: 1500, 1500, 3000 and 3000 MB) - textures 2556 MB, buffers 389 MB; 23456 of the 98304 objects allowed (MaxStreamingResources) - 22222 textures, 1234 buffers; the most so far 2900 MB by the game.s own mark, 2945 MB and 23456 objects at TweaksV.s readings; the update check.s flag is down.$'
+HIGH_MARK='\[Resources\] DIAGNOSTIC: texture budget: 2945 MB of the 3000 MB budget for the texture quality.s index 2 (MaxStreamingMemory_0..3_Base: 1500, 1500, 3000 and 3000 MB) - textures 2556 MB, buffers 389 MB; 23456 of the 98304 objects allowed (MaxStreamingResources) - 22222 textures, 1234 buffers; the most so far 2950 MB by the game.s own mark, 2945 MB and 23456 objects at TweaksV.s readings; the update check.s flag is down.$'
+HIGH_OBJECTS='\[Resources\] DIAGNOSTIC: texture budget: 2945 MB of the 3000 MB budget for the texture quality.s index 2 (MaxStreamingMemory_0..3_Base: 1500, 1500, 3000 and 3000 MB) - textures 2556 MB, buffers 389 MB; 23856 of the 98304 objects allowed (MaxStreamingResources) - 22622 textures, 1234 buffers; the most so far 2950 MB by the game.s own mark, 2945 MB and 23856 objects at TweaksV.s readings; the update check.s flag is down.$'
 UPDATE_CHECK='\[Resources\] DIAGNOSTIC: texture budget: the update check.s switch holds 1 (on), its factors 0.9 of the budget to start evicting, 0.8 to stop, and 0.95 of the video memory Windows gives the game to start evicting too.$'
 UNSET='\[Resources\] DIAGNOSTIC: texture budget: 0 MB of the 0 MB budget for the texture quality.s index 0 (MaxStreamingMemory_0..3_Base: 0, 0, 0 and 0 MB) - textures 0 MB, buffers 0 MB; 0 of the 0 objects allowed (MaxStreamingResources) - 0 textures, 0 buffers; the most so far 0 MB by the game.s own mark, 0 MB and 0 objects at TweaksV.s readings; the update check.s flag is down - the budgets and the most are not set yet (the game sets them when it reads gameconfig.xml).$'
 UPDATE_CHECK_UNSET='\[Resources\] DIAGNOSTIC: texture budget: the update check.s switch holds 0 (off: nothing is evicted ahead of time), its factors 0 of the budget to start evicting, 0 to stop, and 0 of the video memory Windows gives the game to start evicting too.$'
@@ -97,47 +102,52 @@ check "the first summary and the update check's line with the data all 0, word f
 check "the fake set the data after it; the summary as the Release build's and the update check's line again, word for word" "has 'set after the first summary' && log_line '$SUMMARY1' && log_line '$UPDATE_CHECK' && [ \$(count 'the update check.s switch holds') -ge 2 ]"
 check "no problem; the sites as placed, the data as the fake set it" "log_lacks 'PROBLEM' && untouched"
 
-echo "== TB6 TEST_BREAK_PATTERN=Q-E-T3 (test build, ERROR_POPUP=1): logged, not reported - no problem, no box, no summary"
+echo "== TB6 the test build, TWEAKSV_TEST_SUMMARY_MS=500: one new high at a time with the flag down - the bytes, the game's mark, the objects - a summary each"
+fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(TWEAKSV_TEST_SUMMARY_MS=500 ASI=TweaksV_test.asi game full_game.exe tbhigh)
+check "after the first, a summary for each new high alone, word for word, four in all, the update check's flag down in every one" "has 'highs raised one at a time after the first summary' && log_line '$SUMMARY1' && log_line '$HIGH_BYTES' && log_line '$HIGH_MARK' && log_line '$HIGH_OBJECTS' && [ \$(summaries) -eq 4 ] && log_lacks 'flag is up'"
+check "no problem; the sites as placed, the data as the fake set it" "log_lacks 'PROBLEM' && untouched"
+
+echo "== TB7 TEST_BREAK_PATTERN=Q-E-T3 (test build, ERROR_POPUP=1): logged, not reported - no problem, no box, no summary"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; setkey ERROR_POPUP 1; addkey TEST_BREAK_PATTERN Q-E-T3; out=$(ASI=TweaksV_test.asi game full_game.exe wait)
 check "the scanner's line and the module's, word for word; the other four found all the same" "log_has 'TEST BUILD: pattern Q-E-T3 is treated as not found (TEST_BREAK_PATTERN).' && log_line '${NOT_MEASURED}Q-E-T3 was not found.\$' && [ \$(grep -c -E 'Pattern Q-E-T[1245] found: .* 1 match,' TweaksV.log) -eq 4 ]"
 check "no problem, no box, no site line, no announcement, no summary; nothing written" "log_lacks 'PROBLEM' && log_lacks 'message box not shown' && log_lacks 'DIAGNOSTIC: store of' && nothing_measured && untouched"
 
-echo "== TB7 a site not as expected: the shift between the budgets' stores by 21, not 20"
+echo "== TB8 a site not as expected: the shift between the budgets' stores by 21, not 20"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe tbshift wait)
 check "the reason with the bytes found, word for word; the store of the most logged before it, nothing after it" "log_line '${NOT_MEASURED}the code after Q-E-T1 at $(rva stores 21) is not the store of budgets 0 and 1: 66 0F 73 F0 15 F3 0F 7F 05 [0-9A-F ]*.\$' && log_has 'DIAGNOSTIC: store of the most objects' && log_lacks 'DIAGNOSTIC: store of budgets'"
 check "no problem, no announcement, no summary; nothing written" "log_lacks 'PROBLEM' && nothing_measured && untouched"
 
-echo "== TB8 the call after the budgets' stores already hooked by another mod: logged, nothing measured"
+echo "== TB9 the call after the budgets' stores already hooked by another mod: logged, nothing measured"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe tbcallhooked)
 check "the call's line and the reason, word for word" "log_line '\[Resources\] DIAGNOSTIC: call after the budgets. stores at $(rva stores 74) -> 0x[0-9A-F]* (outside the game) (Q-E-T2)\$' && log_line '${NOT_MEASURED}the call after the budgets. stores at $(rva stores 74) is not a call into the game (another mod may have hooked it already) (Q-E-T2).\$'"
 check "no problem, no announcement; nothing written" "log_lacks 'PROBLEM' && nothing_measured && untouched"
 
-echo "== TB9 an address outside the game: the getter's index"
+echo "== TB10 an address outside the game: the getter's index"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe tbindexout)
 check "the reason, word for word" "log_line '${NOT_MEASURED}the index at 0x[0-9A-F]* (outside the game) (Q-E-T3) is not inside the game.\$'"
 check "no problem, no announcement; nothing written" "log_lacks 'PROBLEM' && nothing_measured && untouched"
 
-echo "== TB10 the sites disagree on the counters: the update check's lea 8 bytes past them"
+echo "== TB11 the sites disagree on the counters: the update check's lea 8 bytes past them"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe tbcounters)
 check "the reason, word for word, the placement's check logged before it" "log_line '${NOT_MEASURED}the update check at $(rva update) does not read the counters at $(rva counters) (Q-E-T5).\$' && log_has 'DIAGNOSTIC: placement check at'"
 check "no problem, no announcement; nothing written" "log_lacks 'PROBLEM' && nothing_measured && untouched"
 
-echo "== TB11 the sites disagree on the counters: the placement's check loads the most from 4 bytes past them"
+echo "== TB12 the sites disagree on the counters: the placement's check loads the most from 4 bytes past them"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe tbmost)
 check "the reason, word for word" "log_line '${NOT_MEASURED}the placement.s check loads the most objects from $(rva counters 0x24), not from +0x20 of the counters at $(rva counters) (Q-E-T4).\$'"
 check "no problem, no announcement; nothing written" "log_lacks 'PROBLEM' && nothing_measured && untouched"
 
-echo "== TB12 the update check's multiplication by its raise factor turned into an addition"
+echo "== TB13 the update check's multiplication by its raise factor turned into an addition"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game full_game.exe tbfactor)
 check "the reason with the bytes found, word for word" "log_line '${NOT_MEASURED}the update check.s code at $(rva update 0xA0) is not the multiplication by its factor at $(rva switch 4): F3 44 0F 58 0D [0-9A-F ]* (Q-E-T5).\$'"
 check "no problem, no announcement; nothing written" "log_lacks 'PROBLEM' && nothing_measured && untouched"
 
-echo "== TB13 the plain game, DIAGNOSTIC_MODE=1: every pattern missing - logged, not the module's problem"
+echo "== TB14 the plain game, DIAGNOSTIC_MODE=1: every pattern missing - logged, not the module's problem"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; out=$(game plain_game.exe)
 check "the scanner's five lines and the module's, word for word" "[ \$(grep -c -E 'Pattern Q-E-T[1-5] not found: ' TweaksV.log) -eq 5 ] && log_line '${NOT_MEASURED}Q-E-T1 was not found.\$'"
 check "no problem of the module's, no announcement" "log_lacks '\[Resources\] PROBLEM' && nothing_measured"
 
-echo "== TB14 DRY_RUN=1 with DIAGNOSTIC_MODE=1: the same lines and the same summary; nothing written"
+echo "== TB15 DRY_RUN=1 with DIAGNOSTIC_MODE=1: the same lines and the same summary; nothing written"
 fresh_ini; setkey DIAGNOSTIC_MODE 1; setkey DRY_RUN 1; out=$(game full_game.exe wait)
 check "the five patterns, the eight lines of the sites, the announcement and the summary 10 s in, word for word" "patterns_found && sites_logged && announced && log_line '$SUMMARY1' && first_after_10s"
 check "no problem; nothing written" "log_lacks 'PROBLEM' && untouched"

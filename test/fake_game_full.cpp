@@ -217,6 +217,9 @@
 //   tbgrow         once TweaksV's first texture budget summary is in TweaksV.log, the textures grow by 200 MB and 800 objects,
 //                  past the budget, the game's mark with them, and the update check's flag goes up; then it waits for the
 //                  next summary (TWEAKSV_TEST_SUMMARY_MS), 10 seconds at most
+//   tbhigh         once TweaksV's first texture budget summary is in TweaksV.log, one new high at a time, each once the summary
+//                  before it is there: the textures' bytes by 100 MB, then the game's mark to 2950 MB, then the textures by 400
+//                  objects - the update check's flag left down; then it waits for the last one's summary
 //   tblate         its data all 0 - the counters, the index, the flag, the update check's switch and factors - as before the
 //                  game's start-up reads gameconfig.xml, until TweaksV's first texture budget summary is in TweaksV.log; then
 //                  set as the game's start-up sets them, and the next summary waited for, 10 seconds at most
@@ -1793,34 +1796,51 @@ static int TextureBudgetSummaries()
 	return summaries;
 }
 
-// tbgrow and tblate: once TweaksV's first summary is in its log, the textures grow by 200 MB and 800 objects, past the budget, the
-// game's mark with them, and the update check's flag goes up, as the game's streaming would have it (grow) - or the data, all 0 so
-// far, are set as the game's start-up sets them (late); then the next summary is waited for
+// tbgrow, tbhigh and tblate: what the game does with the data once TweaksV's first summary is in its log - the textures grow by
+// 200 MB and 800 objects, past the budget, the game's mark with them, and the update check's flag goes up, as the game's streaming
+// would have it (grow); one new high at a time, each a single store and each once the summary before it is in the log - the
+// textures' bytes by 100 MB, then the game's mark to 2950 MB, then the textures by 400 objects - the flag left down (high); or the
+// data, all 0 so far, set as the game's start-up sets them (late). Each change is followed by the wait for its summary.
+enum class TextureBudgetChange { Grow, High, Late };
 static wchar_t g_textureBudgetLater[64] = L"";
-static void TextureBudgetLater(bool grow)
+static bool TextureBudgetWaitFor(int summaries, int ms)
 {
-	for (int waited = 0; TextureBudgetSummaries() < 1 && waited < 25000; waited += 250)
+	for (int waited = 0; TextureBudgetSummaries() < summaries && waited < ms; waited += 250)
 		Sleep(250);
-	if (TextureBudgetSummaries() < 1)
+	return TextureBudgetSummaries() >= summaries;
+}
+static void TextureBudgetLater(TextureBudgetChange change)
+{
+	const size_t size = sizeof(g_textureBudgetLater) / sizeof(g_textureBudgetLater[0]);
+	if (!TextureBudgetWaitFor(1, 25000))
 	{
-		swprintf(g_textureBudgetLater, sizeof(g_textureBudgetLater) / sizeof(g_textureBudgetLater[0]), L", nothing done: no first summary");
+		swprintf(g_textureBudgetLater, size, L", nothing done: no first summary");
 		return;
 	}
 	TextureBudgetData& data = *g_textureBudgetData;
-	if (grow)
+	if (change == TextureBudgetChange::Grow)
 	{
 		data.counters.textures += 200ull << 20;
 		data.counters.texturesNumber += 800;
 		data.counters.highest = data.counters.buffers + data.counters.textures;
 		data.flag = 1;
 	}
-	else
+	else if (change == TextureBudgetChange::Late)
 		TextureBudgetSetAsTheGame(data);
+	else
+	{
+		data.counters.textures += 100ull << 20;
+		g_textureBudgetDataAsSet = data;
+		TextureBudgetWaitFor(2, 10000);
+		data.counters.highest = 2950ull << 20;
+		g_textureBudgetDataAsSet = data;
+		TextureBudgetWaitFor(3, 10000);
+		data.counters.texturesNumber += 400;
+	}
 	g_textureBudgetDataAsSet = data;
-	for (int waited = 0; TextureBudgetSummaries() < 2 && waited < 10000; waited += 250)
-		Sleep(250);
-	swprintf(g_textureBudgetLater, sizeof(g_textureBudgetLater) / sizeof(g_textureBudgetLater[0]), grow ? L", grown after the first summary" :
-		L", set after the first summary");
+	TextureBudgetWaitFor(change == TextureBudgetChange::High ? 4 : 2, 10000);
+	swprintf(g_textureBudgetLater, size, change == TextureBudgetChange::Grow ? L", grown after the first summary" :
+		change == TextureBudgetChange::High ? L", highs raised one at a time after the first summary" : L", set after the first summary");
 }
 // [streaming memory]
 
@@ -3806,8 +3826,12 @@ int wmain(int argc, wchar_t** argv)
 		PedPropsGrow();
 	}
 	// [texture budget]
-	if (HasOption(argc, argv, L"tbgrow") || HasOption(argc, argv, L"tblate"))
-		TextureBudgetLater(HasOption(argc, argv, L"tbgrow"));
+	if (HasOption(argc, argv, L"tbgrow"))
+		TextureBudgetLater(TextureBudgetChange::Grow);
+	else if (HasOption(argc, argv, L"tbhigh"))
+		TextureBudgetLater(TextureBudgetChange::High);
+	else if (HasOption(argc, argv, L"tblate"))
+		TextureBudgetLater(TextureBudgetChange::Late);
 	// [streaming memory]
 	if (HasOption(argc, argv, L"wait"))
 		Sleep(11000);	// TweaksV's UNLOCK_FILES summary comes 10 s after the first open it counts, the OpenFile summary 10 s
