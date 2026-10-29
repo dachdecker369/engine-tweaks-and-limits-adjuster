@@ -25,6 +25,7 @@
 #include "TweaksVSirenIds.h"
 #include "TweaksVStraightToStoryMode.h"
 // [streaming memory]
+#include "TweaksVStreamingMemory.h"
 #include "TweaksVSummary.h"
 // [texture budget]
 #include "TweaksVTextureBudget.h"
@@ -107,6 +108,7 @@ namespace TweaksV
 			// [texture budget]
 			{ "Resources", MeasureTextureBudget },
 			// [streaming memory]
+			{ "Resources", MeasureStreamingMemory },
 		};
 	}
 

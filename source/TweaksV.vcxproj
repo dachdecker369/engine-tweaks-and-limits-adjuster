@@ -152,6 +152,7 @@
     <ClCompile Include="TweaksVSirenIds.cpp" />
     <ClCompile Include="TweaksVStraightToStoryMode.cpp" />
     <!-- [streaming memory] -->
+    <ClCompile Include="TweaksVStreamingMemory.cpp" />
     <ClCompile Include="TweaksVSummary.cpp" />
     <!-- [texture budget] -->
     <ClCompile Include="TweaksVTextureBudget.cpp" />
@@ -207,6 +208,7 @@
     <ClInclude Include="TweaksVSirenIds.h" />
     <ClInclude Include="TweaksVStraightToStoryMode.h" />
     <!-- [streaming memory] -->
+    <ClInclude Include="TweaksVStreamingMemory.h" />
     <ClInclude Include="TweaksVSummary.h" />
     <!-- [texture budget] -->
     <ClInclude Include="TweaksVTextureBudget.h" />

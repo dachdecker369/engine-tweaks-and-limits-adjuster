@@ -92,6 +92,9 @@
       <Filter>TweaksV</Filter>
     </ClCompile>
     <!-- [streaming memory] -->
+    <ClCompile Include="TweaksVStreamingMemory.cpp">
+      <Filter>TweaksV</Filter>
+    </ClCompile>
     <ClCompile Include="TweaksVSummary.cpp">
       <Filter>TweaksV</Filter>
     </ClCompile>
@@ -206,6 +209,9 @@
       <Filter>TweaksV</Filter>
     </ClInclude>
     <!-- [streaming memory] -->
+    <ClInclude Include="TweaksVStreamingMemory.h">
+      <Filter>TweaksV</Filter>
+    </ClInclude>
     <ClInclude Include="TweaksVSummary.h">
       <Filter>TweaksV</Filter>
     </ClInclude>

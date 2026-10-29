@@ -222,6 +222,15 @@ namespace TweaksV
 		{ "Q-E-T4", "8B 05 ? ? ? ? 8B 0D ? ? ? ? 01 C1 3B 0D ? ? ? ? 73 ? 48 8B 05 ? ? ? ? 48 8B 35" },
 		{ "Q-E-T5", "83 3D ? ? ? ? 00 0F 84 ? ? ? ? 48 8D 0D ? ? ? ? 48 8B 3D ? ? ? ? 48 8B 35 ? ? ? ? E8" },
 		// [streaming memory]
+		// Resources, the streaming memory (TweaksVStreamingMemory.cpp), for its measurement: the start-up's lea of the
+		// resource heap, its page size, the region size asked and its constructor's call (H1); the streaming update's
+		// lea of the streaming allocator and its call of the budgets' reset (A1); the loader's call of timeGetTime and
+		// its store of the refusal stamp (S1); and the cap on a region's size in the heap's function that makes a
+		// region, which the part's writing half would raise (R1)
+		{ "Q-E-H1", "48 8D 0D ? ? ? ? BA 00 20 00 00 41 B8 00 00 00 40 E8" },
+		{ "Q-E-A1", "48 8D 0D ? ? ? ? E8 ? ? ? ? 8B 05 ? ? ? ? 89 05 ? ? ? ? 48 83 C4 28" },
+		{ "Q-E-S1", "FF 50 30 84 C0 75 0B E8 ? ? ? ? 89 05 ? ? ? ? 89 D8" },
+		{ "Q-E-R1", "49 8B 9F D8 01 00 00 48 81 FB 00 00 00 10 B8 00 00 00 10 48 0F 43 D8 48 81 FB 00 00 00 01" },
 	};
 
 	// A text the scanner can use: bytes as two hex digits or ?, one space apart, at least one of them
