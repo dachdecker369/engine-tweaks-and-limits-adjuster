@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// TweaksV - the scanner: finds TweaksV's patterns (TweaksVPatterns.h) in the running game's code, and
-// every load of one address. The pattern parser is an altered version of ScriptHookVDotNet's memory
+// TweaksV - the scanner: finds TweaksV's patterns (TweaksVPatterns.h) in the running game's code, every
+// load of one address and every call of one function. The pattern parser is an altered version of ScriptHookVDotNet's memory
 // scanner (crosire, kagikn and contributors; the C++ port by Chiheb-Bacha), zlib license - the notice
 // is in TweaksVScanner.cpp and THIRD_PARTY_NOTICES.md. The search itself is TweaksV's own.
 #pragma once
@@ -34,5 +34,11 @@ namespace TweaksV
 		// same prefix and ModRM): for an array whose patterns name its references, the relocation core checks
 		// that they are all the game has. Nothing is logged.
 		std::vector<uint8_t*> FindRipRelativeReferences(const void* target, size_t limit);
+
+		// Every "call rel32" (E8 and a rel32: 5 bytes) in the game's code that leads to target, in address order, at
+		// most limit of them. For a function whose callers a part must know all of: the ped props' measurement checks
+		// that the game calls its per-anchor count and its metadata lookup exactly as often as the research found,
+		// so that no caller a game update adds is left out. Nothing is logged.
+		std::vector<uint8_t*> FindCallsTo(const void* target, size_t limit);
 	}
 }

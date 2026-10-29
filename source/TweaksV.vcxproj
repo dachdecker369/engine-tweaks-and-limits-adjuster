@@ -140,6 +140,7 @@
     <ClCompile Include="TweaksVPackfileLimit.cpp" />
     <ClCompile Include="TweaksVPatch.cpp" />
     <!-- [ped props] -->
+    <ClCompile Include="TweaksVPedProps.cpp" />
     <ClCompile Include="TweaksVRageOpenV.cpp" />
     <ClCompile Include="TweaksVRelocation.cpp" />
     <ClCompile Include="TweaksVScanner.cpp" />
@@ -193,6 +194,7 @@
     <ClInclude Include="TweaksVPatch.h" />
     <ClInclude Include="TweaksVPatterns.h" />
     <!-- [ped props] -->
+    <ClInclude Include="TweaksVPedProps.h" />
     <ClInclude Include="TweaksVRageOpenV.h" />
     <ClInclude Include="TweaksVRelocation.h" />
     <ClInclude Include="TweaksVScanner.h" />

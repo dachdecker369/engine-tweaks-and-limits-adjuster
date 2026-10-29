@@ -17,6 +17,7 @@
 #include "TweaksVModkitLimit.h"
 #include "TweaksVPackfileLimit.h"
 // [ped props]
+#include "TweaksVPedProps.h"
 #include "TweaksVRageOpenV.h"
 // [siren count]
 #include "TweaksVSirenCount.h"
@@ -101,6 +102,7 @@ namespace TweaksV
 			// [siren count]
 			{ "SirenSettings", MeasureSirenCount },
 			// [ped props]
+			{ "PedProps", MeasurePedProps },
 			// [texture budget]
 			// [streaming memory]
 		};

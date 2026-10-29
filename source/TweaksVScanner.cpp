@@ -454,5 +454,53 @@ namespace TweaksV
 		{
 			return FindRipRelative(target, limit, 0x8D, 0x89);	// lea r64, [rip+disp32]; mov [rip+disp32], r64
 		}
+
+		// Every "E8 rel32" whose rel32 leads to target, looked for the way FindRipRelative looks for its loads: two
+		// bytes at 16 positions at a time - the opcode, and the rel32's lowest byte, which a call at p to target must
+		// hold as the lowest byte of target - (p + 5); over 16 positions in a row those bytes count down by one each -
+		// and the whole rel32 only where both match.
+		std::vector<uint8_t*> FindCallsTo(const void* target, size_t limit)
+		{
+			constexpr size_t kLength = 5;
+			std::vector<uint8_t*> found;
+			const auto wanted = reinterpret_cast<intptr_t>(target);
+			const auto calls = [&found, wanted](uint8_t* at)	// at[0] is E8
+			{
+				int32_t rel = 0;
+				memcpy(&rel, at + 1, sizeof(rel));
+				if (reinterpret_cast<intptr_t>(at + kLength) + rel == wanted)
+					found.push_back(at);
+			};
+			const __m128i opcode = _mm_set1_epi8(static_cast<char>(0xE8));
+			const __m128i steps = _mm_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+			for (const Range& range : ReadableCode())
+			{
+				const size_t available = static_cast<size_t>(range.end - range.begin);
+				if (available < kLength)
+					continue;
+				const size_t lastStart = available - kLength;	// the whole call stays inside the range
+				size_t at = 0;
+				for (; at + 15 <= lastStart && found.size() < limit; at += 16)
+				{
+					uint8_t* const begin = range.begin + at;
+					const auto lowest = static_cast<char>(wanted - reinterpret_cast<intptr_t>(begin + kLength));
+					const __m128i lows = _mm_sub_epi8(_mm_set1_epi8(lowest), steps);	// the rel32's lowest byte at begin + i
+					const __m128i x = _mm_loadu_si128(reinterpret_cast<const __m128i*>(begin));
+					const __m128i y = _mm_loadu_si128(reinterpret_cast<const __m128i*>(begin + 1));
+					unsigned mask = static_cast<unsigned>(_mm_movemask_epi8(_mm_and_si128(_mm_cmpeq_epi8(x, opcode), _mm_cmpeq_epi8(y, lows))));
+					while (mask && found.size() < limit)
+					{
+						unsigned long bit = 0;
+						_BitScanForward(&bit, mask);
+						calls(begin + bit);
+						mask &= mask - 1;
+					}
+				}
+				for (; at <= lastStart && found.size() < limit; at++)
+					if (range.begin[at] == 0xE8)
+						calls(range.begin + at);
+			}
+			return found;
+		}
 	}
 }

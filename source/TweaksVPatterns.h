@@ -193,6 +193,24 @@ namespace TweaksV
 		{ "I-E-B3", "0F BE 94 18 AD 00 00 00 48 8B 8E C0 09 00 00" },
 		{ "I-E-B4", "41 57 41 56 41 55 41 54 56 57 53 48 83 EC 20 66 83 79 5E 00" },
 		// [ped props]
+		// PedProps (TweaksVPedProps.cpp): the eleven narrowings to 8 bits the part will widen - an anchor's total in the
+		// check the set-prop native asks (T1) and in the helmet code after its four calls of the per-anchor count
+		// (T2..T5), a worn prop's index before the metadata lookup (G1, which matches 2 times, G3..G6) - then, for the
+		// measurement, the per-anchor count's start (C1) and its loop (C2), which pin the variation data's layout, and
+		// the model info store's lookup followed by a ped's type (S1)
+		{ "A-E-T1", "0F B6 C3 44 39 C0 7E ? E8 ? ? ? ? 0F B6 C0 44 39 F0 0F 9F C0" },
+		{ "A-E-T2", "48 8B 0E 31 D2 E8 ? ? ? ? 0F B6 C0 39 C5 0F 4C C5 83 FD FF" },
+		{ "A-E-T3", "48 8B 09 31 D2 E8 ? ? ? ? 0F B6 C0 39 C7 0F 4C C7 83 FF FF" },
+		{ "A-E-T4", "48 8B 09 31 D2 E8 ? ? ? ? 0F B6 C0 39 F8 76 ? 89 7E 18 88 5E 20" },
+		{ "A-E-T5", "48 8B 09 31 D2 E8 ? ? ? ? 0F B6 C0 39 C7 7C ? 48 8B 0E 31 D2 E8" },
+		{ "A-E-G1", "48 8B 84 24 ? ? ? ? 48 8B 88 40 02 00 00 44 0F B6 C6 40 0F B6 D5 E8" },
+		{ "A-E-G3", "41 8B 44 04 08 83 F8 FF 0F 84 ? ? ? ? 0F B6 E8 48 89 F9 89 F2 41 89 E8 E8" },
+		{ "A-E-G4", "8B 44 38 08 31 FF 83 F8 FF 74 ? 48 8B 49 20 48 8B 89 40 02 00 00 44 0F B6 C0 0F B6 D2 E8" },
+		{ "A-E-G5", "41 8B 44 07 08 85 C0 0F 88 ? ? ? ? 44 0F B6 C0 48 89 F9 44 89 F2 E8" },
+		{ "A-E-G6", "E8 ? ? ? ? 44 0F B6 F7 45 0F B6 FF 4C 89 E9 44 89 FA 45 89 F0 E8" },
+		{ "A-E-C1", "56 57 48 8B 41 20 48 8B 88 40 02 00 00 44 0F B7 41 08 31 C0 4D 85 C0 74 ? 4C 8B 09 45 31 DB EB" },
+		{ "A-E-C2", "44 0F B7 54 39 08 41 0F B6 CA 01 C8 49 FF C3 4D 39 C3 74 ? 4B 8B 0C D9 0F B7 71 60 45 31 D2 48 85 F6 74 ? 48 8B 49 58 48 C1 E6 03 48 8D 34 76 31 FF" },
+		{ "A-E-S1", "3B 05 ? ? ? ? 0F 8D ? ? ? ? 48 8B 0D ? ? ? ? 89 C2 C1 EA 05 8B 0C 91 0F A3 C1 0F 83 ? ? ? ? 48 8B 0D ? ? ? ? 48 85 C9 74 ? 44 89 7C 24 34 48 98 48 0F AF 05 ? ? ? ? 4C 8B 3C 01 BB 02 00 00 00 4D 85 FF 74 ? 41 0F B6 87 9D 00 00 00 24 1F 3C 06" },
 		// [texture budget]
 		// [streaming memory]
 	};
