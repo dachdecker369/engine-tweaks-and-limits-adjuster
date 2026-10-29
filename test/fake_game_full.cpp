@@ -101,7 +101,7 @@
 // [weapon infos]
 // The weapon infos (WeaponLimits): the game's initializer of the weapon info blob array - its lea of the array, then
 // W-E-I1: "mov edx, 160", the call to the allocation, the block's store, "mov word [capacity], 160" -, the allocation's
-// first bytes, and the loader, a CC before its start and W-E-I2 0x18 bytes into it, are always there; the array, in the
+// first bytes, and the loader, a NOP before its start and W-E-I2 0x18 bytes into it, are always there; the array, in the
 // fake's data, is empty while TweaksV starts. Once TweaksV has started, the fake sets the array up as the game's
 // initializer does - a block on its heap of as many blobs of 248 bytes as its site's "mov edx" says, the room its
 // capacity's store says - and its loader's count at 152.
@@ -402,15 +402,16 @@ static Site g_blipMarkRefs[] = { SITE(g_blipMarkSite, 5), SITE(g_blipMarkSite, 1
 // W-E-I1 in the game), then W-E-I1: a field of the manager zeroed, "mov edx, 160", the call to the allocation, the block's
 // "mov [rip+disp32], rax", the capacity's "mov word [rip+disp32], 160" - whose disp32 counts from the instruction's end,
 // after its imm16 - and the "lea rcx" of the manager's exit destructor; the allocation's first bytes, "push rsi" to
-// "imul rcx, rdi, 0xF8", and "mov edx, 8"; the loader, a CC before its start, its prologue and two moves, then W-E-I2: the
-// count read, "lea ecx, [rax+1]", the count written, "imul r13, rax, 0xF8" and "add r13, [block]"; and a third reference
-// to the array, a store of a block once "wiextra" makes its first byte 48. Every site ends in CC.
+// "imul rcx, rdi, 0xF8", and "mov edx, 8"; the loader, a NOP before its start (padding, as TweaksV's function-start check
+// takes it - a CC would add a line to the RageOpenV suite's count of computed starts), its prologue and two moves, then
+// W-E-I2: the count read, "lea ecx, [rax+1]", the count written, "imul r13, rax, 0xF8" and "add r13, [block]"; and a third
+// reference to the array, a store of a block once "wiextra" makes its first byte 48. Every site ends in CC.
 volatile unsigned char g_weaponInfosLea[] = { 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0xCC };
 volatile unsigned char g_weaponInfosInit[] = { 0xC7, 0x05, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0xBA, 0xA0, 0x00, 0x00, 0x00, 0xE8, 0, 0,
 	0, 0, 0x48, 0x89, 0x05, 0, 0, 0, 0, 0x66, 0xC7, 0x05, 0, 0, 0, 0, 0xA0, 0x00, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0xCC };
 volatile unsigned char g_weaponInfosAllocation[] = { 0x56, 0x57, 0x48, 0x83, 0xEC, 0x28, 0x89, 0xD6, 0x48, 0x63, 0xFA, 0x48, 0x69,
 	0xCF, 0xF8, 0x00, 0x00, 0x00, 0xBA, 0x08, 0x00, 0x00, 0x00, 0xCC };
-volatile unsigned char g_weaponInfosLoader[] = { 0xCC, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x56, 0x57, 0x53, 0x48, 0x81,
+volatile unsigned char g_weaponInfosLoader[] = { 0x90, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x56, 0x57, 0x53, 0x48, 0x81,
 	0xEC, 0x80, 0x01, 0x00, 0x00, 0x48, 0x89, 0xCE, 0x48, 0x89, 0xD7, 0x0F, 0xB7, 0x05, 0, 0, 0, 0, 0x8D, 0x48, 0x01, 0x66, 0x89, 0x0D,
 	0, 0, 0, 0, 0x4C, 0x69, 0xE8, 0xF8, 0x00, 0x00, 0x00, 0x4C, 0x03, 0x2D, 0, 0, 0, 0, 0xCC };	// W-E-I2 at +25
 volatile unsigned char g_weaponInfosExtra[] = { 0xCC, 0x89, 0x05, 0, 0, 0, 0, 0xCC };
